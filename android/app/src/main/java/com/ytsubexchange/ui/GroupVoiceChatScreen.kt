@@ -96,40 +96,6 @@ fun GroupVoiceChatScreen(
 
             Divider(color = Color(0xFF1E1E2E), thickness = 0.5.dp)
 
-            // ── Screen Share Viewer ───────────────────────────
-            if (screenShareUserId != null) {
-                val sharerName = participants.firstOrNull { it.userId == screenShareUserId }?.name ?: "Someone"
-                Box(
-                    Modifier.fillMaxWidth().height(200.dp)
-                        .background(Color.Black)
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val remoteScreenView = remember { mutableStateOf<org.webrtc.SurfaceViewRenderer?>(null) }
-                    androidx.compose.ui.viewinterop.AndroidView(
-                        factory = { ctx ->
-                            org.webrtc.SurfaceViewRenderer(ctx).also { sv ->
-                                remoteScreenView.value = sv
-                                viewModel.remoteScreenSurface = sv
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    // Label
-                    Box(
-                        Modifier.align(Alignment.TopStart).padding(8.dp)
-                            .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(0.6f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(Modifier.size(6.dp).clip(CircleShape).background(VcRed))
-                            Text("$sharerName's Screen", color = Color.White, fontSize = 11.sp)
-                        }
-                    }
-                }
-                Divider(color = Color(0xFF1E1E2E), thickness = 0.5.dp)
-            }
-
             // ── Participants Grid ─────────────────────────────
             if (participants.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -224,21 +190,6 @@ fun GroupVoiceChatScreen(
                     ) {
                         myHandRaised = !myHandRaised
                         viewModel.raiseHand(myHandRaised)
-                    }
-
-                    // Screen share
-                    VcControlBtn(
-                        icon = if (isScreenSharing) Icons.Default.StopScreenShare else Icons.Default.ScreenShare,
-                        label = if (isScreenSharing) "Stop Share" else "Share Screen",
-                        bg = if (isScreenSharing) Color(0xFF2A1A3A) else Color(0xFF1A1A2E),
-                        tint = if (isScreenSharing) Color(0xFF9C27B0) else Color(0xFF9E9E9E),
-                        size = 50
-                    ) {
-                        if (isScreenSharing) {
-                            viewModel.stopScreenShare()
-                        } else {
-                            onRequestScreenCapture?.invoke()
-                        }
                     }
 
                     // Admin: End chat
