@@ -234,10 +234,11 @@ fun ChatListScreen(
             }
         }
         Divider(color = Divider2, thickness = 0.5.dp)
-        when (selectedTab) {
-            2 -> CommunityChatScreen(viewModel = viewModel)
-            3 -> AiCompanionChatTab(viewModel = viewModel)
-            else -> {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (selectedTab) {
+                2 -> CommunityChatScreen(viewModel = viewModel)
+                3 -> AiCompanionChatTab(viewModel = viewModel)
+                else -> {
                 if (isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AccentRed) }
                 } else {
