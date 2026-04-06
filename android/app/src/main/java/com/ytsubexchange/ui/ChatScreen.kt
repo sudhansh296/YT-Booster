@@ -773,7 +773,8 @@ fun ChatWindowScreen(
                 // Emoji panel — hide during recording
                 if (showEmojiPanel && !isVoiceRecording) {
                     EmojiPickerPanel(
-                        onEmojiSelected = { emoji -> inputText += emoji }
+                        onEmojiSelected = { emoji -> inputText += emoji },
+                        onDismiss = { showEmojiPanel = false }
                     )
                 }
                 // Attachment popup — floats above 📎 button in one column
@@ -2235,7 +2236,8 @@ fun AttachOption(emoji: String, label: String, onClick: () -> Unit) {
 
 @Composable
 fun EmojiPickerPanel(
-    onEmojiSelected: (String) -> Unit
+    onEmojiSelected: (String) -> Unit,
+    onDismiss: () -> Unit = {}
 ) {
     val categoryEmojis = listOf("😊","👋","❤️","🎉","🔥","🍕","🐶")
     val categories = listOf(
@@ -2254,7 +2256,7 @@ fun EmojiPickerPanel(
             Modifier.fillMaxWidth().background(CardAlt).padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 categoryEmojis.forEachIndexed { i, emoji ->
                     Box(
                         Modifier.clip(RoundedCornerShape(8.dp))
@@ -2264,6 +2266,11 @@ fun EmojiPickerPanel(
                     ) { Text(text = emoji, fontSize = 18.sp) }
                 }
             }
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1A1A2E)).clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) { Text(text = "✕", fontSize = 16.sp, color = TextSec) }
         }
         val emojis: List<String> = categories[selectedCat].second
         Box(
