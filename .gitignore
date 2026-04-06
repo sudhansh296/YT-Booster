@@ -1,0 +1,42 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Build outputs
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/app/debug/
+*.apk
+*.aab
+*.idsig
+
+# Gradle wrapper jar (large binary)
+android/gradle/wrapper/gradle-wrapper.jar
+
+# Environment — sensitive
+server/.env
+
+# Admin build
+admin/dist/
+admin/node_modules/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java heap dumps
+*.hprof
+
+# Uploads (user data)
+server/public/uploads/
+
+# Gradle cache
+**/.gradle/
+**/build/
+**/.idea/

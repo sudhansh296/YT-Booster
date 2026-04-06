@@ -1,0 +1,1751 @@
+package com.ytsubexchange.ui
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
+import com.ytsubexchange.data.*
+import com.ytsubexchange.viewmodel.CallViewModel
+import com.ytsubexchange.viewmodel.ChatViewModel
+import com.ytsubexchange.viewmodel.GroupVoiceChatViewModel
+import java.text.SimpleDateFormat
+import java.util.*
+
+private val avatarGradients = listOf(
+    listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)),
+    listOf(Color(0xFFE67E22), Color(0xFFD35400)),
+    listOf(Color(0xFF27AE60), Color(0xFF1A6B3A)),
+    listOf(Color(0xFF2980B9), Color(0xFF1A5276)),
+    listOf(Color(0xFFE91E8C), Color(0xFF8B0057)),
+    listOf(Color(0xFF546E7A), Color(0xFF263238)),
+)
+private fun avatarGradient(index: Int): Brush =
+    Brush.linearGradient(avatarGradients[index % avatarGradients.size], Offset(0f, 0f), Offset(100f, 100f))
+
+private val BgDark      = Color(0xFF0D0D0D)
+private val CardDark    = Color(0xFF1A1A2E)
+private val CardAlt     = Color(0xFF16213E)
+private val AccentRed   = Color(0xFFE53935)
+private val TextPrimary = Color(0xFFFFFFFF)
+private val TextSec     = Color(0xFF9E9E9E)
+private val Divider2    = Color(0xFF1E1E2E)
+private val SearchBg    = Color(0xFF1A1A2E)
+
+@Composable
+fun ChatScreen(
+    viewModel: ChatViewModel,
+    onBack: () -> Unit = {},
+    callViewModel: CallViewModel? = null,
+    voiceChatViewModel: GroupVoiceChatViewModel? = null,
+    openCommunity: Boolean = false,
+    onPickFile: (String, (android.net.Uri, String, String) -> Unit) -> Unit = { _, _ -> },
+) {
+    val rooms by viewModel.rooms.collectAsState()
+    val openRoom by viewModel.openRoom.collectAsState()
+    val toastMsg by viewModel.toastMsg.collectAsState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(toastMsg) { toastMsg?.let { snackbarHostState.showSnackbar(it); viewModel.clearToast() } }
+
+    Box(Modifier.fillMaxSize().background(BgDark).statusBarsPadding()) {
+        if (openRoom != null) {
+            ChatWindowScreen(
+                room = openRoom!!,
+                viewModel = viewModel,
+                context = context,
+                onBack = { viewModel.closeRoom() },
+                callViewModel = callViewModel,
+                voiceChatViewModel = voiceChatViewModel,
+                onPickFile = onPickFile
+            )
+        } else {
+            ChatListScreen(
+                rooms = rooms,
+                onRoomClick = { viewModel.openRoom(it) },
+                onBack = onBack,
+                viewModel = viewModel,
+                openCommunity = openCommunity
+            )
+        }
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp))
+    }
+}
+
+@Composable
+fun ChatListScreen(
+    rooms: List<ChatRoom>,
+    onRoomClick: (ChatRoom) -> Unit,
+    onBack: () -> Unit,
+    viewModel: ChatViewModel,
+    openCommunity: Boolean = false
+) {
+    val isLoading by viewModel.isLoading.collectAsState()
+    val showNewChat by viewModel.showNewChat.collectAsState()
+    val showCreateGroup by viewModel.showCreateGroup.collectAsState()
+    val users by viewModel.users.collectAsState()
+    val pendingRequests by viewModel.pendingRequests.collectAsState()
+    val sentRequests by viewModel.sentRequests.collectAsState()
+    var selectedTab by remember { mutableStateOf(if (openCommunity) 2 else 0) }
+    val filtered = rooms.filter { if (selectedTab == 0) !it.isGroup else it.isGroup }
+
+    Column(Modifier.fillMaxSize().background(BgDark).navigationBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
+        Box(Modifier.fillMaxWidth().padding(12.dp, 8.dp).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable { viewModel.showNewChatDialog() }) {
+            Row(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Search, null, tint = TextSec, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("User search karo...", color = TextSec, fontSize = 14.sp)
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(12.dp, 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            listOf("Direct", "Group", "Community", "AI 🤖").forEachIndexed { i, label ->
+                Column(Modifier.clickable { selectedTab = i }.padding(8.dp, 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, color = if (selectedTab == i) AccentRed else TextSec,
+                            fontWeight = if (selectedTab == i) FontWeight.Bold else FontWeight.Normal, fontSize = 13.sp)
+                        if (i == 0 && pendingRequests.isNotEmpty()) {
+                            Spacer(Modifier.width(4.dp))
+                            Box(Modifier.size(16.dp).clip(CircleShape).background(AccentRed), contentAlignment = Alignment.Center) {
+                                Text("${pendingRequests.size}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (i == 2) {
+                            Spacer(Modifier.width(4.dp))
+                            Box(Modifier.clip(RoundedCornerShape(4.dp)).background(AccentRed).padding(horizontal = 4.dp, vertical = 1.dp)) {
+                                Text("LIVE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    if (selectedTab == i) Box(Modifier.width(40.dp).height(2.dp).background(AccentRed))
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            if (selectedTab == 1) {
+                IconButton(onClick = { viewModel.showCreateGroupDialog() }) {
+                    Icon(Icons.Default.Add, null, tint = AccentRed, modifier = Modifier.size(22.dp))
+                }
+            } else if (selectedTab == 0) {
+                IconButton(onClick = { viewModel.showNewChatDialog() }) {
+                    Icon(Icons.Default.Add, null, tint = AccentRed, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+        Divider(color = Divider2, thickness = 0.5.dp)
+        when (selectedTab) {
+            2 -> CommunityChatScreen(viewModel = viewModel)
+            3 -> AiCompanionChatTab(viewModel = viewModel)
+            else -> {
+                if (isLoading) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AccentRed) }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        // Pending requests section (Direct tab only)
+                        if (selectedTab == 0 && pendingRequests.isNotEmpty()) {
+                            item {
+                                Column(Modifier.fillMaxWidth().background(Color(0xFF1A0A0A)).padding(12.dp, 8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(8.dp).clip(CircleShape).background(AccentRed))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Chat Requests (${pendingRequests.size})", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    pendingRequests.forEach { req ->
+                                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(0)), contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                                            }
+                                            Column(Modifier.weight(1f)) {
+                                                Text(req.fromName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                Text("Chat karna chahta hai", color = TextSec, fontSize = 12.sp)
+                                            }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF4CAF50)).clickable { viewModel.acceptChatRequest(req.requestId) }.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                                    Text("Accept", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF2A1A1A)).clickable { viewModel.rejectChatRequest(req.requestId) }.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                                    Text("Reject", color = AccentRed, fontSize = 12.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Divider(color = Divider2, thickness = 0.5.dp)
+                            }
+                        }
+                        // Sent requests section (Direct tab only)
+                        if (selectedTab == 0 && sentRequests.isNotEmpty()) {
+                            item {
+                                Column(Modifier.fillMaxWidth().background(Color(0xFF0A1A0A)).padding(12.dp, 8.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Sent Requests (${sentRequests.size})", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    sentRequests.forEach { req ->
+                                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(1)), contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                                            }
+                                            Column(Modifier.weight(1f)) {
+                                                Text(req.toName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                Text("Request pending ⏳", color = TextSec, fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                                Divider(color = Divider2, thickness = 0.5.dp)
+                            }
+                        }
+                        if (filtered.isEmpty() && pendingRequests.isEmpty() && sentRequests.isEmpty()) {
+                            item { Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { Text("Koi chat nahi", color = TextSec, fontSize = 14.sp) } }
+                        } else {
+                            itemsIndexed(filtered) { i, room ->
+                                val isOnline = if (!room.isGroup) room.otherUserId?.let { viewModel.isUserOnline(it) } ?: false else false
+                                ChatRoomRow(room = room, avatarIndex = i, onClick = { onRoomClick(room) }, isOnline = isOnline)
+                                Divider(color = Divider2, thickness = 0.5.dp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (showNewChat) NewChatDialog(users, { viewModel.loadUsers(it) }, { viewModel.sendChatRequest(it) }, { viewModel.showCreateGroupDialog() }, { viewModel.hideNewChatDialog() })
+    if (showCreateGroup) CreateGroupDialog(users, { viewModel.loadUsers(it) }, { n, ids -> viewModel.createGroup(n, ids) }, { viewModel.hideCreateGroupDialog() })
+}
+
+@Composable
+fun CommunityChatScreen(viewModel: ChatViewModel) {
+    val communityMessages by viewModel.communityMessages.collectAsState()
+    val communityOnline by viewModel.communityOnline.collectAsState()
+    var inputText by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    LaunchedEffect(Unit) { viewModel.joinCommunity() }
+    LaunchedEffect(communityMessages.size) { if (communityMessages.isNotEmpty()) listState.animateScrollToItem(communityMessages.size - 1) }
+
+    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Star, null, tint = AccentRed, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Community Chat", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.clip(RoundedCornerShape(4.dp)).background(AccentRed).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                Text("LIVE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.weight(1f))
+            if (communityOnline > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
+                    Spacer(Modifier.width(4.dp))
+                    Text("$communityOnline online", color = Color(0xFF4CAF50), fontSize = 11.sp)
+                }
+            }
+        }
+        Divider(color = Divider2, thickness = 0.5.dp)
+        if (communityMessages.isEmpty()) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text("Koi message nahi abhi", color = TextSec, fontSize = 14.sp)
+            }
+        } else {
+            LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                items(communityMessages) { msg -> MessageBubble(msg = msg, myId = viewModel.myId, onLongClick = {}) }
+            }
+        }
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding(),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
+                BasicTextField(value = inputText, onValueChange = { inputText = it },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = {
+                        if (inputText.isNotBlank()) { viewModel.sendCommunityMessage(inputText.trim()); inputText = "" }
+                    }),
+                    maxLines = 4, modifier = Modifier.fillMaxWidth())
+            }
+            Box(Modifier.size(40.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))),
+                contentAlignment = Alignment.Center) {
+                IconButton(onClick = { if (inputText.isNotBlank()) { viewModel.sendCommunityMessage(inputText.trim()); inputText = "" } }) {
+                    Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatRoomRow(room: ChatRoom, avatarIndex: Int, onClick: () -> Unit, isOnline: Boolean = false) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).background(BgDark).padding(16.dp, 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box {
+            if (!room.pic.isNullOrEmpty()) {
+                AsyncImage(model = room.pic, contentDescription = null, modifier = Modifier.size(52.dp).clip(CircleShape))
+            } else {
+                Box(Modifier.size(52.dp).clip(CircleShape).background(avatarGradient(avatarIndex)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(28.dp))
+                }
+            }
+            // Online/offline dot
+            Box(Modifier.size(13.dp).clip(CircleShape)
+                .background(if (isOnline) Color(0xFF4CAF50) else Color(0xFF666666))
+                .align(Alignment.BottomEnd))
+        }
+        Column(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(room.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+                Text(formatChatTime(room.lastTime ?: ""), color = TextSec, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(3.dp))
+            Text(room.lastMessage ?: "Tap to chat", color = TextSec, fontSize = 13.sp, maxLines = 1)
+        }
+        if (room.unread > 0) {
+            Box(Modifier.size(22.dp).clip(CircleShape).background(AccentRed), contentAlignment = Alignment.Center) {
+                Text(if (room.unread > 9) "9+" else "${room.unread}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatWindowScreen(
+    room: ChatRoom,
+    viewModel: ChatViewModel,
+    context: Context,
+    onBack: () -> Unit,
+    callViewModel: CallViewModel? = null,
+    voiceChatViewModel: GroupVoiceChatViewModel? = null,
+    onPickFile: (String, (android.net.Uri, String, String) -> Unit) -> Unit = { _, _ -> }
+) {
+    val messages by viewModel.messages.collectAsState()
+    val myId by viewModel.myIdFlow.collectAsState()
+    val isTyping by viewModel.isTyping.collectAsState()
+    val replyTo by viewModel.replyTo.collectAsState()
+    val pinnedMsg by viewModel.pinnedMsg.collectAsState()
+    val contextMsg by viewModel.contextMsg.collectAsState()
+    val showStarred by viewModel.showStarred.collectAsState()
+    val showPinned by viewModel.showPinned.collectAsState()
+    val starredMessages by viewModel.starredMessages.collectAsState()
+    val showGroupInfo by viewModel.showGroupInfo.collectAsState()
+    val groupInfo by viewModel.groupInfo.collectAsState()
+    val isBlockedByMe by viewModel.isBlockedByMe.collectAsState()
+    val isBlockedByThem by viewModel.isBlockedByThem.collectAsState()
+    val onlineUsers by viewModel.onlineUsers.collectAsState()
+    val isPartnerOnline = if (!room.isGroup) room.otherUserId?.let { onlineUsers.contains(it) } ?: false else false
+    var inputText by remember { mutableStateOf("") }
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var showSearchBar by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showInviteLink by remember { mutableStateOf("") }
+    var showForwardDialog by remember { mutableStateOf(false) }
+    var forwardMsgId by remember { mutableStateOf("") }
+    var showEmojiPanel by remember { mutableStateOf(false) }
+    var showAttachMenu by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1) }
+    val displayMessages = if (showSearchBar && searchQuery.isNotBlank())
+        messages.filter { it.text.contains(searchQuery, ignoreCase = true) } else messages
+
+    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
+        // Top accent bar
+        Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
+
+        // Header
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(4.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextPrimary) }
+            Box(Modifier.size(38.dp).clip(CircleShape).background(avatarGradient(0)).clickable {
+                if (room.isGroup) viewModel.loadGroupInfo(room._id)
+            }, contentAlignment = Alignment.Center) {
+                if (!room.pic.isNullOrEmpty()) {
+                    AsyncImage(model = room.pic, contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                } else {
+                    Icon(if (room.isGroup) Icons.Default.Group else Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(22.dp))
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f).clickable { if (room.isGroup) viewModel.loadGroupInfo(room._id) }) {
+                Text(room.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    when {
+                        isBlockedByMe -> "Blocked"
+                        isBlockedByThem -> "Blocked you"
+                        isTyping -> "typing..."
+                        else -> if (room.isGroup) "${room.members?.size ?: 0} members" else if (isPartnerOnline) "online" else "offline"
+                    },                    color = when {
+                        isBlockedByMe || isBlockedByThem -> Color(0xFFFF6B6B)
+                        isTyping -> AccentRed
+                        !room.isGroup && !isPartnerOnline -> Color(0xFF666666)
+                        else -> Color(0xFF4CAF50)
+                    },
+                    fontSize = 11.sp
+                )
+            }
+            // Call buttons
+            if (callViewModel != null && !isBlockedByMe && !isBlockedByThem) {
+                IconButton(onClick = { callViewModel.startCall(room._id, room.name, "audio") }) {
+                    Icon(Icons.Default.Call, null, tint = TextSec, modifier = Modifier.size(20.dp))
+                }
+                if (!room.isGroup) {
+                    IconButton(onClick = { callViewModel.startCall(room._id, room.name, "video") }) {
+                        Icon(Icons.Default.Videocam, null, tint = TextSec, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+            // Group voice chat button
+            if (room.isGroup && voiceChatViewModel != null) {
+                IconButton(onClick = {
+                    voiceChatViewModel.join(room._id, myId, "", "")
+                }) {
+                    Icon(Icons.Default.Mic, null, tint = TextSec, modifier = Modifier.size(20.dp))
+                }
+            }
+            IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = TextSec) }
+            DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false },
+                modifier = Modifier.background(CardDark), offset = androidx.compose.ui.unit.DpOffset(x = (-160).dp, y = 0.dp)) {
+                val menuItems = buildList {
+                    add("Search in Chat")
+                    add("Starred Messages")
+                    add("Pinned Messages")
+                    if (room.isGroup) { add("Group Info"); add("Invite Link") }
+                    if (!room.isGroup) { if (isBlockedByMe) add("Unblock User") else add("Block User") }
+                    add("Clear Chat")
+                }
+                menuItems.forEach { item ->
+                    DropdownMenuItem(text = { Text(item, color = if (item.contains("Block") || item == "Clear Chat") Color(0xFFFF6B6B) else TextPrimary, fontSize = 14.sp) },
+                        onClick = {
+                            showMoreMenu = false
+                            when (item) {
+                                "Search in Chat" -> { showSearchBar = !showSearchBar; if (!showSearchBar) searchQuery = "" }
+                                "Starred Messages" -> viewModel.showStarredPanel()
+                                "Pinned Messages" -> viewModel.showPinnedPanel()
+                                "Group Info" -> viewModel.loadGroupInfo(room._id)
+                                "Invite Link" -> viewModel.getGroupInviteLink(room._id) { link -> showInviteLink = link }
+                                "Block User" -> viewModel.blockUser {}
+                                "Unblock User" -> viewModel.unblockUser {}
+                                "Clear Chat" -> viewModel.clearChat()
+                            }
+                        })
+                }
+            }
+        }
+
+        // Search bar
+        if (showSearchBar) {
+            Row(Modifier.fillMaxWidth().background(CardAlt).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(SearchBg).padding(14.dp, 8.dp)) {
+                    if (searchQuery.isEmpty()) Text("Search in chat...", color = TextSec, fontSize = 13.sp)
+                    BasicTextField(value = searchQuery, onValueChange = { searchQuery = it },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+
+        // Pinned message
+        pinnedMsg?.let { msg ->
+            Row(Modifier.fillMaxWidth().background(CardAlt).padding(16.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(3.dp).height(32.dp).background(AccentRed))
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text("Pinned", color = AccentRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(msg.text.take(60), color = TextSec, fontSize = 12.sp, maxLines = 1)
+                }
+            }
+        }
+
+        // Blocked banner
+        if (isBlockedByMe || isBlockedByThem) {
+            Box(Modifier.fillMaxWidth().background(Color(0xFF2A1A1A)).padding(12.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    if (isBlockedByMe) "Aapne is user ko block kiya hai. Unblock karne ke liye menu use karo."
+                    else "Is user ne aapko block kiya hai.",
+                    color = Color(0xFFFF6B6B), fontSize = 12.sp
+                )
+            }
+        }
+
+        // Messages list
+        LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+            items(displayMessages) { msg ->
+                MessageBubble(msg = msg, myId = myId, onLongClick = { viewModel.onMsgLongPress(msg) },
+                    onSwipeReply = { swipedMsg -> viewModel.setReply(swipedMsg) })
+            }
+        }
+
+        // Reply preview
+        replyTo?.let { reply ->
+            Row(Modifier.fillMaxWidth().background(CardAlt).padding(12.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(3.dp).height(28.dp).background(AccentRed))
+                Spacer(Modifier.width(8.dp))
+                Text(reply.text.take(50), color = TextSec, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                IconButton(onClick = { viewModel.cancelReply() }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        // Input row
+        if (!isBlockedByMe && !isBlockedByThem) {
+            var isVoiceRecording by remember { mutableStateOf(false) }
+            Column {
+                // Emoji panel — hide during recording
+                if (showEmojiPanel && !isVoiceRecording) {
+                    EmojiPickerPanel(onEmojiSelected = { emoji -> inputText += emoji })
+                }
+                // Attachment menu — hide during recording
+                if (showAttachMenu && !isVoiceRecording) {
+                    Row(
+                        Modifier.fillMaxWidth().background(CardAlt).padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        AttachOption("🖼", "Photo") {
+                            showAttachMenu = false
+                            onPickFile("image/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
+                        }
+                        AttachOption("🎥", "Video") {
+                            showAttachMenu = false
+                            onPickFile("video/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
+                        }
+                        AttachOption("📄", "Document") {
+                            showAttachMenu = false
+                            onPickFile("*/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
+                        }
+                        AttachOption("🎵", "Audio") {
+                            showAttachMenu = false
+                            onPickFile("audio/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
+                        }
+                    }
+                }
+                if (isVoiceRecording) {
+                    // Full-width recording bar — no other elements
+                    Box(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding()) {
+                        VoiceRecordButton(
+                            onVoiceSent = { file -> viewModel.sendVoiceFile(room._id, file) },
+                            onRecordingStateChanged = { isVoiceRecording = it }
+                        )
+                    }
+                } else {
+                    Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding(),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("📎", fontSize = 20.sp, modifier = Modifier.clickable { showAttachMenu = !showAttachMenu; showEmojiPanel = false }.padding(4.dp))
+                        Text("😊", fontSize = 20.sp, modifier = Modifier.clickable { showEmojiPanel = !showEmojiPanel; showAttachMenu = false }.padding(4.dp))
+                        VoiceRecordButton(
+                            onVoiceSent = { file -> viewModel.sendVoiceFile(room._id, file) },
+                            onRecordingStateChanged = { isVoiceRecording = it }
+                        )
+                        Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                            if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
+                            BasicTextField(value = inputText, onValueChange = { inputText = it; viewModel.onTyping(room._id, true) },
+                                textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = {
+                                if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false }
+                            }),
+                            maxLines = 4, modifier = Modifier.fillMaxWidth())
+                    }
+                    Box(Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))),
+                        contentAlignment = Alignment.Center) {
+                        IconButton(onClick = { if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false } }) {
+                            Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+                } // end else (not recording)
+            }
+        } else {
+            Box(Modifier.fillMaxWidth().background(CardDark).padding(16.dp).navigationBarsPadding(), contentAlignment = Alignment.Center) {
+                Text("Message nahi bhej sakte", color = TextSec, fontSize = 13.sp)
+            }
+        }
+    }
+
+    // Context menu — WhatsApp style bottom sheet
+    contextMsg?.let { msg ->
+        val isImage = !msg.fileUrl.isNullOrEmpty() && msg.fileType?.startsWith("image") == true
+        val fullUrl = if (!msg.fileUrl.isNullOrEmpty()) {
+            if (msg.fileUrl!!.startsWith("http")) msg.fileUrl!! else "https://api.picrypto.in${msg.fileUrl}"
+        } else ""
+        Dialog(onDismissRequest = { viewModel.dismissContext() }) {
+            Box(
+                Modifier.fillMaxSize().clickable { viewModel.dismissContext() },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Column(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                        .background(CardDark)
+                        .padding(bottom = 16.dp)
+                        .clickable(enabled = false) { } // prevent dismiss when tapping menu itself
+                ) {
+                    // Preview of message
+                    Box(Modifier.fillMaxWidth().background(CardAlt).padding(16.dp, 12.dp)) {
+                        when {
+                            isImage -> AsyncImage(
+                                model = fullUrl, contentDescription = null,
+                                modifier = Modifier.height(120.dp).clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            !msg.fileUrl.isNullOrEmpty() && msg.fileType?.startsWith("audio") == true ->
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Default.Mic, null, tint = AccentRed, modifier = Modifier.size(28.dp))
+                                    Text("🎤 Voice Message", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                }
+                            !msg.fileUrl.isNullOrEmpty() && msg.fileType?.startsWith("video") == true ->
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Default.Videocam, null, tint = AccentRed, modifier = Modifier.size(28.dp))
+                                    Text("🎥 Video", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                }
+                            !msg.fileUrl.isNullOrEmpty() ->
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Default.InsertDriveFile, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(28.dp))
+                                    Text(msg.fileName ?: "File", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                }
+                            else -> Text(
+                                msg.text.take(80) + if (msg.text.length > 80) "..." else "",
+                                color = TextSec, fontSize = 13.sp
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    // Quick emoji reactions row
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        listOf("❤️", "😂", "😮", "😢", "👍", "🙏", "🔥").forEach { emoji ->
+                            Box(
+                                Modifier.size(44.dp).clip(CircleShape)
+                                    .background(SearchBg)
+                                    .clickable { viewModel.reactToMessage(emoji) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = emoji, fontSize = 22.sp)
+                            }
+                        }
+                    }
+                    Divider(color = Divider2, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 4.dp))
+                    // Action items
+                    val hasFile = !msg.fileUrl.isNullOrEmpty()
+                    // Live starred state from messages list (not stale contextMsg)
+                    val liveMsg = messages.firstOrNull { it._id == msg._id }
+                    val isStarred = liveMsg?.starred ?: msg.starred
+                    val actions = buildList {
+                        add(Triple("Reply", Icons.Default.Reply, false))
+                        add(Triple("Forward", Icons.Default.Forward, false))
+                        add(Triple(if (isStarred) "Unstar ★" else "Star ⭐", Icons.Default.Star, false))
+                        add(Triple("Pin 📌", Icons.Default.PushPin, false))
+                        if (msg.text.isNotBlank() && !hasFile) add(Triple("Copy", Icons.Default.ContentCopy, false))
+                        if (hasFile) {
+                            add(Triple("Save / Open", Icons.Default.Download, false))
+                            add(Triple("Share", Icons.Default.Share, false))
+                        }
+                        add(Triple("Delete", Icons.Default.Delete, true))
+                    }
+                    actions.forEach { (label, icon, isDanger) ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clickable {
+                                    when (label) {
+                                        "Reply" -> viewModel.setReplyFromContext()
+                                        "Forward" -> { showForwardDialog = true; forwardMsgId = msg._id; viewModel.dismissContext() }
+                                        "Star ⭐" -> viewModel.starMessage()
+                                        "Unstar ★" -> viewModel.starMessage()
+                                        "Pin 📌" -> viewModel.pinMessage()
+                                        "Copy" -> {
+                                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            cm.setPrimaryClip(ClipData.newPlainText("msg", msg.text))
+                                            viewModel.dismissContext()
+                                        }
+                                        "Save / Open" -> {
+                                            // Direct download to phone using DownloadManager
+                                            try {
+                                                val fileName = msg.fileName ?: fullUrl.substringAfterLast('/').ifBlank { "file_${System.currentTimeMillis()}" }
+                                                val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
+                                                    setTitle(fileName)
+                                                    setDescription("YT-Booster se download ho raha hai...")
+                                                    setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                    when {
+                                                        msg.fileType?.startsWith("image") == true ->
+                                                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_PICTURES, "YTBooster/$fileName")
+                                                        msg.fileType?.startsWith("video") == true ->
+                                                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_MOVIES, "YTBooster/$fileName")
+                                                        msg.fileType?.startsWith("audio") == true ->
+                                                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_MUSIC, "YTBooster/$fileName")
+                                                        else ->
+                                                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "YTBooster/$fileName")
+                                                    }
+                                                    setAllowedOverMetered(true)
+                                                    setAllowedOverRoaming(true)
+                                                }
+                                                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                                dm.enqueue(request)
+                                                viewModel.dismissContext()
+                                                // Show toast via snackbar (handled by ChatScreen)
+                                            } catch (e: Exception) {
+                                                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))
+                                                context.startActivity(Intent.createChooser(intent, "Open with"))
+                                            }
+                                            viewModel.dismissContext()
+                                        }
+                                        "Share" -> {
+                                            val shareText = if (fullUrl.isNotEmpty()) fullUrl else msg.text
+                                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                                type = if (isImage) "image/*" else "text/plain"
+                                                putExtra(Intent.EXTRA_TEXT, shareText)
+                                            }
+                                            context.startActivity(Intent.createChooser(intent, "Share"))
+                                            viewModel.dismissContext()
+                                        }                                        "Delete" -> viewModel.deleteMessage()
+                                    }
+                                }
+                                .padding(horizontal = 20.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Icon(icon, null, tint = if (isDanger) AccentRed else TextPrimary, modifier = Modifier.size(22.dp))
+                            Text(label, color = if (isDanger) AccentRed else TextPrimary, fontSize = 15.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Starred messages panel
+    if (showStarred) {
+        Dialog(onDismissRequest = { viewModel.hideStarredPanel() }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("⭐ Starred Messages", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        IconButton(onClick = { viewModel.hideStarredPanel() }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (starredMessages.isEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("⭐", fontSize = 36.sp)
+                                Text("Koi starred message nahi", color = TextSec, fontSize = 14.sp)
+                            }
+                        }
+                    } else {
+                        LazyColumn(Modifier.weight(1f, false), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(starredMessages) { m ->
+                                val mUrl = if (!m.fileUrl.isNullOrEmpty()) {
+                                    if (m.fileUrl!!.startsWith("http")) m.fileUrl!! else "https://api.picrypto.in${m.fileUrl}"
+                                } else ""
+                                Row(
+                                    Modifier.fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(CardAlt)
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // Content
+                                    Column(Modifier.weight(1f)) {
+                                        Text(m.senderName, color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(Modifier.height(3.dp))
+                                        when {
+                                            !m.fileUrl.isNullOrEmpty() && m.fileType?.startsWith("image") == true ->
+                                                AsyncImage(model = mUrl, contentDescription = null,
+                                                    modifier = Modifier.height(80.dp).clip(RoundedCornerShape(6.dp)),
+                                                    contentScale = ContentScale.Crop)
+                                            !m.fileUrl.isNullOrEmpty() && m.fileType?.startsWith("audio") == true ->
+                                                Text("🎤 Voice Message", color = TextPrimary, fontSize = 13.sp)
+                                            !m.fileUrl.isNullOrEmpty() && m.fileType?.startsWith("video") == true ->
+                                                Text("🎥 Video", color = TextPrimary, fontSize = 13.sp)
+                                            !m.fileUrl.isNullOrEmpty() ->
+                                                Text("📄 ${m.fileName ?: "File"}", color = TextPrimary, fontSize = 13.sp)
+                                            else ->
+                                                Text(m.text, color = TextPrimary, fontSize = 13.sp, maxLines = 3)
+                                        }
+                                        Spacer(Modifier.height(3.dp))
+                                        Text(formatChatTime(m.createdAt), color = TextSec, fontSize = 10.sp)
+                                    }
+                                    // Unstar button
+                                    Box(
+                                        Modifier.size(32.dp).clip(CircleShape)
+                                            .background(Color(0xFF2A2A1A))
+                                            .clickable {
+                                                viewModel.starMessageById(m._id)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("⭐", fontSize = 16.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Pinned message panel
+    if (showPinned) {
+        Dialog(onDismissRequest = { viewModel.hidePinnedPanel() }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("📌 Pinned Message", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    pinnedMsg?.let { Text(it.text, color = TextPrimary, fontSize = 13.sp) } ?: Text("Koi pinned message nahi", color = TextSec, fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { viewModel.hidePinnedPanel() }, modifier = Modifier.align(Alignment.End)) { Text("Close", color = AccentRed) }
+                }
+            }
+        }
+    }
+
+    // Invite link dialog
+    if (showInviteLink.isNotEmpty()) {
+        Dialog(onDismissRequest = { showInviteLink = "" }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("🔗 Group Invite Link", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CardAlt).padding(12.dp)) {
+                        Text(showInviteLink, color = Color(0xFF29B6F6), fontSize = 12.sp)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText("link", showInviteLink))
+                            showInviteLink = ""
+                        }, colors = ButtonDefaults.buttonColors(containerColor = AccentRed), modifier = Modifier.weight(1f)) {
+                            Text("Copy", color = Color.White)
+                        }
+                        Button(onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, showInviteLink) }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share Group Link"))
+                            showInviteLink = ""
+                        }, colors = ButtonDefaults.buttonColors(containerColor = CardAlt), modifier = Modifier.weight(1f)) {
+                            Text("Share", color = TextPrimary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Forward dialog
+    if (showForwardDialog) {
+        val allRooms by viewModel.rooms.collectAsState()
+        Dialog(onDismissRequest = { showForwardDialog = false }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("↪ Forward to...", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn(Modifier.weight(1f, false)) {
+                        items(allRooms.filter { it._id != room._id }) { r ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    viewModel.forwardMessage(forwardMsgId, listOf(r._id))
+                                    showForwardDialog = false
+                                }.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(allRooms.indexOf(r))),
+                                    contentAlignment = Alignment.Center) {
+                                    Icon(if (r.isGroup) Icons.Default.Group else Icons.Default.Person, null,
+                                        tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                                }
+                                Text(r.name, color = TextPrimary, fontSize = 14.sp)
+                            }
+                        }
+                    }
+                    TextButton(onClick = { showForwardDialog = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text("Cancel", color = TextSec)
+                    }
+                }
+            }
+        }
+    }
+
+    // Group info panel
+    if (showGroupInfo && groupInfo != null) {
+        GroupInfoPanel(groupInfo = groupInfo!!, viewModel = viewModel, roomId = room._id, myId = myId)
+    }
+}
+
+@Composable
+fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomId: String, myId: String) {
+    Dialog(onDismissRequest = { viewModel.hideGroupInfo() }) {
+        Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("👥 Group Info", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    IconButton(onClick = { viewModel.hideGroupInfo() }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(groupInfo.room.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                if (!groupInfo.room.description.isNullOrEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(groupInfo.room.description, color = TextSec, fontSize = 13.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Members (${groupInfo.members.size})", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Spacer(Modifier.height(6.dp))
+                LazyColumn(Modifier.heightIn(max = 250.dp)) {
+                    items(groupInfo.members) { member ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(groupInfo.members.indexOf(member))),
+                                contentAlignment = Alignment.Center) {
+                                if (member.profilePic.isNotEmpty()) {
+                                    AsyncImage(model = member.profilePic, contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                                } else {
+                                    Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Text(member.channelName, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            if (groupInfo.isAdmin && member._id != myId) {
+                                IconButton(onClick = { viewModel.removeMemberFromGroup(roomId, member._id) }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Default.PersonRemove, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+                if (groupInfo.isAdmin) {
+                    Spacer(Modifier.height(8.dp))
+                    Divider(color = Divider2)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Admin Actions", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { viewModel.getGroupInviteLink(roomId) {} },
+                            colors = ButtonDefaults.buttonColors(containerColor = CardAlt),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+                            Text("Invite Link", color = TextPrimary, fontSize = 12.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                // Leave group button (non-admin)
+                if (!groupInfo.isAdmin) {
+                    TextButton(onClick = { viewModel.leaveGroup { viewModel.hideGroupInfo() } }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Leave Group", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwipeReply: ((ChatMessage) -> Unit)? = null) {
+    val isMine = myId.isNotEmpty() && msg.senderId == myId
+    var showEmojiPicker by remember { mutableStateOf(false) }
+    var offsetX by remember { mutableStateOf(0f) }
+    val animatedOffset by animateFloatAsState(
+        targetValue = offsetX,
+        animationSpec = androidx.compose.animation.core.spring(stiffness = 400f),
+        label = "swipe"
+    )
+
+    Column(
+        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Reply arrow indicator for received messages (left side, shows when swiping right)
+            if (!isMine && offsetX > 20f) {
+                Icon(
+                    Icons.Default.Reply, null,
+                    tint = AccentRed.copy(alpha = (offsetX / 60f).coerceIn(0f, 1f)),
+                    modifier = Modifier.size(20.dp).padding(end = 4.dp)
+                )
+            }
+
+            Column(
+                Modifier
+                    .widthIn(max = 270.dp)
+                    .offset { androidx.compose.ui.unit.IntOffset(animatedOffset.toInt(), 0) }
+                    .clip(RoundedCornerShape(18.dp, 18.dp, if (isMine) 4.dp else 18.dp, if (isMine) 18.dp else 4.dp))
+                    .background(if (isMine) Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B))) else Brush.linearGradient(listOf(CardDark, CardAlt)))
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { onLongClick() },
+                            onTap = { /* single tap — handled per content type */ }
+                        )
+                    }
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                val threshold = if (isMine) -60f else 60f
+                                if ((!isMine && offsetX > threshold) || (isMine && offsetX < threshold)) {
+                                    onSwipeReply?.invoke(msg)
+                                }
+                                offsetX = 0f
+                            },
+                            onHorizontalDrag = { change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: Float ->
+                                change.consume()
+                                val newOffset = offsetX + dragAmount
+                                offsetX = if (isMine) {
+                                    newOffset.coerceIn(-80f, 0f)
+                                } else {
+                                    newOffset.coerceIn(0f, 80f)
+                                }
+                            }
+                        )
+                    }
+                    .padding(12.dp, 8.dp)
+            ) {
+                if (!isMine) {
+                    Text(msg.senderName, color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(2.dp))
+                }
+                msg.replyTo?.let { reply ->
+                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(0.2f)).padding(8.dp)) {
+                        Text(reply.text.take(50), color = Color.White.copy(0.7f), fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+                // File/voice message
+                if (!msg.fileUrl.isNullOrEmpty()) {
+                    val ctx = LocalContext.current
+                    val fullUrl = if (msg.fileUrl!!.startsWith("http")) msg.fileUrl!! else "https://api.picrypto.in${msg.fileUrl}"
+                    when {
+                        msg.fileType?.startsWith("image") == true -> {
+                            // Image — show thumbnail, tap to open full-screen viewer in-app
+                            var showFullImage by remember { mutableStateOf(false) }
+                            AsyncImage(
+                                model = fullUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .widthIn(max = 220.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onTap = { showFullImage = true },
+                                            onLongPress = { onLongClick() }
+                                        )
+                                    },
+                                contentScale = ContentScale.FillWidth
+                            )
+                            if (showFullImage) {
+                                Dialog(onDismissRequest = { showFullImage = false }) {
+                                    Box(
+                                        Modifier.fillMaxSize().background(Color.Black.copy(0.95f))
+                                            .clickable { showFullImage = false },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        AsyncImage(
+                                            model = fullUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                        // Close button
+                                        Box(
+                                            Modifier.align(Alignment.TopEnd).padding(12.dp)
+                                                .size(36.dp).clip(CircleShape)
+                                                .background(Color.Black.copy(0.6f))
+                                                .clickable { showFullImage = false },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                        }
+                                        // Download button
+                                        Box(
+                                            Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(AccentRed)
+                                                .clickable {
+                                                    try {
+                                                        val fileName = msg.fileName ?: "image_${System.currentTimeMillis()}.jpg"
+                                                        val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
+                                                            setTitle(fileName)
+                                                            setDescription("Saving image...")
+                                                            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_PICTURES, "YTBooster/$fileName")
+                                                            setAllowedOverMetered(true)
+                                                        }
+                                                        val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                                        dm.enqueue(request)
+                                                        showFullImage = false
+                                                    } catch (e: Exception) {
+                                                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))
+                                                        ctx.startActivity(intent)
+                                                    }
+                                                }
+                                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Icon(Icons.Default.Download, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                                Text("Save", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        msg.fileType?.startsWith("video") == true -> {
+                            Row(
+                                Modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(0.3f))
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onTap = {
+                                                // Download then open via DownloadManager
+                                                try {
+                                                    val fileName = msg.fileName ?: "video_${System.currentTimeMillis()}.mp4"
+                                                    val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
+                                                        setTitle(fileName)
+                                                        setDescription("Video download ho raha hai...")
+                                                        setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                        setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_MOVIES, "YTBooster/$fileName")
+                                                        setAllowedOverMetered(true)
+                                                        setAllowedOverRoaming(true)
+                                                    }
+                                                    val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                                    dm.enqueue(request)
+                                                } catch (e: Exception) {
+                                                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))
+                                                    intent.setDataAndType(android.net.Uri.parse(fullUrl), "video/*")
+                                                    ctx.startActivity(Intent.createChooser(intent, "Play video"))
+                                                }
+                                            },
+                                            onLongPress = { onLongClick() }
+                                        )
+                                    }.padding(10.dp, 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                                Column {
+                                    Text("🎥 Video", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("Tap to play", color = Color.White.copy(0.6f), fontSize = 10.sp)
+                                }
+                            }
+                        }
+                        msg.fileType?.startsWith("audio") == true -> {
+                            // Voice message — WhatsApp style
+                            var isPlaying by remember { mutableStateOf(false) }
+                            var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
+                            Row(
+                                Modifier.clip(RoundedCornerShape(20.dp)).background(Color.Black.copy(0.2f))
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(onLongPress = { onLongClick() })
+                                    }.padding(10.dp, 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    Modifier.size(36.dp).clip(CircleShape)
+                                        .background(if (isPlaying) AccentRed else Color.White.copy(0.2f))
+                                        .clickable {
+                                            if (isPlaying) {
+                                                mediaPlayer?.pause()
+                                                isPlaying = false
+                                            } else {
+                                                try {
+                                                    mediaPlayer?.release()
+                                                    val mp = android.media.MediaPlayer().apply {
+                                                        setDataSource(fullUrl)
+                                                        setOnPreparedListener { start(); }
+                                                        setOnCompletionListener { isPlaying = false }
+                                                        prepareAsync()
+                                                    }
+                                                    mediaPlayer = mp
+                                                    isPlaying = true
+                                                } catch (e: Exception) { isPlaying = false }
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        null, tint = Color.White, modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column {
+                                    Text("🎤 Voice", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(if (isPlaying) "Playing..." else "Tap to play", color = Color.White.copy(0.6f), fontSize = 10.sp)
+                                }
+                            }
+                        }
+                        else -> {
+                            // Document / other file
+                            Row(
+                                Modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(0.2f))
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onTap = {
+                                                try {
+                                                    val fileName = msg.fileName ?: "file_${System.currentTimeMillis()}"
+                                                    val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
+                                                        setTitle(fileName)
+                                                        setDescription("File download ho raha hai...")
+                                                        setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                        setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "YTBooster/$fileName")
+                                                        setAllowedOverMetered(true)
+                                                        setAllowedOverRoaming(true)
+                                                    }
+                                                    val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                                    dm.enqueue(request)
+                                                } catch (e: Exception) {
+                                                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))
+                                                    ctx.startActivity(Intent.createChooser(intent, "Open with"))
+                                                }
+                                            },
+                                            onLongPress = { onLongClick() }
+                                        )
+                                    }.padding(10.dp, 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.InsertDriveFile, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(28.dp))
+                                Column(Modifier.widthIn(max = 160.dp)) {
+                                    Text(msg.fileName ?: "File", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                                    Text("Tap to open / download", color = Color.White.copy(0.6f), fontSize = 10.sp)
+                                }
+                                Icon(Icons.Default.Download, null, tint = Color.White.copy(0.7f), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                } else {
+                    Text(msg.text, color = Color.White, fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(3.dp))
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.wrapContentWidth()) {
+                    if (msg.starred) {
+                        Text("⭐", fontSize = 10.sp)
+                        Spacer(Modifier.width(3.dp))
+                    }
+                    Text(formatChatTime(msg.createdAt), color = Color.White.copy(0.6f), fontSize = 10.sp)
+                    if (isMine && msg.read) {
+                        Spacer(Modifier.width(4.dp))
+                        Text("✓✓", color = Color(0xFF29B6F6), fontSize = 10.sp)
+                    }
+                }
+            }
+
+            // Reply arrow for sent messages (right side, shows when swiping left)
+            if (isMine && offsetX < -20f) {
+                Icon(
+                    Icons.Default.Reply, null,
+                    tint = AccentRed.copy(alpha = ((-offsetX) / 60f).coerceIn(0f, 1f)),
+                    modifier = Modifier.size(20.dp).graphicsLayer(scaleX = -1f).padding(start = 4.dp)
+                )
+            }
+        }
+
+        // Reactions display
+        if (msg.reactions.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(CardDark.copy(0.9f))
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                msg.reactions.entries.take(5).forEach { (emoji, users) ->
+                    Text("$emoji ${users.size}", fontSize = 12.sp, color = Color.White)
+                }
+            }
+        }
+    }
+
+    // Emoji picker popup
+    if (showEmojiPicker) {
+        Dialog(onDismissRequest = { showEmojiPicker = false }) {
+            Box(Modifier.clip(RoundedCornerShape(16.dp)).background(CardDark).padding(12.dp)) {
+                Column {
+                    Text("React karo", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("❤️", "😂", "😮", "😢", "👍", "🙏").forEach { emoji ->
+                            Text(
+                                emoji, fontSize = 28.sp,
+                                modifier = Modifier.clickable { showEmojiPicker = false; onLongClick() }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NewChatDialog(users: List<ChatUser>, onSearch: (String) -> Unit, onDm: (ChatUser) -> Unit, onCreateGroup: () -> Unit, onDismiss: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Text("New Chat", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(10.dp))
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                    if (query.isEmpty()) Text("Search users...", color = TextSec, fontSize = 13.sp)
+                    BasicTextField(value = query, onValueChange = { query = it; onSearch(it) },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onCreateGroup, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Add, null, tint = AccentRed); Spacer(Modifier.width(8.dp))
+                    Text("Create Group", color = AccentRed, fontWeight = FontWeight.SemiBold)
+                }
+                Divider(color = Divider2)
+                LazyColumn(Modifier.weight(1f, false)) {
+                    itemsIndexed(users) { i, user ->
+                        Row(Modifier.fillMaxWidth().clickable { onDm(user) }.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.size(38.dp).clip(CircleShape).background(avatarGradient(i)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                            }
+                            Text(user.channelName, color = TextPrimary, fontSize = 14.sp)
+                        }
+                    }
+                }
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Cancel", color = TextSec) }
+            }
+        }
+    }
+}
+
+@Composable
+fun CreateGroupDialog(users: List<ChatUser>, onSearch: (String) -> Unit, onCreate: (String, List<String>) -> Unit, onDismiss: () -> Unit) {
+    var groupName by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
+    val selected = remember { mutableStateListOf<String>() }
+    Dialog(onDismissRequest = onDismiss) {
+        Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Create Group", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(10.dp))
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                    if (groupName.isEmpty()) Text("Group name...", color = TextSec, fontSize = 13.sp)
+                    BasicTextField(value = groupName, onValueChange = { groupName = it },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
+                Spacer(Modifier.height(8.dp))
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                    if (query.isEmpty()) Text("Search members...", color = TextSec, fontSize = 13.sp)
+                    BasicTextField(value = query, onValueChange = { query = it; onSearch(it) },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.heightIn(max = 200.dp)) {
+                    itemsIndexed(users) { i, user ->
+                        val isSel = selected.contains(user._id)
+                        Row(Modifier.fillMaxWidth().clickable { if (isSel) selected.remove(user._id) else selected.add(user._id) }.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Checkbox(checked = isSel, onCheckedChange = { if (it) selected.add(user._id) else selected.remove(user._id) },
+                                colors = CheckboxDefaults.colors(checkedColor = AccentRed, uncheckedColor = TextSec))
+                            Box(Modifier.size(32.dp).clip(CircleShape).background(avatarGradient(i)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(18.dp))
+                            }
+                            Text(user.channelName, color = TextPrimary, fontSize = 14.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = TextSec) }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { if (groupName.isNotBlank() && selected.isNotEmpty()) onCreate(groupName.trim(), selected.toList()) },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                        enabled = groupName.isNotBlank() && selected.isNotEmpty()) { Text("Create") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AiCompanionChatTab(viewModel: ChatViewModel) {
+    val aiMessages by viewModel.aiMessages.collectAsState()
+    var inputText by remember { mutableStateOf("") }
+    val isLoading by viewModel.aiLoading.collectAsState()
+    val listState = rememberLazyListState()
+    LaunchedEffect(aiMessages.size) { if (aiMessages.isNotEmpty()) listState.animateScrollToItem(aiMessages.size - 1) }
+
+    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("🤖", fontSize = 20.sp)
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text("AI Companion", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("YT-Booster Assistant", color = Color(0xFF4CAF50), fontSize = 11.sp)
+            }
+        }
+        Divider(color = Divider2, thickness = 0.5.dp)
+        if (aiMessages.isEmpty()) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🤖", fontSize = 48.sp)
+                    Text("AI Companion", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Koi bhi sawaal pucho!", color = TextSec, fontSize = 14.sp)
+                }
+            }
+        } else {
+            LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                items(aiMessages) { msg ->
+                    val isUser = msg.role == "user"
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start) {
+                        if (!isUser) {
+                            Box(Modifier.size(32.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))),
+                                contentAlignment = Alignment.Center) { Text("🤖", fontSize = 16.sp) }
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Box(Modifier.widthIn(max = 260.dp)
+                            .clip(RoundedCornerShape(18.dp, 18.dp, if (isUser) 4.dp else 18.dp, if (isUser) 18.dp else 4.dp))
+                            .background(if (isUser) Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B))) else Brush.linearGradient(listOf(CardDark, CardAlt)))
+                            .padding(12.dp, 8.dp)) {
+                            Text(msg.text, color = Color.White, fontSize = 14.sp)
+                        }
+                    }
+                }
+                if (isLoading) {
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                            Box(Modifier.size(32.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))),
+                                contentAlignment = Alignment.Center) { Text("🤖", fontSize = 16.sp) }
+                            Spacer(Modifier.width(8.dp))
+                            Box(Modifier.clip(RoundedCornerShape(18.dp)).background(CardDark).padding(16.dp, 12.dp)) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = AccentRed, strokeWidth = 2.dp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding(),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                if (inputText.isEmpty()) Text("AI se pucho...", color = TextSec, fontSize = 14.sp)
+                BasicTextField(value = inputText, onValueChange = { inputText = it },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = {
+                        if (inputText.isNotBlank() && !isLoading) { viewModel.sendAiMessage(inputText.trim()); inputText = "" }
+                    }),
+                    maxLines = 4, modifier = Modifier.fillMaxWidth())
+            }
+            Box(Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))),
+                contentAlignment = Alignment.Center) {
+                IconButton(onClick = { if (inputText.isNotBlank() && !isLoading) { viewModel.sendAiMessage(inputText.trim()); inputText = "" } }) {
+                    Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AttachOption(emoji: String, label: String, onClick: () -> Unit) {
+    Column(
+        Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(12.dp, 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(Modifier.size(48.dp).clip(CircleShape).background(CardDark), contentAlignment = Alignment.Center) {
+            Text(text = emoji, fontSize = 24.sp)
+        }
+        Text(label, color = TextSec, fontSize = 11.sp)
+    }
+}
+
+@Composable
+fun EmojiPickerPanel(onEmojiSelected: (String) -> Unit) {
+    val categories = listOf(
+        "😊 Smileys" to listOf("😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙","🥲","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","🤐","🤨","😐","😑","😶","😏","😒","🙄","😬","🤥","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢","🤮","🤧","🥵","🥶","🥴","😵","🤯","🤠","🥳","🥸","😎","🤓","🧐","😕","😟","🙁","☹️","😮","😯","😲","😳","🥺","😦","😧","😨","😰","😥","😢","😭","😱","😖","😣","😞","😓","😩","😫","🥱","😤","😡","😠","🤬","😈","👿","💀","☠️","💩","🤡","👹","👺","👻","👽","👾","🤖"),
+        "👋 Gestures" to listOf("👋","🤚","🖐","✋","🖖","👌","🤌","🤏","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","🖕","👇","☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦾","🦿","🦵","🦶","👂","🦻","👃","🫀","🫁","🧠","🦷","🦴","👀","👁","👅","👄","💋","🩸"),
+        "❤️ Hearts" to listOf("❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","☮️","✝️","☪️","🕉","☸️","✡️","🔯","🕎","☯️","☦️","🛐","⛎","♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓","🆔","⚛️","🉑","☢️","☣️","📴","📳","🈶","🈚","🈸","🈺","🈷️","✴️","🆚","💮","🉐","㊙️","㊗️","🈴","🈵","🈹","🈲","🅰️","🅱️","🆎","🆑","🅾️","🆘","❌","⭕","🛑","⛔","📛","🚫"),
+        "🎉 Fun" to listOf("🎉","🎊","🎈","🎁","🎀","🎗","🎟","🎫","🎖","🏆","🥇","🥈","🥉","🏅","🎪","🤹","🎭","🎨","🎬","🎤","🎧","🎼","🎵","🎶","🎷","🎸","🎹","🎺","🎻","🥁","🪘","🎮","🕹","🎲","♟","🎯","🎳","🎰","🧩","🪅","🪆","🪄","🔮","🧿","🪬","🧸","🪀","🪁","🎠","🎡","🎢","🎪"),
+        "🔥 Popular" to listOf("🔥","💯","✨","⭐","🌟","💫","⚡","🌈","🎯","💥","🎆","🎇","🌊","🌸","🌺","🌻","🌹","🌷","🍀","🌿","🍃","🍂","🍁","🌾","🌵","🌴","🌳","🌲","🎋","🎍","🪴","🌱","🌾","🌏","🌍","🌎","🌕","🌖","🌗","🌘","🌑","🌒","🌓","🌔","🌙","🌛","🌜","🌚","🌝","🌞","🪐","⭐","🌟","💫","✨","⚡","🌤","⛅","🌥","☁️","🌦","🌧","⛈","🌩","🌨","❄️","☃️","⛄","🌬","💨","🌀","🌈","🌂","☂️","☔","⛱","⚡","❄️","🔥","💧","🌊"),
+        "🍕 Food" to listOf("🍕","🍔","🍟","🌭","🍿","🧂","🥓","🥚","🍳","🧇","🥞","🧈","🍞","🥐","🥖","🫓","🥨","🥯","🧀","🥗","🥙","🥪","🌮","🌯","🫔","🍱","🍘","🍙","🍚","🍛","🍜","🍝","🍠","🍢","🍣","🍤","🍥","🥮","🍡","🥟","🥠","🥡","🦀","🦞","🦐","🦑","🦪","🍦","🍧","🍨","🍩","🍪","🎂","🍰","🧁","🥧","🍫","🍬","🍭","🍮","🍯","🍼","🥛","☕","🫖","🍵","🧃","🥤","🧋","🍶","🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧉","🍾"),
+        "🐶 Animals" to listOf("🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐻‍❄️","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🙈","🙉","🙊","🐒","🐔","🐧","🐦","🐤","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🪱","🐛","🦋","🐌","🐞","🐜","🪲","🦟","🦗","🪳","🕷","🦂","🐢","🐍","🦎","🦖","🦕","🐙","🦑","🦐","🦞","🦀","🐡","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🦣","🐘","🦛","🦏","🐪","🐫","🦒","🦘","🦬","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🦮","🐕‍🦺","🐈","🐈‍⬛","🪶","🐓","🦃","🦤","🦚","🦜","🦢","🦩","🕊","🐇","🦝","🦨","🦡","🦫","🦦","🦥","🐁","🐀","🐿","🦔"),
+    )
+    var selectedCat by remember { mutableStateOf(0) }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .height(260.dp)
+            .background(CardDark)
+    ) {
+        // Category tabs - scrollable row
+        Row(
+            Modifier.fillMaxWidth().background(CardAlt).padding(4.dp).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            categories.forEachIndexed { i, (label, _) ->
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (selectedCat == i) AccentRed else Color.Transparent)
+                        .clickable { selectedCat = i }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(label.take(2), fontSize = 18.sp)
+                }
+            }
+        }
+        // Emoji grid
+        val emojis = categories[selectedCat].second
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(8),
+            modifier = Modifier.fillMaxSize().padding(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            gridItems(emojis) { emoji ->
+                Box(
+                    Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onEmojiSelected(emoji) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = emoji, fontSize = 22.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VoiceRecordButton(onVoiceSent: (java.io.File) -> Unit, onRecordingStateChanged: (Boolean) -> Unit = {}) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var isRecording by remember { mutableStateOf(false) }
+    var isPaused by remember { mutableStateOf(false) }
+    var recorder by remember { mutableStateOf<android.media.MediaRecorder?>(null) }
+    var voiceFile by remember { mutableStateOf<java.io.File?>(null) }
+    var elapsedSecs by remember { mutableStateOf(0) }
+    var swipeOffset by remember { mutableStateOf(0f) }
+
+    // Timer — runs while recording and not paused
+    LaunchedEffect(isRecording, isPaused) {
+        if (isRecording && !isPaused) {
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                elapsedSecs++
+            }
+        }
+    }
+
+    fun startRecording() {
+        val file = java.io.File(context.cacheDir, "voice_${System.currentTimeMillis()}.m4a")
+        voiceFile = file
+        try {
+            val rec = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                android.media.MediaRecorder(context)
+            } else {
+                @Suppress("DEPRECATION") android.media.MediaRecorder()
+            }
+            rec.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+            rec.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+            rec.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+            rec.setOutputFile(file.absolutePath)
+            rec.prepare()
+            rec.start()
+            recorder = rec
+            elapsedSecs = 0
+            isPaused = false
+            isRecording = true
+            onRecordingStateChanged(true)
+        } catch (e: Exception) { isRecording = false }
+    }
+
+    fun stopAndSend() {
+        try { recorder?.stop(); recorder?.release() } catch (e: Exception) { }
+        recorder = null
+        val f = voiceFile
+        isRecording = false; isPaused = false; elapsedSecs = 0; swipeOffset = 0f
+        onRecordingStateChanged(false)
+        if (f != null && f.exists() && f.length() > 0) onVoiceSent(f)
+    }
+
+    fun cancelRecording() {
+        try { recorder?.stop(); recorder?.release() } catch (e: Exception) { }
+        recorder = null
+        voiceFile?.delete(); voiceFile = null
+        isRecording = false; isPaused = false; elapsedSecs = 0; swipeOffset = 0f
+        onRecordingStateChanged(false)
+    }
+
+    fun formatTime(secs: Int) = "%d:%02d".format(secs / 60, secs % 60)
+
+    if (isRecording) {
+        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+        val pulseAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.3f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(600),
+                repeatMode = RepeatMode.Reverse
+            ), label = "alpha"
+        )
+        val waveAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.2f, targetValue = 0.9f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(400),
+                repeatMode = RepeatMode.Reverse
+            ), label = "wave"
+        )
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(CardAlt)
+                .padding(8.dp, 6.dp)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = { if (swipeOffset < -80f) cancelRecording() },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            swipeOffset = (swipeOffset + dragAmount).coerceIn(-200f, 0f)
+                        }
+                    )
+                },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(Modifier.size(32.dp).clip(CircleShape).background(Color(0xFF2A1A1A)).clickable { cancelRecording() },
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Close, null, tint = AccentRed, modifier = Modifier.size(16.dp))
+            }
+            Box(Modifier.size(10.dp).clip(CircleShape)
+                .background(if (isPaused) Color(0xFFFFAA00) else AccentRed.copy(alpha = pulseAlpha)))
+            if (swipeOffset < -20f) {
+                // Show slide to cancel hint
+                Text(
+                    "← Cancel",
+                    color = AccentRed.copy(alpha = ((-swipeOffset - 20f) / 60f).coerceIn(0f, 1f)),
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                Text(formatTime(elapsedSecs), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp))
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    listOf(0.4f, 0.7f, 1f, 0.6f, 0.9f, 0.5f, 0.8f, 0.3f).forEach { h ->
+                        Box(Modifier.width(3.dp).height((h * 20).dp).clip(RoundedCornerShape(2.dp))
+                            .background(AccentRed.copy(alpha = if (isPaused) 0.2f else (waveAlpha * h).coerceIn(0.1f, 1f))))
+                    }
+                }
+            }
+            Box(Modifier.size(32.dp).clip(CircleShape).background(SearchBg).clickable {
+                if (isPaused) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                        try { recorder?.resume() } catch (e: Exception) { }
+                    }
+                    isPaused = false
+                } else {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                        try { recorder?.pause() } catch (e: Exception) { }
+                    }
+                    isPaused = true
+                }
+            }, contentAlignment = Alignment.Center) {
+                Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, tint = TextPrimary, modifier = Modifier.size(18.dp))
+            }
+            Box(
+                Modifier.size(36.dp).clip(CircleShape)
+                    .background(if (elapsedSecs >= 3) Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B))) else Brush.linearGradient(listOf(Color(0xFF444444), Color(0xFF333333))))
+                    .clickable(enabled = elapsedSecs >= 3) { stopAndSend() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Send, null, tint = if (elapsedSecs >= 3) Color.White else Color(0xFF666666), modifier = Modifier.size(18.dp))
+            }
+        }
+    } else {
+        Box(
+            Modifier.size(36.dp).clip(CircleShape).background(SearchBg)
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { startRecording() }) },
+            contentAlignment = Alignment.Center
+        ) {
+            Text("🎤", fontSize = 16.sp)
+        }
+    }
+}
+
+fun formatChatTime(iso: String): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+        sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        val date = sdf.parse(iso) ?: return ""
+        val diff = Date().time - date.time
+        when {
+            diff < 60_000 -> "now"
+            diff < 3_600_000 -> "${diff / 60_000}m"
+            diff < 86_400_000 -> "${diff / 3_600_000}h"
+            else -> SimpleDateFormat("dd MMM", Locale.getDefault()).format(date)
+        }
+    } catch (e: Exception) { "" }
+}

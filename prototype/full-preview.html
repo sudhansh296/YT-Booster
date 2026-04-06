@@ -1,0 +1,1341 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT-Booster Preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;background:radial-gradient(ellipse at top,#1a0533,#0a0a1a 60%,#000);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;}
+h1{color:#e63946;font-size:22px;margin-bottom:4px;letter-spacing:1px;}
+.sub{color:#555;font-size:12px;margin-bottom:24px;}
+.phone{width:340px;height:720px;background:#111;border-radius:48px;border:8px solid #222;box-shadow:0 0 0 1px #333,0 40px 100px rgba(230,57,70,0.2);position:relative;overflow:hidden;}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:28px;background:#111;border-radius:0 0 20px 20px;z-index:100;}
+.screen{width:100%;height:100%;background:#0f0f0f;border-radius:40px;overflow:hidden;display:flex;flex-direction:column;}
+.sbar{height:42px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 24px 7px;font-size:11px;color:#fff;font-weight:600;flex-shrink:0;}
+.app-hdr{background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #e63946;flex-shrink:0;}
+.logo{color:#e63946;font-size:16px;font-weight:700;}
+.cbadge{background:#e63946;padding:5px 12px;border-radius:16px;font-weight:bold;font-size:13px;color:#fff;}
+.page{display:none;flex:1;overflow-y:auto;scrollbar-width:none;flex-direction:column;position:relative;min-height:0;}
+.page::-webkit-scrollbar{display:none;}
+.page.active{display:flex;}
+.scroll{padding:14px;display:flex;flex-direction:column;gap:10px;}
+.bnav{display:flex;background:#111;border-top:1px solid #1a1a2e;flex-shrink:0;height:58px;}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:8px;color:#444;gap:2px;transition:color 0.2s;position:relative;}
+.ni.active{color:#e63946;}
+.ni .ic{font-size:18px;}
+.ni.active::after{content:'';position:absolute;bottom:4px;width:4px;height:4px;border-radius:50%;background:#e63946;}
+.card{background:#1a1a2e;border-radius:12px;padding:14px;border:1px solid #2a2a3e;}
+.row{display:flex;align-items:center;gap:10px;}
+.col{display:flex;flex-direction:column;gap:4px;}
+.t1{font-size:13px;font-weight:700;color:#fff;}
+.t2{font-size:11px;color:#666;}
+.t3{font-size:10px;color:#aaa;}
+.lbl{font-size:10px;color:#444;text-transform:uppercase;letter-spacing:1px;}
+.green{color:#2ecc71;} .gold{color:#ffd700;} .red{color:#e63946;} .blue{color:#29b6f6;}
+.btn-red{background:#e63946;color:#fff;padding:8px 16px;font-size:12px;border:none;border-radius:8px;cursor:pointer;font-weight:600;}
+.btn-red:disabled{background:#2ecc71;cursor:default;}
+.btn-out{background:none;border:1px solid #e63946;color:#e63946;padding:7px 14px;font-size:11px;border-radius:8px;cursor:pointer;}
+.stat-row{display:flex;gap:8px;}
+.stat{flex:1;background:#0f0f0f;border-radius:10px;padding:10px;text-align:center;border:1px solid #2a2a3e;}
+.stat .sv{font-size:16px;font-weight:700;}
+.stat .sl{font-size:10px;color:#555;margin-top:2px;}
+.qcard{background:#1a1a2e;border-radius:12px;padding:12px;border:1px solid #2a2a3e;display:flex;align-items:center;gap:10px;}
+.av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.etabs{display:flex;background:#1a1a2e;border-bottom:1px solid #2a2a3e;flex-shrink:0;}
+.etab{flex:1;padding:9px 4px;text-align:center;cursor:pointer;font-size:10px;color:#444;border-bottom:2px solid transparent;transition:all 0.2s;}
+.etab.active{color:#e63946;border-bottom-color:#e63946;}
+.etab-pg{display:none;padding:12px;overflow-y:auto;scrollbar-width:none;}
+.etab-pg::-webkit-scrollbar{display:none;}
+.etab-pg.active{display:block;}
+.tbar{background:#333;height:4px;border-radius:2px;margin:6px 0;overflow:hidden;}
+.tfill{height:100%;background:linear-gradient(90deg,#e63946,#ff6b6b);width:0%;transition:width 1s linear;border-radius:2px;}
+.lb-row{background:#1a1a2e;border-radius:10px;padding:11px 12px;border:1px solid #2a2a3e;display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.ref-code{font-size:28px;font-weight:900;color:#ffd700;letter-spacing:4px;}
+.prog-bar{background:#2a2a3e;height:6px;border-radius:3px;overflow:hidden;margin:4px 0;}
+.prog-fill{height:100%;border-radius:3px;}
+.txn{background:#1a1a2e;border-radius:10px;padding:12px;border:1px solid #2a2a3e;display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.txn-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;}
+.prof-pic{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 10px;}
+.chat-hdr{background:linear-gradient(135deg,#1a0a2e,#0d0d1a);padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(230,57,70,0.2);flex-shrink:0;}
+.bot-av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.chat-msgs{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;scrollbar-width:none;}
+.chat-msgs::-webkit-scrollbar{display:none;}
+.cmsg{display:flex;gap:6px;}
+.cmsg.user{flex-direction:row-reverse;}
+.cav{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.cbbl{max-width:220px;padding:8px 10px;border-radius:12px;font-size:11px;line-height:1.5;}
+.cmsg.bot .cbbl{background:rgba(255,255,255,0.07);color:#ddd;border-bottom-left-radius:3px;}
+.cmsg.user .cbbl{background:linear-gradient(135deg,#e63946,#c0392b);color:#fff;border-bottom-right-radius:3px;}
+.sugs{display:flex;flex-wrap:wrap;gap:5px;padding:0 10px 8px;flex-shrink:0;}
+.sug{background:rgba(230,57,70,0.1);border:1px solid rgba(230,57,70,0.3);color:#e63946;padding:5px 9px;border-radius:14px;font-size:10px;cursor:pointer;font-weight:600;}
+.cinp-row{padding:8px 10px;background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:6px;align-items:center;flex-shrink:0;}
+.cinp{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:7px 10px;border-radius:18px;font-size:11px;outline:none;}
+.cinp::placeholder{color:#444;}
+.csend{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);border:none;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.chat-fab{position:absolute;bottom:10px;right:12px;width:42px;height:42px;background:linear-gradient(135deg,#e63946,#c0392b);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(230,57,70,0.5);z-index:20;}
+.chat-panel{position:absolute;bottom:0;left:0;right:0;height:78%;background:#0d0d1a;border-radius:20px 20px 0 0;border-top:2px solid rgba(230,57,70,0.4);display:flex;flex-direction:column;z-index:30;transform:translateY(110%);transition:transform 0.3s ease;visibility:hidden;overflow:hidden;}
+.chat-panel.open{transform:translateY(0);visibility:visible;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-5px);}}
+.dot{width:5px;height:5px;border-radius:50%;background:#2ecc71;animation:pulse 2s infinite;display:inline-block;}
+</style>
+</head>
+<body>
+<h1>&#128640; YT-Booster</h1>
+<p class="sub">App Preview — Real app jaisa</p>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="screen">
+    <div class="sbar"><span>9:41</span><span>&#9679;&#9679;&#9679;</span></div>
+    <div class="app-hdr">
+      <span class="logo">&#128640; YT-Booster</span>
+      <div class="cbadge">&#129689; <span id="coins">120</span></div>
+    </div>
+
+    <!-- HOME -->
+    <div class="page active" id="pg-home">
+      <div class="scroll">
+        <div class="card row">
+          <div class="av">&#128100;</div>
+          <div class="col" style="flex:1"><div class="t1">User123</div><div class="gold" style="font-size:13px">120 Coins</div></div>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="sv blue">47</div><div class="sl">Given</div></div>
+          <div class="stat"><div class="sv green">32</div><div class="sl">Received</div></div>
+          <div class="stat"><div class="sv gold">840</div><div class="sl">Earned</div></div>
+        </div>
+        <div class="lbl">Subscribe karo, Coins kamao</div>
+        <div class="qcard">
+          <div class="av" style="font-size:16px">&#128100;</div>
+          <div class="col" style="flex:1"><div class="t1">TechGuru India</div><div class="gold" style="font-size:11px">+2 coins</div></div>
+          <button class="btn-red" id="sb1" onclick="doSub(1)">Subscribe</button>
+        </div>
+        <div class="qcard">
+          <div class="av" style="font-size:16px">&#128100;</div>
+          <div class="col" style="flex:1"><div class="t1">PriyaCreates</div><div class="gold" style="font-size:11px">+2 coins</div></div>
+          <button class="btn-red" id="sb2" onclick="doSub(2)">Subscribe</button>
+        </div>
+        <button class="btn-red" id="bonusBtn" onclick="claimBonus()" style="width:100%;padding:11px;font-size:13px;border-radius:10px">&#127873; Daily Bonus Claim Karo</button>
+        <button onclick="toast('Telegram: @GODCHEATOFFICIAL')" style="width:100%;padding:11px;font-size:13px;border-radius:10px;background:#1a3a1a;color:#ffd700;border:none;cursor:pointer;font-weight:600">&#128176; Buy Coins</button>
+        <button onclick="openUserChat()" style="width:100%;padding:11px;font-size:13px;border-radius:10px;background:#0d1a2e;color:#29b6f6;border:1px solid #29b6f6;cursor:pointer;font-weight:600">&#128172; Community Chat <span style="background:#e63946;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px">LIVE</span></button>
+        <!-- Leaderboard section on Home -->
+        <div class="lbl" style="margin-top:4px">&#127942; Top Earners</div>
+        <div class="card" style="background:#1a1a3a;border-color:#333;padding:10px 12px"><div class="row" style="justify-content:space-between"><div class="t3">Meri Rank</div><div class="gold" style="font-size:18px;font-weight:900">#5</div><div class="blue" style="font-size:11px">840 coins</div></div></div>
+        <div class="lb-row" style="border-color:#ffd700;margin-bottom:6px"><span style="font-size:18px;width:28px">&#129351;</span><div class="av" style="width:32px;height:32px;font-size:13px">&#128100;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">RahulYT</div><div class="t3">Given: 120</div></div><div class="gold" style="font-weight:700;font-size:14px">2400 &#129689;</div></div>
+        <div class="lb-row" style="border-color:#ffd700;margin-bottom:6px"><span style="font-size:18px;width:28px">&#129352;</span><div class="av" style="width:32px;height:32px;font-size:13px">&#128100;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">PriyaCreates</div><div class="t3">Given: 98</div></div><div class="gold" style="font-weight:700;font-size:14px">1980 &#129689;</div></div>
+        <div class="lb-row" style="border-color:#ffd700;margin-bottom:6px"><span style="font-size:18px;width:28px">&#129353;</span><div class="av" style="width:32px;height:32px;font-size:13px">&#128100;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">TechBoyAman</div><div class="t3">Given: 85</div></div><div class="gold" style="font-weight:700;font-size:14px">1700 &#129689;</div></div>
+        <div class="lb-row" style="border-color:#e63946;margin-bottom:6px"><span style="font-size:13px;width:28px;color:#e63946">#5</span><div class="av" style="width:32px;height:32px;font-size:13px">&#11088;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">You</div><div class="t3">Given: 47</div></div><div class="gold" style="font-weight:700;font-size:14px">840 &#129689;</div></div>
+        <button onclick="toggleGetSubs()" style="width:100%;padding:11px;font-size:13px;border-radius:10px;background:#2a1a00;color:#ffd700;border:none;cursor:pointer;font-weight:600">&#128640; Use Coins &#8594; Get Subscribers</button>
+        <div id="getSubsPanel" style="display:none">
+          <div class="card" style="border-color:#e63946">
+            <div class="t1" style="margin-bottom:10px">&#128640; Get Subscribers</div>
+            <div id="orderMsg" style="font-size:11px;margin-bottom:8px;color:#2ecc71;display:none"></div>
+            <div class="card" style="margin-bottom:8px;background:#0f0f0f;border-color:#2a2a3e"><div class="row" style="justify-content:space-between"><div><div class="t1">100 Subs</div><div class="gold" style="font-size:11px">1000 Coins</div></div><button class="btn-red" style="font-size:11px;padding:6px 10px" onclick="redeemSubs(1000,100)">Redeem</button></div></div>
+            <div class="card" style="margin-bottom:8px;background:#0f0f0f;border-color:#2a2a3e"><div class="row" style="justify-content:space-between"><div><div class="t1">500 Subs</div><div class="gold" style="font-size:11px">5000 Coins</div></div><button class="btn-red" style="font-size:11px;padding:6px 10px" onclick="redeemSubs(5000,500)">Redeem</button></div></div>
+            <div class="card" style="background:#0f0f0f;border-color:#ff6b00"><div class="row" style="justify-content:space-between"><div><div class="t1">1500 Subs <span style="color:#ff6b00;font-size:10px">&#128293; Best</span></div><div class="gold" style="font-size:11px">10000 Coins</div></div><button class="btn-red" style="font-size:11px;padding:6px 10px" onclick="redeemSubs(10000,1500)">Redeem</button></div></div>
+            <button class="btn-out" onclick="toggleGetSubs()" style="width:100%;margin-top:10px;padding:8px">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT PAGE (User-to-User Community Chat) -->
+    <!-- CHAT PAGE -->
+    <div class="page" id="pg-chat" style="flex-direction:column;position:relative">
+
+      <!-- VIEW 1: DM List -->
+      <div id="chat-list-view" style="display:flex;flex-direction:column;flex:1;min-height:0">
+        <!-- Header -->
+        <div style="background:#1a1a2e;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a2a3e;flex-shrink:0">
+          <div class="t1" style="font-size:14px">&#128172; Messages</div>
+          <div style="color:#2ecc71;font-size:10px;display:flex;align-items:center;gap:3px"><span class="dot"></span>247 online</div>
+        </div>
+        <!-- Search -->
+        <div style="padding:8px 12px;flex-shrink:0">
+          <input placeholder="&#128269; User search karo..." style="width:100%;background:#1a1a2e;border:1px solid #2a2a3e;color:#fff;padding:7px 12px;border-radius:20px;font-size:11px;outline:none">
+        </div>
+        <!-- Tabs: DM / Group -->
+        <div style="display:flex;border-bottom:1px solid #2a2a3e;flex-shrink:0;align-items:center">
+          <div id="ct-dm" onclick="switchChatTab('dm')" style="flex:1;text-align:center;padding:8px;font-size:11px;color:#e63946;border-bottom:2px solid #e63946;cursor:pointer;font-weight:600">Direct</div>
+          <div id="ct-grp" onclick="switchChatTab('grp')" style="flex:1;text-align:center;padding:8px;font-size:11px;color:#444;border-bottom:2px solid transparent;cursor:pointer">Group</div>
+          <div onclick="openCreateGroup()" style="padding:8px 12px;cursor:pointer;font-size:18px;color:#e63946" title="New Group">&#43;</div>
+        </div>
+        <!-- DM List -->
+        <div id="dm-list" style="flex:1;overflow-y:auto;scrollbar-width:none"></div>
+        <!-- Group List -->
+        <div id="grp-list" style="flex:1;overflow-y:auto;scrollbar-width:none;display:none">
+          <!-- Default groups -->
+          <div onclick="openDM('community','Community Chat','#29b6f6',true)" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #1a1a2e;cursor:pointer">
+            <div style="width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#29b6f6,#0288d1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">&#128172;</div>
+            <div style="flex:1"><div class="t1" style="font-size:12px">Community Chat</div><div class="t3" style="font-size:10px">247 members online</div></div>
+            <div style="background:#e63946;color:#fff;border-radius:10px;padding:1px 6px;font-size:9px;font-weight:700">LIVE</div>
+          </div>
+          <div onclick="openDM('ytcreators','YT Creators India','#ffd700',true)" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #1a1a2e;cursor:pointer">
+            <div style="width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#ffd700,#e65100);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">&#127909;</div>
+            <div style="flex:1"><div class="t1" style="font-size:12px">YT Creators India</div><div class="t3" style="font-size:10px">89 members</div></div>
+            <div style="background:#2a2a3e;color:#aaa;border-radius:10px;padding:1px 6px;font-size:9px">3</div>
+          </div>
+          <!-- User-created groups rendered here -->
+          <div id="user-grp-list"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Private Chat Window -->
+      <div id="chat-dm-view" style="display:none;flex-direction:column;flex:1;min-height:0;position:absolute;inset:0;background:#0f0f0f;z-index:10">
+        <!-- DM Header -->
+        <div style="background:#1a1a2e;padding:8px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e;flex-shrink:0">
+          <button onclick="closeDM()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer;padding:0 4px">&#8592;</button>
+          <div id="dm-av" style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;background:linear-gradient(135deg,#e63946,#111)">&#128100;</div>
+          <div style="flex:1;cursor:pointer" onclick="showDMInfo()">
+            <div id="dm-name" class="t1" style="font-size:13px">User</div>
+            <div id="dm-status" style="color:#2ecc71;font-size:10px;display:flex;align-items:center;gap:3px"><span class="dot"></span>Online</div>
+          </div>
+          <span style="font-size:16px;cursor:pointer;color:#aaa;margin-right:4px" onclick="toast('&#128269; Search — coming soon!')">&#128269;</span>
+          <span style="font-size:18px;cursor:pointer;color:#aaa" onclick="showDMMenu(event)">&#8942;</span>
+        </div>
+        <!-- Pinned message bar -->
+        <div id="dm-pinned" style="display:none;background:#1a1a2e;border-bottom:1px solid #2a2a3e;padding:6px 12px;align-items:center;gap:8px;flex-shrink:0;cursor:pointer">
+          <div style="width:3px;height:32px;background:#e63946;border-radius:2px;flex-shrink:0"></div>
+          <div><div style="font-size:9px;color:#e63946;font-weight:600">Pinned Message</div><div id="dm-pinned-text" style="font-size:10px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px"></div></div>
+          <button onclick="document.getElementById('dm-pinned').style.display='none'" style="margin-left:auto;background:none;border:none;color:#555;font-size:14px;cursor:pointer">&#10005;</button>
+        </div>
+        <!-- Messages -->
+        <div id="dm-msgs" style="flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:2px;scrollbar-width:none;background:linear-gradient(180deg,#0a0a14,#0f0f0f)"></div>
+        <!-- Reply preview bar -->
+        <div id="reply-bar" style="display:none;background:#1a1a2e;border-top:1px solid #2a2a3e;padding:6px 12px;align-items:center;gap:8px;flex-shrink:0">
+          <div style="width:3px;height:28px;background:#e63946;border-radius:2px;flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:9px;color:#e63946;font-weight:600">Reply</div><div id="reply-text" style="font-size:10px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px"></div></div>
+          <button onclick="cancelReply()" style="background:none;border:none;color:#555;font-size:16px;cursor:pointer">&#10005;</button>
+        </div>
+        <!-- Typing indicator -->
+        <div id="dm-typing" style="padding:2px 14px 2px;font-size:10px;color:#555;display:none;flex-shrink:0;font-style:italic">typing...</div>
+        <!-- Input bar -->
+        <div style="padding:6px 8px;background:#111;border-top:1px solid #1a1a2e;display:flex;gap:6px;align-items:flex-end;flex-shrink:0">
+          <button id="attach-btn" onclick="toast('&#128206; Attach — coming soon!')" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0">&#128206;</button>
+          <div style="flex:1;background:#1a1a2e;border-radius:20px;padding:6px 12px;display:flex;align-items:center;gap:6px">
+            <input id="dm-inp" style="flex:1;background:none;border:none;color:#fff;font-size:12px;outline:none" placeholder="Message..." onkeydown="if(event.key==='Enter')dmSend()" oninput="toggleVoiceBtn()">
+            <span style="font-size:14px;cursor:pointer;color:#555" onclick="toast('&#128578; Emoji — coming soon!')">&#128578;</span>
+          </div>
+          <button id="voice-btn" onclick="toast('&#127908; Voice message — coming soon!')" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#127908;</button>
+          <button id="send-btn" onclick="dmSend()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;display:none">&#10148;</button>
+        </div>
+      </div>
+
+      <!-- DM Context Menu -->
+      <div id="dm-ctx-menu" style="display:none;position:fixed;background:#1a1a2e;border:1px solid #2a2a3e;border-radius:12px;z-index:500;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.6);overflow:hidden">
+        <div onclick="ctxReply()" style="padding:10px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #2a2a3e">&#8617; Reply</div>
+        <div onclick="ctxReact()" style="padding:10px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #2a2a3e">&#128515; React</div>
+        <div onclick="ctxStar()" style="padding:10px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #2a2a3e">&#11088; Star</div>
+        <div onclick="ctxPin()" style="padding:10px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #2a2a3e">&#128204; Pin</div>
+        <div onclick="ctxCopy()" style="padding:10px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #2a2a3e">&#128203; Copy</div>
+        <div onclick="ctxDelete()" style="padding:10px 16px;font-size:12px;color:#e63946;cursor:pointer;display:flex;align-items:center;gap:8px">&#128465; Delete</div>
+      </div>
+      <!-- Reaction picker -->
+      <div id="react-picker" style="display:none;position:fixed;background:#1a1a2e;border:1px solid #2a2a3e;border-radius:30px;z-index:501;padding:6px 10px;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+        <span onclick="addReaction('&#128077;')" style="font-size:20px;cursor:pointer">&#128077;</span>
+        <span onclick="addReaction('&#10084;')" style="font-size:20px;cursor:pointer">&#10084;</span>
+        <span onclick="addReaction('&#128514;')" style="font-size:20px;cursor:pointer">&#128514;</span>
+        <span onclick="addReaction('&#128562;')" style="font-size:20px;cursor:pointer">&#128562;</span>
+        <span onclick="addReaction('&#128293;')" style="font-size:20px;cursor:pointer">&#128293;</span>
+        <span onclick="addReaction('&#128079;')" style="font-size:20px;cursor:pointer">&#128079;</span>
+      </div>
+
+      <!-- More Options Dropdown -->
+      <div id="dm-more-menu" style="display:none;position:fixed;background:#1a1a2e;border:1px solid #2a2a3e;border-radius:14px;z-index:502;min-width:190px;box-shadow:0 8px 32px rgba(0,0,0,0.7);overflow:hidden">
+        <div onclick="dmMenuAction('search')" style="padding:11px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e">
+          <span style="font-size:16px">&#128269;</span> Search in Chat
+        </div>
+        <div onclick="dmMenuAction('starred')" style="padding:11px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e">
+          <span style="font-size:16px">&#11088;</span> Starred Messages
+        </div>
+        <div onclick="dmMenuAction('pinned')" style="padding:11px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e">
+          <span style="font-size:16px">&#128204;</span> Pinned Messages
+        </div>
+        <div onclick="dmMenuAction('media')" style="padding:11px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e">
+          <span style="font-size:16px">&#128247;</span> Media &amp; Files
+        </div>
+        <div id="mute-option" onclick="dmMenuAction('mute')" style="padding:11px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e">
+          <span style="font-size:16px">&#128263;</span> <span id="mute-label">Mute Notifications</span>
+        </div>
+        <div onclick="dmMenuAction('clear')" style="padding:11px 16px;font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e">
+          <span style="font-size:16px">&#128465;</span> Clear Chat
+        </div>
+        <div onclick="dmMenuAction('block')" style="padding:11px 16px;font-size:12px;color:#e63946;cursor:pointer;display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px">&#128683;</span> <span id="block-label">Block User</span>
+        </div>
+      </div>
+
+      <!-- Search in Chat overlay -->
+      <div id="dm-search-bar" style="display:none;position:absolute;top:0;left:0;right:0;background:#1a1a2e;padding:8px 10px;display:flex;align-items:center;gap:8px;z-index:20;border-bottom:1px solid #2a2a3e;flex-shrink:0">
+        <input id="dm-search-inp" placeholder="&#128269; Message search karo..." style="flex:1;background:#0f0f0f;border:1px solid #333;color:#fff;padding:7px 12px;border-radius:20px;font-size:11px;outline:none" oninput="dmSearchMessages(this.value)">
+        <button onclick="closeDMSearch()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer">&#10005;</button>
+      </div>
+
+      <!-- Starred Messages Panel -->
+      <div id="starred-panel" style="display:none;position:absolute;inset:0;background:#0f0f0f;z-index:25;flex-direction:column">
+        <div style="background:#1a1a2e;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e;flex-shrink:0">
+          <button onclick="closeStarredPanel()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer">&#8592;</button>
+          <div style="font-size:13px;font-weight:700;color:#fff">&#11088; Starred Messages</div>
+        </div>
+        <div id="starred-list" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;scrollbar-width:none">
+          <div id="starred-empty" style="text-align:center;color:#444;font-size:12px;margin-top:40px">Koi starred message nahi hai<br><span style="font-size:24px">&#11088;</span></div>
+        </div>
+      </div>
+
+      <!-- Pinned Messages Panel -->
+      <div id="pinned-panel" style="display:none;position:absolute;inset:0;background:#0f0f0f;z-index:25;flex-direction:column">
+        <div style="background:#1a1a2e;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a2a3e;flex-shrink:0">
+          <button onclick="closePinnedPanel()" style="background:none;border:none;color:#aaa;font-size:18px;cursor:pointer">&#8592;</button>
+          <div style="font-size:13px;font-weight:700;color:#fff">&#128204; Pinned Messages</div>
+        </div>
+        <div id="pinned-list" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;scrollbar-width:none">
+          <div id="pinned-empty" style="text-align:center;color:#444;font-size:12px;margin-top:40px">Koi pinned message nahi hai<br><span style="font-size:24px">&#128204;</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- REFERRAL -->
+    <div class="page" id="pg-refer">
+      <div class="scroll">
+        <div class="t1" style="font-size:16px;margin-bottom:4px">&#127873; Referral</div>
+        <div class="card" style="background:#1a1a3a;border-color:#333">
+          <div class="gold" style="font-size:14px;font-weight:700;margin-bottom:8px">Dost ko invite karo &#128640;</div>
+          <div class="t2">&#8226; Tumhe milega: +20 Coins</div>
+          <div class="t2">&#8226; Dost ko milega: +20 Coins</div>
+          <div class="green" style="font-size:12px;margin-top:4px">&#8226; Jitne dost, utne coins!</div>
+        </div>
+        <div class="card">
+          <div class="t3" style="margin-bottom:6px">Mera Referral Code</div>
+          <div class="row" style="justify-content:space-between;margin-bottom:12px">
+            <div class="ref-code">YTB-X7K2</div>
+            <button class="btn-red" style="font-size:11px" onclick="toast('Code copied!')">Copy</button>
+          </div>
+          <div class="t3" style="margin-bottom:4px">Referral Link</div>
+          <div class="blue" style="font-size:11px;margin-bottom:8px">ytbooster.app/ref/YTB-X7K2</div>
+          <div class="row" style="gap:8px;margin-bottom:14px">
+            <button class="btn-out" style="flex:1;padding:7px;font-size:11px" onclick="toast('Link copied!')">Copy Link</button>
+            <button class="btn-red" style="flex:1;padding:7px;font-size:11px">Share &#128228;</button>
+          </div>
+          <div style="border-top:1px solid #2a2a3e;padding-top:12px;margin-bottom:12px">
+            <div class="t3" style="margin-bottom:8px">Referral Stats</div>
+            <div class="stat-row">
+              <div class="stat"><div class="sv green">2</div><div class="sl">Aaj</div></div>
+              <div class="stat"><div class="sv blue">8</div><div class="sl">Week</div></div>
+              <div class="stat"><div class="sv" style="color:#ff9800">15</div><div class="sl">Month</div></div>
+              <div class="stat"><div class="sv gold">23</div><div class="sl">Total</div></div>
+            </div>
+          </div>
+          <div style="text-align:center;border-top:1px solid #2a2a3e;padding-top:12px;margin-bottom:12px">
+            <div class="gold" style="font-size:22px;font-weight:900">460</div>
+            <div class="t3">Total Coins Earned</div>
+          </div>
+          <div style="border-top:1px solid #2a2a3e;padding-top:12px">
+            <div class="gold" style="font-size:13px;font-weight:700;margin-bottom:10px">&#127942; Milestone Bonuses</div>
+            <div style="margin-bottom:10px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><div class="row" style="gap:6px"><span>&#9989;</span><div class="t2">5 Referrals</div></div><div class="green" style="font-size:12px;font-weight:700">Claimed &#10003;</div></div><div class="prog-bar"><div class="prog-fill" style="width:100%;background:#2ecc71"></div></div></div>
+            <div style="margin-bottom:10px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><div class="row" style="gap:6px"><span>&#127873;</span><div class="t2">10 Referrals</div></div><div class="gold" style="font-size:12px;font-weight:700">+100 Coins</div></div><div class="prog-bar"><div class="prog-fill" style="width:80%;background:#ffd700"></div></div><div class="t3" style="font-size:9px">8/10 (2 aur chahiye)</div></div>
+            <div><div class="row" style="justify-content:space-between;margin-bottom:4px"><div class="row" style="gap:6px"><span>&#128274;</span><div class="t2" style="color:#444">25 Referrals</div></div><div style="font-size:12px;font-weight:700;color:#444">+300 Coins</div></div><div class="prog-bar"><div class="prog-fill" style="width:32%;background:#555"></div></div><div class="t3" style="font-size:9px">8/25 (17 aur chahiye)</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="t3" style="margin-bottom:8px">Kisi ka code use karo</div>
+          <input id="refInp" placeholder="Referral code daalo" style="width:100%;background:#0f0f0f;border:1px solid #333;color:#fff;padding:9px 12px;border-radius:8px;font-size:12px;outline:none;margin-bottom:8px;text-transform:uppercase">
+          <button class="btn-red" style="width:100%;padding:10px;font-size:13px;border-radius:8px" onclick="applyRef()">Apply Code (+20 Coins)</button>
+          <div id="refMsg" style="font-size:11px;margin-top:6px;display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXCHANGE -->
+    <div class="page" id="pg-exchange" style="flex-direction:column">
+      <div class="etabs">
+        <div class="etab active" id="et-watch" onclick="showETab('watch',this)">&#128065; Watch</div>
+        <div class="etab" id="et-like" onclick="showETab('like',this)">&#128077; Like</div>
+        <div class="etab" id="et-comment" onclick="showETab('comment',this)">&#128172; Comment</div>
+        <div class="etab" id="et-submit" onclick="showETab('submit',this)">&#128228; Submit</div>
+      </div>
+      <div style="flex:1;overflow-y:auto;scrollbar-width:none">
+        <div class="etab-pg active" id="ep-watch">
+          <!-- Short / Long toggle -->
+          <div style="display:flex;background:#1a1a2e;border-radius:10px;padding:3px;margin-bottom:10px;gap:3px">
+            <button id="wtype-short" onclick="switchWatchType('short')" style="flex:1;padding:6px;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:#e63946;color:#fff">&#9889; Short Video</button>
+            <button id="wtype-long" onclick="switchWatchType('long')" style="flex:1;padding:6px;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:none;color:#555">&#127909; Long Video</button>
+          </div>
+          <!-- Short videos list -->
+          <div id="watch-short-list">
+            <div style="background:#16213e;border:1px solid #2ecc71;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#2ecc71">&#9432; Short video (60s max) • Watch karo &#8594; Coins milenge!</div>
+            <div class="card" style="padding:0;overflow:hidden;margin-bottom:10px">
+              <div style="position:relative;height:90px;background:linear-gradient(135deg,#e63946,#1a1a2e)">
+                <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:34px;height:34px;background:rgba(230,57,70,0.9);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px">&#9654;</div></div>
+                <div style="position:absolute;top:5px;left:6px;background:#9c27b0;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600">SHORT</div>
+                <div style="position:absolute;top:5px;right:6px;background:rgba(230,57,70,0.9);padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600">&#129689; up to 2</div>
+              </div>
+              <div style="padding:9px"><div class="t1" style="font-size:11px;margin-bottom:2px">5 Quick YouTube Tips #shorts</div><div class="t3" style="margin-bottom:6px">TechGuru India • 45K views</div>
+              <div style="display:flex;gap:4px;margin-bottom:6px"><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">30s=1&#129689;</span><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">60s=2&#129689;</span></div>
+              <div class="tbar"><div class="tfill" id="wf-s1"></div></div><div id="wt-s1" class="t3" style="margin-bottom:5px">Watch Now dabao</div>
+              <button class="btn-red" id="wb-s1" onclick="startWatchV2('s1','https://www.youtube.com/shorts/dQw4w9WgXcQ',60,2)" style="width:100%;padding:7px;font-size:11px;border-radius:7px">&#9654; Watch Short</button></div>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="position:relative;height:90px;background:linear-gradient(135deg,#1a1a2e,#9c27b0)">
+                <img src="https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:34px;height:34px;background:rgba(230,57,70,0.9);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px">&#9654;</div></div>
+                <div style="position:absolute;top:5px;left:6px;background:#9c27b0;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600">SHORT</div>
+                <div style="position:absolute;top:5px;right:6px;background:rgba(230,57,70,0.9);padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600">&#129689; up to 2</div>
+              </div>
+              <div style="padding:9px"><div class="t1" style="font-size:11px;margin-bottom:2px">Android Tips in 60s #shorts</div><div class="t3" style="margin-bottom:6px">AppReviewer • 28K views</div>
+              <div style="display:flex;gap:4px;margin-bottom:6px"><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">30s=1&#129689;</span><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">60s=2&#129689;</span></div>
+              <div class="tbar"><div class="tfill" id="wf-s2"></div></div><div id="wt-s2" class="t3" style="margin-bottom:5px">Watch Now dabao</div>
+              <button class="btn-red" id="wb-s2" onclick="startWatchV2('s2','https://www.youtube.com/shorts/9bZkp7q19f0',60,2)" style="width:100%;padding:7px;font-size:11px;border-radius:7px">&#9654; Watch Short</button></div>
+            </div>
+          </div>
+          <!-- Long videos list -->
+          <div id="watch-long-list" style="display:none">
+            <div style="background:#16213e;border:1px solid #ffd700;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#ffd700">&#9432; Long video (90s+ watch) • Zyada watch = Zyada coins!</div>
+            <div class="card" style="padding:0;overflow:hidden;margin-bottom:10px">
+              <div style="position:relative;height:110px;background:linear-gradient(135deg,#e63946,#1a1a2e)">
+                <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:38px;height:38px;background:rgba(230,57,70,0.9);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px">&#9654;</div></div>
+                <div style="position:absolute;top:5px;left:6px;background:#ff9800;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600">LONG</div>
+                <div style="position:absolute;top:5px;right:6px;background:rgba(230,57,70,0.9);padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600">&#129689; up to 5</div>
+              </div>
+              <div style="padding:10px"><div class="t1" style="font-size:12px;margin-bottom:2px">How to Grow YouTube Fast 2025</div><div class="t3" style="margin-bottom:7px">TechGuru India • 12K views</div>
+              <div style="display:flex;gap:4px;margin-bottom:7px;flex-wrap:wrap"><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">30s=1&#129689;</span><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">60s=2&#129689;</span><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">90s=3&#129689;</span><span style="background:#1a2a00;border:1px solid #ffd700;color:#ffd700;padding:2px 6px;border-radius:8px;font-size:9px">120s=4&#129689;</span><span style="background:#1a2a00;border:1px solid #ffd700;color:#ffd700;padding:2px 6px;border-radius:8px;font-size:9px">150s=5&#129689;</span></div>
+              <div class="tbar"><div class="tfill" id="wf-l1"></div></div><div id="wt-l1" class="t3" style="margin-bottom:6px">Watch Now dabao</div>
+              <button class="btn-red" id="wb-l1" onclick="startWatchV2('l1','https://www.youtube.com/watch?v=dQw4w9WgXcQ',150,5)" style="width:100%;padding:8px;font-size:11px;border-radius:7px">&#9654; Watch Long Video</button></div>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="position:relative;height:110px;background:linear-gradient(135deg,#1a1a2e,#e63946)">
+                <img src="https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:38px;height:38px;background:rgba(230,57,70,0.9);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px">&#9654;</div></div>
+                <div style="position:absolute;top:5px;left:6px;background:#ff9800;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600">LONG</div>
+                <div style="position:absolute;top:5px;right:6px;background:rgba(230,57,70,0.9);padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600">&#129689; up to 5</div>
+              </div>
+              <div style="padding:10px"><div class="t1" style="font-size:12px;margin-bottom:2px">Best Android Apps 2025</div><div class="t3" style="margin-bottom:7px">AppReviewer • 8.5K views</div>
+              <div style="display:flex;gap:4px;margin-bottom:7px;flex-wrap:wrap"><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">30s=1&#129689;</span><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">60s=2&#129689;</span><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px">90s=3&#129689;</span><span style="background:#1a2a00;border:1px solid #ffd700;color:#ffd700;padding:2px 6px;border-radius:8px;font-size:9px">120s=4&#129689;</span><span style="background:#1a2a00;border:1px solid #ffd700;color:#ffd700;padding:2px 6px;border-radius:8px;font-size:9px">150s=5&#129689;</span></div>
+              <div class="tbar"><div class="tfill" id="wf-l2"></div></div><div id="wt-l2" class="t3" style="margin-bottom:6px">Watch Now dabao</div>
+              <button class="btn-red" id="wb-l2" onclick="startWatchV2('l2','https://www.youtube.com/watch?v=9bZkp7q19f0',150,5)" style="width:100%;padding:8px;font-size:11px;border-radius:7px">&#9654; Watch Long Video</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="etab-pg" id="ep-like">
+          <div class="t3" style="margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">Like karo, 2 coins earn karo</div>
+          <div class="card" style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><img src="https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg" style="width:65px;height:46px;border-radius:6px;object-fit:cover;flex-shrink:0"><div style="flex:1"><div class="t1" style="font-size:11px;margin-bottom:2px">10 Tips for Better YouTube SEO</div><div class="t3" style="margin-bottom:6px">SEO Master • 45K subs</div><div style="display:flex;gap:6px;align-items:center"><button class="btn-red" id="lb1" onclick="doLike(1)" style="padding:5px 10px;font-size:11px">&#128077; Like</button><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 7px;border-radius:8px;font-size:10px">+2 &#129689;</span></div></div></div>
+          <div class="card" style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><img src="https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" style="width:65px;height:46px;border-radius:6px;object-fit:cover;flex-shrink:0"><div style="flex:1"><div class="t1" style="font-size:11px;margin-bottom:2px">Lofi Music for Coding - 2 Hours</div><div class="t3" style="margin-bottom:6px">ChillBeats • 120K subs</div><div style="display:flex;gap:6px;align-items:center"><button class="btn-red" id="lb2" onclick="doLike(2)" style="padding:5px 10px;font-size:11px">&#128077; Like</button><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 7px;border-radius:8px;font-size:10px">+2 &#129689;</span></div></div></div>
+          <div class="card" style="display:flex;gap:8px;align-items:center"><img src="https://img.youtube.com/vi/kJQP7kiw5Fk/mqdefault.jpg" style="width:65px;height:46px;border-radius:6px;object-fit:cover;flex-shrink:0"><div style="flex:1"><div class="t1" style="font-size:11px;margin-bottom:2px">React vs Vue vs Angular 2025</div><div class="t3" style="margin-bottom:6px">DevTalks • 89K subs</div><div style="display:flex;gap:6px;align-items:center"><button class="btn-red" id="lb3" onclick="doLike(3)" style="padding:5px 10px;font-size:11px">&#128077; Like</button><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 7px;border-radius:8px;font-size:10px">+2 &#129689;</span></div></div></div>
+        </div>
+        <div class="etab-pg" id="ep-comment">
+          <div class="t3" style="margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">Comment karo, 3 coins earn karo</div>
+          <div class="card" style="margin-bottom:10px"><div style="display:flex;gap:8px;margin-bottom:10px;align-items:center"><img src="https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg" style="width:60px;height:42px;border-radius:6px;object-fit:cover;flex-shrink:0"><div><div class="t1" style="font-size:11px">How I Got 1000 Subs in 30 Days</div><div class="t3">GrowthHacker • 200K subs</div><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px;margin-top:4px;display:inline-block">+3 &#129689;</span></div></div><textarea id="ci1" placeholder="YouTube pe comment karo, phir yahan paste karo..." style="width:100%;background:#0f0f0f;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:10px;resize:none;height:50px;outline:none;margin-bottom:7px"></textarea><button class="btn-red" id="cb1" onclick="doComment(1)" style="width:100%;padding:8px;font-size:11px;border-radius:6px">&#128172; Submit (+3 &#129689;)</button></div>
+          <div class="card"><div style="display:flex;gap:8px;margin-bottom:10px;align-items:center"><img src="https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" style="width:60px;height:42px;border-radius:6px;object-fit:cover;flex-shrink:0"><div><div class="t1" style="font-size:11px">Top 5 Coding Apps for Android 2025</div><div class="t3">MobileDev • 55K subs</div><span style="background:#0d3b2e;border:1px solid #2ecc71;color:#2ecc71;padding:2px 6px;border-radius:8px;font-size:9px;margin-top:4px;display:inline-block">+3 &#129689;</span></div></div><textarea id="ci2" placeholder="YouTube pe comment karo, phir yahan paste karo..." style="width:100%;background:#0f0f0f;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:10px;resize:none;height:50px;outline:none;margin-bottom:7px"></textarea><button class="btn-red" id="cb2" onclick="doComment(2)" style="width:100%;padding:8px;font-size:11px;border-radius:6px">&#128172; Submit (+3 &#129689;)</button></div>
+        </div>
+        <div class="etab-pg" id="ep-submit">
+          <div style="background:#0d3b2e;border:1px solid #2ecc71;border-radius:8px;padding:8px;text-align:center;font-size:11px;margin-bottom:12px">Total Cost: <span id="exCost" style="color:#2ecc71;font-size:18px;font-weight:bold">0</span> &#129689;</div>
+          <div class="card">
+            <!-- Video type selector -->
+            <div class="t3" style="margin-bottom:6px">Video Type</div>
+            <div style="display:flex;background:#0f0f0f;border-radius:10px;padding:3px;margin-bottom:12px;gap:3px">
+              <button id="extype-short" onclick="switchExType('short')" style="flex:1;padding:6px;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:#9c27b0;color:#fff">&#9889; Short Video</button>
+              <button id="extype-long" onclick="switchExType('long')" style="flex:1;padding:6px;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:none;color:#555">&#127909; Long Video</button>
+            </div>
+            <!-- Short info -->
+            <div id="extype-short-info" style="background:#1a0a2e;border:1px solid #9c27b0;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#ce93d8">&#9889; Short video (60s max) • Watchers: 20 • Cost kam, fast results</div>
+            <!-- Long info -->
+            <div id="extype-long-info" style="display:none;background:#1a2a00;border:1px solid #ffd700;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:10px;color:#ffd700">&#127909; Long video (90s+) • Watchers: 30 • Zyada engagement, zyada cost</div>
+            <div class="t3" style="margin-bottom:5px">YouTube Video URL</div>
+            <input type="url" id="exUrl" placeholder="https://youtube.com/watch?v=..." style="width:100%;background:#0f0f0f;border:1px solid #333;color:#fff;padding:8px 10px;border-radius:6px;font-size:11px;outline:none;margin-bottom:12px">
+            <div class="t3" style="margin-bottom:8px">Tasks select karo</div>
+            <label style="display:flex;align-items:center;gap:7px;padding:7px 9px;background:#0f0f0f;border-radius:6px;border:1px solid #2a2a3e;margin-bottom:6px;cursor:pointer;font-size:10px">
+              <input type="checkbox" id="extw" onchange="exCalc()" style="accent-color:#e63946">
+              &#128065; Watch <span id="extw-label">(20 watchers)</span><span style="margin-left:auto;color:#e63946;font-weight:bold" id="extw-cost">-20&#129689;</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;padding:7px 9px;background:#0f0f0f;border-radius:6px;border:1px solid #2a2a3e;margin-bottom:6px;cursor:pointer;font-size:10px">
+              <input type="checkbox" id="extl" onchange="exCalc()" style="accent-color:#e63946"> &#128077; Like (20 likes)<span style="margin-left:auto;color:#e63946;font-weight:bold">-40&#129689;</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;padding:7px 9px;background:#0f0f0f;border-radius:6px;border:1px solid #2a2a3e;margin-bottom:10px;cursor:pointer;font-size:10px">
+              <input type="checkbox" id="extc" onchange="exCalc()" style="accent-color:#e63946"> &#128172; Comment (10)<span style="margin-left:auto;color:#e63946;font-weight:bold">-30&#129689;</span>
+            </label>
+            <button onclick="exSubmit()" style="width:100%;padding:10px;background:#e63946;border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">&#128640; Submit Video</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE (with History + Chat FAB) -->
+    <div class="page" id="pg-profile" style="position:relative">
+      <div class="scroll" style="flex:1;overflow-y:auto;height:100%">
+        <div class="row" style="justify-content:space-between;margin-bottom:4px">
+          <div class="t1" style="font-size:16px">&#128100; Profile</div>
+          <span style="font-size:20px;cursor:pointer" onclick="toast('Settings — Dark mode, Notifications')">&#9881;&#65039;</span>
+        </div>
+        <div style="text-align:center;padding:10px 0">
+          <div class="prof-pic">&#128100;</div>
+          <div class="t1" style="font-size:17px">User123</div>
+          <div class="t3" style="font-size:11px">youtube.com/c/user123</div>
+          <div style="display:inline-flex;align-items:center;gap:8px;background:#2a1a00;border-radius:20px;padding:8px 18px;margin-top:10px"><span style="font-size:18px">&#128176;</span><span class="gold" style="font-size:16px;font-weight:700"><span id="profCoins">120</span> Coins</span></div>
+        </div>
+        <div class="card"><div class="t1" style="margin-bottom:10px">Subscriber Stats</div><div class="stat-row"><div class="stat"><div class="sv blue">47</div><div class="sl">Subs<br>Diye</div></div><div class="stat"><div class="sv green">32</div><div class="sl">Subs<br>Mile</div></div><div class="stat"><div class="sv gold">840&#129689;</div><div class="sl">Total<br>Earned</div></div></div></div>
+        <div class="card row" style="justify-content:space-between;cursor:pointer" onclick="toast('Streak: 7 days! Best: 14 days')"><div class="row" style="gap:24px"><div class="stat" style="border:none;background:none;padding:0"><div class="sv" style="color:#ff6b00">&#128293; 7</div><div class="sl">Current<br>Streak</div></div><div class="stat" style="border:none;background:none;padding:0"><div class="sv gold">&#11088; 14</div><div class="sl">Best<br>Streak</div></div></div><span style="color:#555;font-size:20px">&#8250;</span></div>
+        <div class="card"><div class="t1" style="margin-bottom:10px">Referral</div><div class="stat-row"><div class="stat"><div class="sv" style="color:#9c27b0">23</div><div class="sl">Friends<br>Invited</div></div><div class="stat"><div class="sv gold">460</div><div class="sl">Referral<br>Coins</div></div><div class="stat"><div class="sv blue" style="font-size:12px">YTB-X7K2</div><div class="sl">My<br>Code</div></div></div></div>
+        <!-- Transaction History -->
+        <div class="card">
+          <div class="t1" style="margin-bottom:10px">&#128203; Transaction History</div>
+          <div class="txn"><div class="txn-ic" style="background:#1a2a1a;color:#2ecc71">&#8593;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">Subscribe Earn</div><div class="t3">TechGuru India subscribe kiya</div><div class="t3" style="font-size:9px">2026-03-21</div></div><div class="green" style="font-weight:700">+2</div></div>
+          <div class="txn"><div class="txn-ic" style="background:#1a2a1a;color:#2ecc71">&#8593;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">Bonus/Reward</div><div class="t3">Daily bonus claim kiya</div><div class="t3" style="font-size:9px">2026-03-21</div></div><div class="green" style="font-weight:700">+10</div></div>
+          <div class="txn"><div class="txn-ic" style="background:#2a1a1a;color:#e63946">&#8595;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">Subscribers Buy</div><div class="t3">100 subscribers order kiye</div><div class="t3" style="font-size:9px">2026-03-20</div></div><div class="red" style="font-weight:700">-1000</div></div>
+          <div class="txn"><div class="txn-ic" style="background:#1a2a1a;color:#2ecc71">&#8593;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">Referral Earn</div><div class="t3">Dost ne join kiya</div><div class="t3" style="font-size:9px">2026-03-19</div></div><div class="green" style="font-weight:700">+20</div></div>
+          <div class="txn"><div class="txn-ic" style="background:#2a1a1a;color:#e63946">&#8595;</div><div class="col" style="flex:1"><div class="t1" style="font-size:12px">Subscribers Buy</div><div class="t3">500 subscribers order kiye</div><div class="t3" style="font-size:9px">2026-03-18</div></div><div class="red" style="font-weight:700">-5000</div></div>
+        </div>
+        <button class="btn-out" style="width:100%;padding:11px;font-size:13px;border-radius:10px;color:#ff6b6b;border-color:#ff6b6b" onclick="toast('Logout ho gaye!')">Logout</button>
+      </div>
+      <!-- Chat FAB -->
+      <div class="chat-fab" id="chatFab" onclick="toggleChat()">&#129302;</div>
+      <!-- Chat Panel -->
+      <div class="chat-panel" id="chatPanel">
+        <div class="chat-hdr">
+          <div class="bot-av">&#129302;</div>
+          <div><div class="t1" style="font-size:13px">YT Assistant</div><div style="color:#2ecc71;font-size:10px;display:flex;align-items:center;gap:3px"><span class="dot"></span>Online</div></div>
+          <button onclick="toggleChat()" style="margin-left:auto;background:none;border:none;color:#aaa;font-size:20px;cursor:pointer">&#10005;</button>
+        </div>
+        <div class="chat-msgs" id="chatMsgs">
+          <div class="cmsg bot"><div class="cav">&#129302;</div><div class="cbbl">Namaste! &#128075; YouTube se related koi bhi sawaal poochho!</div></div>
+        </div>
+        <div class="sugs" id="chatSugs">
+          <div class="sug" onclick="chatAsk('Subscribers kaise badhaye?')">&#128100; Subscribers</div>
+          <div class="sug" onclick="chatAsk('Views kaise badhaye?')">&#128065; Views</div>
+          <div class="sug" onclick="chatAsk('Monetization kaise kare?')">&#128176; Monetize</div>
+          <div class="sug" onclick="chatAsk('YouTube SEO tips?')">&#128269; SEO</div>
+          <div class="sug" onclick="chatAsk('Viral video kaise banaye?')">&#128293; Viral</div>
+        </div>
+        <div class="cinp-row">
+          <input class="cinp" id="chatInp" placeholder="YouTube sawaal poochho..." onkeydown="if(event.key==='Enter')chatSend()">
+          <button class="csend" onclick="chatSend()">&#10148;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM NAV (5 tabs) -->
+    <div class="bnav">
+      <div class="ni active" id="nav-home" onclick="showPage('home')"><span class="ic">&#127968;</span>Home</div>
+      <div class="ni" id="nav-chat" onclick="showPage('chat')"><span class="ic">&#128172;</span>Chat</div>
+      <div class="ni" id="nav-refer" onclick="showPage('refer')"><span class="ic">&#127873;</span>Refer</div>
+      <div class="ni" id="nav-exchange" onclick="showPage('exchange')"><span class="ic">&#128065;</span>Exchange</div>
+      <div class="ni" id="nav-profile" onclick="showPage('profile')"><span class="ic">&#128100;</span>Profile</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- CREATE GROUP MODAL -->
+<div id="cg-overlay" onclick="closeCreateGroup()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300"></div>
+<div id="cg-modal" style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:340px;background:#1a1a2e;border-radius:20px 20px 0 0;border-top:2px solid #e63946;z-index:301;flex-direction:column;max-height:80vh">
+  <div style="padding:14px 16px;border-bottom:1px solid #2a2a3e;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <div class="t1" style="font-size:14px">&#128172; New Group</div>
+    <button onclick="closeCreateGroup()" style="background:none;border:none;color:#aaa;font-size:20px;cursor:pointer">&#10005;</button>
+  </div>
+  <!-- Group name + icon -->
+  <div style="padding:12px 16px;border-bottom:1px solid #2a2a3e;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div id="cg-icon-preview" onclick="cycleGrpIcon()" style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#e63946,#c0392b);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;flex-shrink:0">&#128172;</div>
+      <div style="flex:1">
+        <input id="cg-name" placeholder="Group name..." style="width:100%;background:#0f0f0f;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;outline:none">
+        <div style="font-size:9px;color:#555;margin-top:4px">Icon pe tap karo change karne ke liye</div>
+      </div>
+    </div>
+  </div>
+  <!-- Member select -->
+  <div style="padding:10px 16px 4px;flex-shrink:0">
+    <div class="t3" style="font-size:10px;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Members add karo</div>
+  </div>
+  <div id="cg-members" style="overflow-y:auto;padding:0 16px 12px;scrollbar-width:none;flex:1"></div>
+  <!-- Selected count + create btn -->
+  <div style="padding:12px 16px;border-top:1px solid #2a2a3e;flex-shrink:0">
+    <div id="cg-sel-count" style="font-size:11px;color:#aaa;margin-bottom:8px;text-align:center">0 members selected</div>
+    <button onclick="createGroup()" style="width:100%;padding:11px;background:#e63946;border:none;color:#fff;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">&#10003; Create Group</button>
+  </div>
+</div>
+
+<div id="toastEl" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#fff;padding:10px 22px;border-radius:20px;font-weight:600;font-size:13px;display:none;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.5);white-space:nowrap"></div>
+
+<script>
+let coins = 120;
+let chatOpen = false;
+
+function toast(msg, color) {
+  const el = document.getElementById('toastEl');
+  el.textContent = msg;
+  el.style.background = color || '#2ecc71';
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 2500);
+}
+
+function addCoins(n) {
+  coins += n;
+  document.getElementById('coins').textContent = coins;
+  document.getElementById('profCoins').textContent = coins;
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  document.getElementById('pg-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'chat') initUcChat();
+  if (chatOpen && name !== 'profile') {
+    chatOpen = false;
+    document.getElementById('chatPanel').classList.remove('open');
+  }
+}
+
+// HOME
+function doSub(id) {
+  const btn = document.getElementById('sb' + id);
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '✓ Subscribed';
+  addCoins(2);
+  toast('+2 Coins mile! 🎉');
+}
+
+function claimBonus() {
+  const btn = document.getElementById('bonusBtn');
+  btn.disabled = true;
+  btn.textContent = '✓ Bonus Claimed!';
+  addCoins(10);
+  toast('+10 Daily Bonus Coins! 🎁');
+}
+
+function toggleGetSubs() {
+  const p = document.getElementById('getSubsPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function redeemSubs(cost, subs) {
+  if (coins < cost) { toast('Coins kam hain! Pehle earn karo 😅', '#e63946'); return; }
+  addCoins(-cost);
+  document.getElementById('orderMsg').style.display = 'block';
+  document.getElementById('orderMsg').textContent = '✓ Order placed! ' + subs + ' subscribers aa rahe hain...';
+  toast(subs + ' Subscribers order ho gaya! 🚀');
+}
+
+// REFERRAL
+function applyRef() {
+  const val = document.getElementById('refInp').value.trim().toUpperCase();
+  const msg = document.getElementById('refMsg');
+  msg.style.display = 'block';
+  if (!val) { msg.style.color = '#e63946'; msg.textContent = 'Code daalo pehle!'; return; }
+  if (val === 'YTB-X7K2') { msg.style.color = '#e63946'; msg.textContent = 'Apna khud ka code use nahi kar sakte!'; return; }
+  addCoins(20);
+  msg.style.color = '#2ecc71';
+  msg.textContent = '✓ Code apply ho gaya! +20 Coins mile 🎉';
+  toast('+20 Referral Coins! 🎁');
+}
+
+// EXCHANGE
+function showETab(name, el) {
+  document.querySelectorAll('.etab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.etab-pg').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('ep-' + name).classList.add('active');
+}
+
+// Watch type toggle
+function switchWatchType(type) {
+  const isShort = type === 'short';
+  document.getElementById('wtype-short').style.background = isShort ? '#e63946' : 'none';
+  document.getElementById('wtype-short').style.color = isShort ? '#fff' : '#555';
+  document.getElementById('wtype-long').style.background = !isShort ? '#ff9800' : 'none';
+  document.getElementById('wtype-long').style.color = !isShort ? '#fff' : '#555';
+  document.getElementById('watch-short-list').style.display = isShort ? 'block' : 'none';
+  document.getElementById('watch-long-list').style.display = !isShort ? 'block' : 'none';
+}
+
+// Submit type toggle
+let exVideoType = 'short';
+function switchExType(type) {
+  exVideoType = type;
+  const isShort = type === 'short';
+  document.getElementById('extype-short').style.background = isShort ? '#9c27b0' : 'none';
+  document.getElementById('extype-short').style.color = isShort ? '#fff' : '#555';
+  document.getElementById('extype-long').style.background = !isShort ? '#ff9800' : 'none';
+  document.getElementById('extype-long').style.color = !isShort ? '#fff' : '#555';
+  document.getElementById('extype-short-info').style.display = isShort ? 'block' : 'none';
+  document.getElementById('extype-long-info').style.display = !isShort ? 'block' : 'none';
+  // update watch label & cost
+  document.getElementById('extw-label').textContent = isShort ? '(20 watchers)' : '(30 watchers)';
+  document.getElementById('extw-cost').textContent = isShort ? '-20🪙' : '-30🪙';
+  exCalc();
+}
+
+let watchTimers = {};
+function startWatchV2(id, url, maxSecs, maxCoins) {
+  if (watchTimers[id]) return;
+  window.open(url, '_blank');
+  const fill = document.getElementById('wf-' + id);
+  const txt = document.getElementById('wt-' + id);
+  const btn = document.getElementById('wb-' + id);
+  if (!fill || !txt || !btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Watching...';
+  let secs = 0;
+  const milestones = [];
+  for (let i = 1; i <= maxCoins; i++) milestones.push(Math.round((maxSecs / maxCoins) * i));
+  let earned = 0;
+  watchTimers[id] = setInterval(() => {
+    secs++;
+    fill.style.width = Math.min((secs / maxSecs) * 100, 100) + '%';
+    const hit = milestones.indexOf(secs);
+    if (hit !== -1) { earned++; addCoins(1); txt.textContent = secs + 's done! +' + earned + ' coin' + (earned > 1 ? 's' : ''); toast('+1 Coin (' + secs + 's watch)! 🎉'); }
+    if (secs >= maxSecs) {
+      clearInterval(watchTimers[id]);
+      txt.textContent = '✓ Complete! +' + maxCoins + ' coins earned';
+      btn.textContent = '✓ Done';
+    }
+  }, 1000);
+}
+
+// keep old startWatch for backward compat
+function startWatch(id, url) { startWatchV2(id, url, 90, 3); }
+
+function doLike(id) {
+  const btn = document.getElementById('lb' + id);
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '✓ Liked';
+  addCoins(2);
+  toast('+2 Coins! Like kiya 👍');
+}
+
+function doComment(id) {
+  const txt = document.getElementById('ci' + id).value.trim();
+  const btn = document.getElementById('cb' + id);
+  if (!txt) { toast('Comment paste karo pehle!', '#e63946'); return; }
+  btn.disabled = true;
+  btn.textContent = '✓ Submitted';
+  addCoins(3);
+  toast('+3 Coins! Comment submit hua 💬');
+}
+
+function exCalc() {
+  let cost = 0;
+  const watchCost = (typeof exVideoType !== 'undefined' && exVideoType === 'long') ? 30 : 20;
+  if (document.getElementById('extw').checked) cost += watchCost;
+  if (document.getElementById('extl').checked) cost += 40;
+  if (document.getElementById('extc').checked) cost += 30;
+  document.getElementById('exCost').textContent = cost;
+}
+
+function exSubmit() {
+  const url = document.getElementById('exUrl').value.trim();
+  if (!url) { toast('Video URL daalo pehle!', '#e63946'); return; }
+  const cost = parseInt(document.getElementById('exCost').textContent);
+  if (cost === 0) { toast('Koi task select karo!', '#e63946'); return; }
+  if (coins < cost) { toast('Coins kam hain! Earn karo pehle 😅', '#e63946'); return; }
+  addCoins(-cost);
+  toast('Video submit ho gaya! 🚀 Processing...');
+}
+
+// CHAT
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+}
+
+function chatAsk(q) {
+  addMsg('user', q);
+  document.getElementById('chatSugs').style.display = 'none';
+  showTyping();
+  setTimeout(() => { removeTyping(); addMsg('bot', getReply(q)); }, 1200);
+}
+
+function chatSend() {
+  const inp = document.getElementById('chatInp');
+  const q = inp.value.trim();
+  if (!q) return;
+  inp.value = '';
+  chatAsk(q);
+}
+
+function addMsg(type, text) {
+  const msgs = document.getElementById('chatMsgs');
+  const div = document.createElement('div');
+  div.className = 'cmsg ' + type;
+  div.innerHTML = '<div class="cav">' + (type === 'bot' ? '🤖' : '👤') + '</div><div class="cbbl">' + text + '</div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs = document.getElementById('chatMsgs');
+  const div = document.createElement('div');
+  div.className = 'cmsg bot';
+  div.id = 'typing';
+  div.innerHTML = '<div class="cav">🤖</div><div class="cbbl" style="display:flex;gap:4px;align-items:center"><span style="animation:bounce 1s infinite;display:inline-block">●</span><span style="animation:bounce 1s 0.2s infinite;display:inline-block">●</span><span style="animation:bounce 1s 0.4s infinite;display:inline-block">●</span></div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+}
+
+// P2P DM CHAT
+const ucUsers = [
+  {id:'rahul', name:'RahulYT', color:'#9c27b0', last:'Bhai mujhe 50 subs mil gaye!', unread:2, msgs:['Bhai mujhe 50 subs mil gaye aaj!','Exchange tab bahut kaam ka hai yaar','Koi subscribe karo mera channel?','Daily bonus mat bhoolna guys']},
+  {id:'priya', name:'Priya', color:'#ff9800', last:'Coins se subscribers liye', unread:1, msgs:['Mera channel grow ho raha hai slowly','Coins se subscribers liye, real lag rahe hain!','Koi referral code share karo please','Watch task complete kiya +3 coins']},
+  {id:'aman', name:'AmanYT', color:'#2ecc71', last:'Streak 14 days ho gayi', unread:0, msgs:['Bhai 100 subs ka order diya, aa gaye!','Community chat mein sab active ho','Leaderboard pe #3 aa gaya main','Streak 14 days ho gayi meri']},
+  {id:'sneha', name:'SnehaVlogs', color:'#29b6f6', last:'Naya video upload kiya!', unread:3, msgs:['Naya video upload kiya, watch karo!','Comment task se 3 coins milte hain easy','Referral se 460 coins kama liye','YT-Booster best app hai growth ke liye']},
+  {id:'dev', name:'DevKing99', color:'#e91e63', last:'Koi subscribe karo yaar', unread:0, msgs:['Koi subscribe karo yaar please','Main bhi subscribe karunga wapas','Exchange se 5 subs mile aaj','Coins earn karna easy hai is app mein']},
+  {id:'kiran', name:'KiranCreates', color:'#607d8b', last:'Thanks for subscribing!', unread:0, msgs:['Thanks for subscribing!','Mera gaming channel hai, check karo','Aaj 10 coins earn kiye watch se','Referral code share karo guys']},
+];
+
+let currentDM = null;
+let dmHistory = {};
+
+function initChatList() {
+  const list = document.getElementById('dm-list');
+  if (!list || list.children.length > 0) return;
+  ucUsers.forEach(u => {
+    const div = document.createElement('div');
+    div.id = 'dm-row-' + u.id;
+    div.onclick = () => openDM(u.id, u.name, u.color, false);
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #1a1a2e;cursor:pointer;';
+    div.innerHTML = '<div style="position:relative;flex-shrink:0"><div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,'+u.color+',#111);display:flex;align-items:center;justify-content:center;font-size:18px">&#128100;</div><div style="position:absolute;bottom:1px;right:1px;width:10px;height:10px;border-radius:50%;background:#2ecc71;border:2px solid #0f0f0f"></div></div><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><div class="t1" style="font-size:12px">'+u.name+'</div><div style="font-size:9px;color:#444">now</div></div><div style="font-size:10px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+u.last+'</div></div>'+(u.unread>0?'<div style="background:#e63946;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+u.unread+'</div>':'');
+    list.appendChild(div);
+  });
+}
+
+function switchChatTab(tab) {
+  document.getElementById('ct-dm').style.color = tab==='dm'?'#e63946':'#444';
+  document.getElementById('ct-dm').style.borderBottomColor = tab==='dm'?'#e63946':'transparent';
+  document.getElementById('ct-grp').style.color = tab==='grp'?'#e63946':'#444';
+  document.getElementById('ct-grp').style.borderBottomColor = tab==='grp'?'#e63946':'transparent';
+  document.getElementById('dm-list').style.display = tab==='dm'?'block':'none';
+  document.getElementById('grp-list').style.display = tab==='grp'?'block':'none';
+}
+
+function openDM(userId, name, color, isGroup) {
+  currentDM = userId;
+  currentIsGroup = isGroup;
+  const av = document.getElementById('dm-av');
+  av.style.background = 'linear-gradient(135deg,'+color+',#111)';
+  av.textContent = isGroup ? String.fromCodePoint(0x1F4AC) : String.fromCodePoint(0x1F464);
+  document.getElementById('dm-name').textContent = name;
+  const msgs = document.getElementById('dm-msgs');
+  msgs.innerHTML = '';
+  if (!dmHistory[userId]) {
+    dmHistory[userId] = [];
+    const u = ucUsers.find(x => x.id === userId);
+    if (u) { dmHistory[userId].push({from:u.name,text:u.msgs[0]}); dmHistory[userId].push({from:u.name,text:u.msgs[1]}); }
+    else if (isGroup) { dmHistory[userId] = [{from:'Rahul',text:'Bhai mujhe 50 subs mil gaye!'},{from:'Priya',text:'Coins se subscribers liye'},{from:'Aman',text:'Streak 14 days ho gayi'}]; }
+  }
+  dmHistory[userId].forEach(m => {
+    if (m.from === 'system') {
+      renderSystemMsg(m.text);
+    } else if (m.from === 'invite') {
+      renderInviteCard({id: m.memberId, name: m.memberName}, m.grpId, m.grpName, m.grpIcon, m.grpColor);
+    } else {
+      renderDMMsg(m.from, m.text, color, isGroup);
+    }
+  });
+  document.getElementById('chat-list-view').style.display = 'none';
+  document.getElementById('chat-dm-view').style.display = 'flex';
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function closeDM() {
+  currentDM = null;
+  document.getElementById('chat-dm-view').style.display = 'none';
+  document.getElementById('chat-list-view').style.display = 'flex';
+}
+
+let msgIdCounter = 0;
+let selectedMsgEl = null;
+let replyTo = null;
+let currentIsGroup = false;
+
+function renderDMMsg(from, text, color, isGroup, replyRef) {
+  const msgs = document.getElementById('dm-msgs');
+  const isMe = from === 'me';
+  const u = ucUsers.find(x => x.name === from);
+  const avColor = isMe ? '#e63946' : (u ? u.color : color);
+  const msgId = 'msg-' + (++msgIdCounter);
+  const wrapper = document.createElement('div');
+  wrapper.id = msgId;
+  wrapper.style.cssText = 'display:flex;gap:6px;align-items:flex-end;margin-bottom:4px;' + (isMe ? 'flex-direction:row-reverse;' : '');
+  const avHtml = !isMe ? '<div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,' + avColor + ',#111);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;align-self:flex-end">&#128100;</div>' : '<div style="width:26px;flex-shrink:0"></div>';
+  const nameTag = (!isMe && isGroup) ? '<div style="font-size:9px;color:' + avColor + ';font-weight:600;margin-bottom:2px">' + from + '</div>' : '';
+  const replyHtml = replyRef ? '<div style="background:rgba(255,255,255,0.05);border-left:2px solid #e63946;padding:3px 7px;border-radius:5px;margin-bottom:4px;font-size:9px;color:#aaa;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + replyRef + '</div>' : '';
+  const bubbleStyle = isMe ? 'background:linear-gradient(135deg,#c0392b,#e63946);color:#fff;border-radius:16px 16px 4px 16px;' : 'background:#1e1e2e;color:#ddd;border-radius:16px 16px 16px 4px;';
+  const ticks = isMe ? '<span class="msg-tick" style="font-size:9px;color:rgba(255,255,255,0.5);margin-left:3px">&#10003;&#10003;</span>' : '';
+  const timeStr = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  wrapper.innerHTML = avHtml + '<div style="max-width:210px">' + nameTag + '<div style="padding:8px 11px 5px;' + bubbleStyle + 'box-shadow:0 1px 4px rgba(0,0,0,0.3)">' + replyHtml + '<div style="font-size:11px;line-height:1.5;word-break:break-word">' + text + '</div><div style="display:flex;align-items:center;justify-content:flex-end;gap:2px;margin-top:1px"><span style="font-size:9px;color:rgba(255,255,255,0.35)">' + timeStr + '</span>' + ticks + '</div></div><div id="react-' + msgId + '" style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px"></div></div>';
+  wrapper.addEventListener('contextmenu', function(e) { e.preventDefault(); showCtxMenu(e, msgId, text, isMe); });
+  wrapper.addEventListener('touchstart', function(e) { const t = setTimeout(() => showCtxMenu(e.touches[0], msgId, text, isMe), 500); wrapper.addEventListener('touchend', () => clearTimeout(t), {once:true}); });
+  msgs.appendChild(wrapper);
+  msgs.scrollTop = msgs.scrollHeight;
+  if (isMe) { setTimeout(() => { const tick = wrapper.querySelector('.msg-tick'); if (tick) tick.style.color = '#29b6f6'; }, 1200); }
+}
+
+function dmSend() {
+  const inp = document.getElementById('dm-inp');
+  const txt = inp.value.trim();
+  if (!txt || !currentDM) return;
+  inp.value = '';
+  toggleVoiceBtn();
+  const replyRef = replyTo;
+  cancelReply();
+  if (!dmHistory[currentDM]) dmHistory[currentDM] = [];
+  dmHistory[currentDM].push({from:'me', text:txt});
+  renderDMMsg('me', txt, '#e63946', currentIsGroup, replyRef);
+  const typing = document.getElementById('dm-typing');
+  typing.style.display = 'block';
+  const u = ucUsers.find(x => x.id === currentDM);
+  setTimeout(() => {
+    typing.style.display = 'none';
+    const replies = ['Haan bhai bilkul!','Sahi keh rahe ho yaar','Main bhi try karunga','Mera channel bhi dekho','Subscribe kar diya','Nice! Keep it up','Aaj kitne coins mile tumhe?'];
+    const reply = u ? u.msgs[Math.floor(Math.random()*u.msgs.length)] : replies[Math.floor(Math.random()*replies.length)];
+    dmHistory[currentDM].push({from: u?u.name:'User', text:reply});
+    renderDMMsg(u?u.name:'User', reply, u?u.color:'#555', currentIsGroup, null);
+  }, 800 + Math.random()*700);
+}
+
+function toggleVoiceBtn() {
+  const val = document.getElementById('dm-inp') && document.getElementById('dm-inp').value.trim();
+  const vb = document.getElementById('voice-btn');
+  const sb = document.getElementById('send-btn');
+  if (vb) vb.style.display = val ? 'none' : 'flex';
+  if (sb) sb.style.display = val ? 'flex' : 'none';
+}
+
+function showCtxMenu(e, msgId, text, isMe) {
+  selectedMsgEl = {id: msgId, text, isMe};
+  const menu = document.getElementById('dm-ctx-menu');
+  menu.style.display = 'block';
+  const phone = document.querySelector('.phone').getBoundingClientRect();
+  let x = Math.min((e.clientX||e.pageX), phone.right - 175);
+  let y = Math.min((e.clientY||e.pageY), phone.bottom - 210);
+  x = Math.max(x, phone.left + 5);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  setTimeout(() => document.addEventListener('click', closeCtxMenu, {once:true}), 100);
+}
+function closeCtxMenu() {
+  const m = document.getElementById('dm-ctx-menu');
+  const r = document.getElementById('react-picker');
+  if (m) m.style.display = 'none';
+  if (r) r.style.display = 'none';
+}
+
+function ctxReply() {
+  closeCtxMenu();
+  if (!selectedMsgEl) return;
+  replyTo = selectedMsgEl.text.substring(0, 40) + (selectedMsgEl.text.length > 40 ? '...' : '');
+  const rb = document.getElementById('reply-bar');
+  rb.style.display = 'flex';
+  rb.style.alignItems = 'center';
+  document.getElementById('reply-text').textContent = replyTo;
+  document.getElementById('dm-inp').focus();
+}
+function cancelReply() {
+  replyTo = null;
+  const rb = document.getElementById('reply-bar');
+  if (rb) rb.style.display = 'none';
+}
+
+function ctxReact() {
+  closeCtxMenu();
+  const picker = document.getElementById('react-picker');
+  picker.style.display = 'flex';
+  picker.style.alignItems = 'center';
+  const phone = document.querySelector('.phone').getBoundingClientRect();
+  picker.style.left = (phone.left + 15) + 'px';
+  picker.style.top = (phone.top + 320) + 'px';
+  setTimeout(() => document.addEventListener('click', () => { picker.style.display = 'none'; }, {once:true}), 100);
+}
+function addReaction(emoji) {
+  document.getElementById('react-picker').style.display = 'none';
+  if (!selectedMsgEl) return;
+  const reactDiv = document.getElementById('react-' + selectedMsgEl.id);
+  if (!reactDiv) return;
+  const existing = Array.from(reactDiv.children).find(c => c.dataset.emoji === emoji);
+  if (existing) { const s = existing.querySelector('span'); s.textContent = parseInt(s.textContent) + 1; return; }
+  const pill = document.createElement('div');
+  pill.dataset.emoji = emoji;
+  pill.style.cssText = 'background:#1a1a2e;border:1px solid #2a2a3e;border-radius:10px;padding:2px 6px;font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;';
+  pill.innerHTML = emoji + '<span style="font-size:9px;color:#aaa">1</span>';
+  pill.onclick = () => { const s = pill.querySelector('span'); s.textContent = parseInt(s.textContent) + 1; };
+  reactDiv.appendChild(pill);
+}
+
+function ctxPin() {
+  closeCtxMenu();
+  if (!selectedMsgEl) return;
+  const bar = document.getElementById('dm-pinned');
+  bar.style.display = 'flex';
+  bar.style.alignItems = 'center';
+  document.getElementById('dm-pinned-text').textContent = selectedMsgEl.text;
+  // add to pinned list
+  addToPinnedList(selectedMsgEl.text);
+  toast('Message pinned!');
+}
+function ctxCopy() {
+  closeCtxMenu();
+  if (selectedMsgEl) toast('Copied!');
+}
+
+let starredMessages = [];
+let pinnedMessages = [];
+
+function ctxStar() {
+  closeCtxMenu();
+  if (!selectedMsgEl) return;
+  const already = starredMessages.find(m => m.id === selectedMsgEl.id);
+  if (already) {
+    starredMessages = starredMessages.filter(m => m.id !== selectedMsgEl.id);
+    const el = document.getElementById(selectedMsgEl.id);
+    if (el) { const s = el.querySelector('.star-ind'); if (s) s.remove(); }
+    toast('Star hata diya');
+  } else {
+    starredMessages.push({id: selectedMsgEl.id, text: selectedMsgEl.text, time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+    const el = document.getElementById(selectedMsgEl.id);
+    if (el) {
+      const bubble = el.querySelector('div[style*="padding:8px"]');
+      if (bubble && !el.querySelector('.star-ind')) {
+        const s = document.createElement('span');
+        s.className = 'star-ind';
+        s.style.cssText = 'font-size:9px;margin-left:4px;';
+        s.textContent = '⭐';
+        bubble.appendChild(s);
+      }
+    }
+    toast('⭐ Message starred!');
+  }
+}
+
+function addToPinnedList(text) {
+  if (!pinnedMessages.find(m => m.text === text))
+    pinnedMessages.push({text, time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+}
+
+function openStarredPanel() {
+  const panel = document.getElementById('starred-panel');
+  panel.style.display = 'flex';
+  const list = document.getElementById('starred-list');
+  Array.from(list.children).forEach(c => { if (c.id !== 'starred-empty') c.remove(); });
+  const empty = document.getElementById('starred-empty');
+  if (starredMessages.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  starredMessages.forEach(m => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#1a1a2e;border:1px solid #2a2a3e;border-left:3px solid #ffd700;border-radius:10px;padding:10px 12px;';
+    div.innerHTML = '<div style="font-size:9px;color:#ffd700;font-weight:600;margin-bottom:4px">&#11088; Starred</div><div style="font-size:11px;color:#ddd;line-height:1.5">' + m.text + '</div><div style="font-size:9px;color:#444;margin-top:4px">' + m.time + '</div>';
+    list.appendChild(div);
+  });
+}
+function closeStarredPanel() { document.getElementById('starred-panel').style.display = 'none'; }
+
+function openPinnedPanel() {
+  const panel = document.getElementById('pinned-panel');
+  panel.style.display = 'flex';
+  const list = document.getElementById('pinned-list');
+  Array.from(list.children).forEach(c => { if (c.id !== 'pinned-empty') c.remove(); });
+  const empty = document.getElementById('pinned-empty');
+  if (pinnedMessages.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  pinnedMessages.forEach(m => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#1a1a2e;border:1px solid #2a2a3e;border-left:3px solid #e63946;border-radius:10px;padding:10px 12px;';
+    div.innerHTML = '<div style="font-size:9px;color:#e63946;font-weight:600;margin-bottom:4px">&#128204; Pinned</div><div style="font-size:11px;color:#ddd;line-height:1.5">' + m.text + '</div><div style="font-size:9px;color:#444;margin-top:4px">' + m.time + '</div>';
+    list.appendChild(div);
+  });
+}
+function closePinnedPanel() { document.getElementById('pinned-panel').style.display = 'none'; }
+
+function ctxDelete() {
+  closeCtxMenu();
+  if (!selectedMsgEl) return;
+  const el = document.getElementById(selectedMsgEl.id);
+  if (el) { el.style.opacity = '0.3'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }
+  toast('Message deleted');
+}
+function showDMInfo() { toast('Profile info — coming soon!'); }
+
+let isMuted = false;
+let isBlocked = false;
+
+function showDMMenu(e) {
+  const menu = document.getElementById('dm-more-menu');
+  menu.style.display = 'block';
+  const phone = document.querySelector('.phone').getBoundingClientRect();
+  const x = Math.min(e.clientX, phone.right - 200);
+  const y = Math.min(e.clientY + 8, phone.bottom - 230);
+  menu.style.left = Math.max(x, phone.left + 5) + 'px';
+  menu.style.top = y + 'px';
+  document.getElementById('mute-label').textContent = isMuted ? 'Unmute Notifications' : 'Mute Notifications';
+  document.getElementById('block-label').textContent = isBlocked ? 'Unblock User' : 'Block User';
+  setTimeout(() => document.addEventListener('click', closeDMMoreMenu, {once:true}), 100);
+}
+
+function closeDMMoreMenu() {
+  document.getElementById('dm-more-menu').style.display = 'none';
+}
+
+function dmMenuAction(action) {
+  closeDMMoreMenu();
+  if (action === 'search') {
+    const bar = document.getElementById('dm-search-bar');
+    bar.style.display = 'flex';
+    bar.style.alignItems = 'center';
+    document.getElementById('dm-search-inp').focus();
+  } else if (action === 'starred') {
+    openStarredPanel();
+  } else if (action === 'pinned') {
+    openPinnedPanel();
+  } else if (action === 'media') {
+    toast('&#128247; Media & Files — coming soon!');
+  } else if (action === 'mute') {
+    isMuted = !isMuted;
+    toast(isMuted ? '&#128263; Notifications muted!' : '&#128276; Notifications unmuted!');
+  } else if (action === 'clear') {
+    if (confirm('Saari chat clear karni hai?')) {
+      document.getElementById('dm-msgs').innerHTML = '';
+      if (currentDM) dmHistory[currentDM] = [];
+      toast('&#128465; Chat cleared!');
+    }
+  } else if (action === 'block') {
+    isBlocked = !isBlocked;
+    toast(isBlocked ? '&#128683; User blocked!' : '&#9989; User unblocked!', isBlocked ? '#e63946' : '#2ecc71');
+    const inp = document.getElementById('dm-inp');
+    if (inp) inp.disabled = isBlocked;
+  }
+}
+
+function dmSearchMessages(query) {
+  const msgs = document.getElementById('dm-msgs');
+  const all = msgs.querySelectorAll('[id^="msg-"]');
+  all.forEach(el => {
+    el.style.opacity = '1';
+    el.style.outline = 'none';
+  });
+  if (!query.trim()) return;
+  const q = query.toLowerCase();
+  all.forEach(el => {
+    const txt = el.textContent.toLowerCase();
+    if (txt.includes(q)) {
+      el.style.outline = '1px solid #e63946';
+      el.scrollIntoView({block:'nearest'});
+    } else {
+      el.style.opacity = '0.3';
+    }
+  });
+}
+
+function closeDMSearch() {
+  const bar = document.getElementById('dm-search-bar');
+  bar.style.display = 'none';
+  document.getElementById('dm-search-inp').value = '';
+  dmSearchMessages('');
+}
+
+function initUcChat() { initChatList(); }
+function ucSend() {}
+function openUserChat() { showPage('chat'); }
+function closeUserChat() {}
+
+// GROUP CREATE
+const grpIcons = ['&#128172;','&#127909;','&#127918;','&#128293;','&#128640;','&#127942;','&#128176;','&#9917;','&#127925;','&#128187;'];
+let grpIconIdx = 0;
+let userGroups = [];
+
+function openCreateGroup() {
+  switchChatTab('grp');
+  const modal = document.getElementById('cg-modal');
+  const overlay = document.getElementById('cg-overlay');
+  modal.style.display = 'flex';
+  overlay.style.display = 'block';
+  document.getElementById('cg-name').value = '';
+  grpIconIdx = 0;
+  document.getElementById('cg-icon-preview').innerHTML = grpIcons[0];
+  // render member checkboxes
+  const cont = document.getElementById('cg-members');
+  cont.innerHTML = '';
+  ucUsers.forEach(u => {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #2a2a3e;cursor:pointer;';
+    row.innerHTML = '<input type="checkbox" class="cg-chk" data-id="'+u.id+'" data-name="'+u.name+'" style="accent-color:#e63946;width:16px;height:16px;flex-shrink:0" onchange="updateSelCount()"><div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,'+u.color+',#111);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">&#128100;</div><div><div class="t1" style="font-size:12px">'+u.name+'</div><div class="t3" style="font-size:10px">Online</div></div>';
+    cont.appendChild(row);
+  });
+  updateSelCount();
+}
+
+function closeCreateGroup() {
+  document.getElementById('cg-modal').style.display = 'none';
+  document.getElementById('cg-overlay').style.display = 'none';
+}
+
+function cycleGrpIcon() {
+  grpIconIdx = (grpIconIdx + 1) % grpIcons.length;
+  document.getElementById('cg-icon-preview').innerHTML = grpIcons[grpIconIdx];
+}
+
+function updateSelCount() {
+  const n = document.querySelectorAll('.cg-chk:checked').length;
+  document.getElementById('cg-sel-count').textContent = n + ' member' + (n!==1?'s':'') + ' selected';
+}
+
+// pending invites: { grpId, grpName, grpIcon, grpColor, invitedMembers: [{id,name,status:'pending'|'accepted'|'declined'}] }
+let pendingInvites = {};
+
+function createGroup() {
+  const name = document.getElementById('cg-name').value.trim();
+  if (!name) { toast('Group name daalo!', '#e63946'); return; }
+  const checked = document.querySelectorAll('.cg-chk:checked');
+  if (checked.length === 0) { toast('Kam se kam 1 member add karo!', '#e63946'); return; }
+  const members = Array.from(checked).map(c => ({id: c.dataset.id, name: c.dataset.name}));
+  const icon = grpIcons[grpIconIdx];
+  const colors = ['#e63946','#9c27b0','#ff9800','#2ecc71','#29b6f6','#e91e63'];
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  const grpId = 'grp_' + Date.now();
+
+  // Save group as pending (only creator is in it for now)
+  userGroups.push({id:grpId, name, icon, color, members:[], pending: members.map(m=>m.name)});
+  pendingInvites[grpId] = {grpId, grpName:name, grpIcon:icon, grpColor:color, members: members.map(m=>({...m, status:'pending'}))};
+
+  // Add group to list with "Pending" badge
+  const list = document.getElementById('user-grp-list');
+  const div = document.createElement('div');
+  div.id = 'grp-row-' + grpId;
+  div.onclick = () => openDM(grpId, name, color, true);
+  div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #1a1a2e;cursor:pointer;';
+  div.innerHTML = '<div style="width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,'+color+',#111);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">'+icon+'</div>'
+    +'<div style="flex:1"><div class="t1" style="font-size:12px">'+name+'</div><div class="t3" style="font-size:10px" id="grp-sub-'+grpId+'">Invites bheje ja rahe hain...</div></div>'
+    +'<div id="grp-badge-'+grpId+'" style="background:#ff9800;color:#fff;border-radius:10px;padding:1px 6px;font-size:9px;font-weight:600">Pending</div>';
+  list.appendChild(div);
+
+  // Seed group chat with system message
+  dmHistory[grpId] = [{from:'system', text:'Group "'+name+'" create ho gaya! Invites bheje ja rahe hain...'}];
+
+  closeCreateGroup();
+  toast('Invites bheje ja rahe hain ⏳');
+
+  // Simulate: each member gets invite in their DM after short delay
+  members.forEach((m, i) => {
+    setTimeout(() => sendGroupInviteToDM(m, grpId, name, icon, color), 600 + i * 400);
+  });
+}
+
+function sendGroupInviteToDM(member, grpId, grpName, grpIcon, grpColor) {
+  // Ensure DM history exists for this member
+  if (!dmHistory[member.id]) {
+    const u = ucUsers.find(x => x.id === member.id);
+    dmHistory[member.id] = u ? [{from:u.name, text:u.msgs[0]}, {from:u.name, text:u.msgs[1]}] : [];
+  }
+
+  // Add invite message to their DM history
+  dmHistory[member.id].push({
+    from: 'invite',
+    grpId, grpName, grpIcon, grpColor,
+    memberId: member.id, memberName: member.name
+  });
+
+  // If this DM is currently open, render the invite card live
+  if (currentDM === member.id) {
+    renderInviteCard(member, grpId, grpName, grpIcon, grpColor);
+  }
+
+  // Update DM list row last message
+  const row = document.getElementById('dm-row-' + member.id);
+  if (row) {
+    const lastMsg = row.querySelector('div[style*="font-size:10px"]');
+    if (lastMsg) lastMsg.textContent = '📩 Group invite: ' + grpName;
+    // add unread badge if not already
+    if (!row.querySelector('div[style*="background:#e63946"]')) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'background:#e63946;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0';
+      badge.textContent = '1';
+      row.appendChild(badge);
+    }
+  }
+
+  // Simulate: member auto-responds after delay (Accept or Decline randomly for demo)
+  const willAccept = Math.random() > 0.3; // 70% accept chance
+  setTimeout(() => simulateMemberResponse(member, grpId, grpName, grpIcon, grpColor, willAccept), 2000 + Math.random()*2000);
+}
+
+function renderInviteCard(member, grpId, grpName, grpIcon, grpColor) {
+  const msgs = document.getElementById('dm-msgs');
+  const cardId = 'invite-' + grpId + '-' + member.id;
+  if (document.getElementById(cardId)) return;
+  const card = document.createElement('div');
+  card.id = cardId;
+  card.style.cssText = 'display:flex;justify-content:center;margin:8px 0;';
+  card.innerHTML = '<div style="background:#1a1a2e;border:1px solid #e63946;border-radius:14px;padding:12px 14px;max-width:240px;text-align:center">'
+    +'<div style="font-size:22px;margin-bottom:4px">'+grpIcon+'</div>'
+    +'<div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:2px">'+grpName+'</div>'
+    +'<div style="font-size:10px;color:#aaa;margin-bottom:10px">Tumhe is group mein invite kiya gaya hai</div>'
+    +'<div style="display:flex;gap:8px;justify-content:center">'
+    +'<button onclick="respondToInvite(\''+grpId+'\',\''+member.id+'\',\''+member.name+'\',true,\''+grpName+'\',\''+grpIcon+'\',\''+grpColor+'\')" style="background:#2ecc71;border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">&#10003; Accept</button>'
+    +'<button onclick="respondToInvite(\''+grpId+'\',\''+member.id+'\',\''+member.name+'\',false,\''+grpName+'\',\''+grpIcon+'\',\''+grpColor+'\')" style="background:#e63946;border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">&#10005; Decline</button>'
+    +'</div></div>';
+  msgs.appendChild(card);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function respondToInvite(grpId, memberId, memberName, accepted, grpName, grpIcon, grpColor) {
+  const cardId = 'invite-' + grpId + '-' + memberId;
+  const card = document.getElementById(cardId);
+  if (card) {
+    card.innerHTML = '<div style="background:#1a1a2e;border:1px solid '+(accepted?'#2ecc71':'#555')+';border-radius:14px;padding:10px 16px;font-size:11px;color:'+(accepted?'#2ecc71':'#555')+';text-align:center">'
+      +(accepted ? '✓ Group join kar liya: <b>'+grpName+'</b>' : '✗ Invite decline kar diya')+'</div>';
+  }
+  simulateMemberResponse({id:memberId, name:memberName}, grpId, grpName, grpIcon, grpColor, accepted);
+}
+
+function simulateMemberResponse(member, grpId, grpName, grpIcon, grpColor, accepted) {
+  const invite = pendingInvites[grpId];
+  if (!invite) return;
+  const m = invite.members.find(x => x.id === member.id);
+  if (!m || m.status !== 'pending') return;
+  m.status = accepted ? 'accepted' : 'declined';
+
+  // Add system message in group chat
+  dmHistory[grpId].push({from:'system', text: member.name + (accepted ? ' ne group join kar liya! 🎉' : ' ne invite decline kar diya.')});
+  if (currentDM === grpId) {
+    renderSystemMsg(member.name + (accepted ? ' ne group join kar liya! 🎉' : ' ne invite decline kar diya.'));
+  }
+
+  // If accepted, add to group members
+  if (accepted) {
+    const grp = userGroups.find(g => g.id === grpId);
+    if (grp && !grp.members.includes(member.name)) grp.members.push(member.name);
+  }
+
+  // Update group row subtitle + badge
+  const allDone = invite.members.every(x => x.status !== 'pending');
+  if (allDone) {
+    const accepted_list = invite.members.filter(x => x.status === 'accepted').map(x => x.name);
+    const sub = document.getElementById('grp-sub-' + grpId);
+    const badge = document.getElementById('grp-badge-' + grpId);
+    if (sub) sub.textContent = accepted_list.length > 0 ? accepted_list.join(', ') + ' + You' : 'Sirf aap (koi join nahi kiya)';
+    if (badge) { badge.textContent = accepted_list.length + ' joined'; badge.style.background = '#2ecc71'; }
+    toast('"'+grpName+'" — ' + accepted_list.length + ' members joined!');
+  }
+}
+
+function renderSystemMsg(text) {
+  const msgs = document.getElementById('dm-msgs');
+  const div = document.createElement('div');
+  div.style.cssText = 'text-align:center;margin:6px 0;';
+  div.innerHTML = '<span style="background:#1a1a2e;color:#555;font-size:10px;padding:3px 10px;border-radius:10px;font-style:italic">'+text+'</span>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+
+
+</script>
+</body>
+</html>

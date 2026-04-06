@@ -1,0 +1,135 @@
+﻿<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>YT-Booster Chatbot</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:radial-gradient(ellipse at top,#1a0533,#0a0a1a 60%,#000);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:Segoe UI,sans-serif;padding:20px;}
+.phone{width:375px;height:812px;background:#000;border-radius:54px;border:10px solid #1a1a1a;box-shadow:0 0 0 1px #333,0 40px 100px rgba(230,57,70,0.2);position:relative;overflow:hidden;}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:126px;height:34px;background:#000;border-radius:0 0 22px 22px;z-index:100;}
+.screen{width:100%;height:100%;background:#0d0d0d;border-radius:44px;overflow:hidden;display:flex;flex-direction:column;}
+.sbar{height:48px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 8px;font-size:12px;color:#fff;font-weight:600;flex-shrink:0;}
+.chat-hdr{background:linear-gradient(135deg,#1a0a2e,#0d0d1a);padding:14px 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(230,57,70,0.2);flex-shrink:0;}
+.bot-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 15px rgba(230,57,70,0.4);flex-shrink:0;}
+.bot-info{flex:1;}
+.bot-name{color:#fff;font-size:14px;font-weight:700;}
+.bot-status{color:#2ecc71;font-size:11px;display:flex;align-items:center;gap:4px;}
+.dot{width:6px;height:6px;border-radius:50%;background:#2ecc71;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.messages{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px;scrollbar-width:none;}
+.messages::-webkit-scrollbar{display:none;}
+.msg{display:flex;gap:8px;animation:fadeUp 0.3s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.msg.bot{align-items:flex-end;}
+.msg.user{flex-direction:row-reverse;}
+.msg-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.bubble{max-width:240px;padding:10px 13px;border-radius:16px;font-size:12px;line-height:1.5;}
+.msg.bot .bubble{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:#ddd;border-bottom-left-radius:4px;}
+.msg.user .bubble{background:linear-gradient(135deg,#e63946,#c0392b);color:#fff;border-bottom-right-radius:4px;box-shadow:0 4px 15px rgba(230,57,70,0.3);}
+.msg-time{font-size:9px;color:#444;margin-top:3px;text-align:right;}
+.suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px;}
+.sug{background:rgba(230,57,70,0.1);border:1px solid rgba(230,57,70,0.3);color:#e63946;padding:6px 11px;border-radius:16px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600;}
+.sug:hover{background:rgba(230,57,70,0.2);}
+.input-area{padding:10px 12px;background:rgba(255,255,255,0.03);border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:8px;align-items:center;flex-shrink:0;}
+.chat-input{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px 13px;border-radius:22px;font-size:12px;outline:none;}
+.chat-input::placeholder{color:#444;}
+.chat-input:focus{border-color:rgba(230,57,70,0.4);}
+.send-btn{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#e63946,#c0392b);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(230,57,70,0.4);flex-shrink:0;}
+.typing{display:flex;gap:4px;align-items:center;padding:10px 13px;}
+.typing span{width:6px;height:6px;border-radius:50%;background:#555;animation:bounce 1.2s infinite;}
+.typing span:nth-child(2){animation-delay:0.2s;}
+.typing span:nth-child(3){animation-delay:0.4s;}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-6px);}}
+</style></head><body>
+<div class="phone">
+<div class="notch"></div>
+<div class="screen">
+<div class="sbar"><span>9:41</span><span>&#9679;&#9679;&#9679;</span></div>
+<div class="chat-hdr">
+  <div class="bot-avatar">&#129302;</div>
+  <div class="bot-info">
+    <div class="bot-name">YT Assistant</div>
+    <div class="bot-status"><div class="dot"></div>Online — YouTube Expert</div>
+  </div>
+</div>
+<div class="messages" id="msgs">
+  <div class="msg bot">
+    <div class="msg-avatar">&#129302;</div>
+    <div>
+      <div class="bubble">Namaste! &#128075; Main YT Assistant hoon. YouTube se related koi bhi sawaal poochho — subscribers, views, monetization, SEO sab kuch!</div>
+      <div class="msg-time">9:41 AM</div>
+    </div>
+  </div>
+</div>
+<div class="suggestions" id="sugs">
+  <div class="sug" onclick="ask('Subscribers kaise badhaye?')">&#128100; Subscribers</div>
+  <div class="sug" onclick="ask('Views kaise badhaye?')">&#128065; Views</div>
+  <div class="sug" onclick="ask('Monetization kaise kare?')">&#128176; Monetize</div>
+  <div class="sug" onclick="ask('YouTube SEO tips?')">&#128269; SEO</div>
+  <div class="sug" onclick="ask('Thumbnail tips?')">&#128444; Thumbnail</div>
+  <div class="sug" onclick="ask('Viral video kaise banaye?')">&#128293; Viral</div>
+</div>
+<div class="input-area">
+  <input class="chat-input" id="inp" placeholder="YouTube sawaal poochho..." onkeydown="if(event.key==='Enter')send()">
+  <button class="send-btn" onclick="send()">&#10148;</button>
+</div>
+</div></div>
+<script>
+var now = function(){var d=new Date();return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')+' '+(d.getHours()<12?'AM':'PM');};
+var qa = [
+  {k:['subscriber','sub','badhaye','grow','increase'],a:'Subscribers badhane ke liye:\n1. Consistent upload schedule rakho (week mein 2-3 videos)\n2. Har video ke end mein subscribe karne ko kaho\n3. Community posts use karo\n4. Doosre creators ke saath collab karo\n5. YT-Booster use karo — real subscribers milenge! &#128640;'},
+  {k:['view','views','traffic'],a:'Views badhane ke tips:\n1. Catchy thumbnail banao (CTR improve hoga)\n2. First 30 seconds engaging rakho\n3. Playlists banao\n4. Shorts banao — algorithm boost milta hai\n5. Social media pe share karo\n6. Upload time: evening 6-9 PM best hai &#128065;'},
+  {k:['monetiz','paise','earn','money','income'],a:'YouTube Monetization ke liye:\n✅ 1000 subscribers chahiye\n✅ 4000 watch hours (last 12 months)\n✅ AdSense account link karo\n✅ Community guidelines follow karo\n\nIndia mein avg CPM: ₹30-150 per 1000 views &#128176;'},
+  {k:['seo','search','rank','keyword'],a:'YouTube SEO Tips:\n1. Title mein main keyword pehle rakho\n2. Description mein 3-5 keywords use karo\n3. Tags mein broad + specific keywords\n4. Chapters add karo (timestamps)\n5. Closed captions enable karo\n6. VidIQ ya TubeBuddy use karo &#128269;'},
+  {k:['thumbnail','click','ctr'],a:'Thumbnail Tips:\n1. Bright colors use karo (red, yellow, orange)\n2. Face close-up rakho — emotions dikhao\n3. Bold text (max 3-4 words)\n4. 1280x720 resolution\n5. Canva ya Photoshop use karo\n6. A/B test karo different thumbnails &#128444;'},
+  {k:['viral','trending','popular'],a:'Viral Video Formula:\n1. Trending topics pe videos banao (Google Trends check karo)\n2. First 3 seconds mein hook daalo\n3. Emotional ya surprising content\n4. Share-worthy moments include karo\n5. Shorts format try karo\n6. Upload karne ka sahi time: Tuesday-Thursday &#128293;'},
+  {k:['shorts','short','reel'],a:'YouTube Shorts Tips:\n1. 60 seconds se kam rakho\n2. Vertical format (9:16)\n3. Hook pehle 2 seconds mein\n4. Trending audio use karo\n5. Shorts se channel grow bahut fast hota hai\n6. Regular channel ke saath Shorts bhi banao &#127916;'},
+  {k:['algorithm','algo','recommend'],a:'YouTube Algorithm Kaise Kaam Karta Hai:\n1. CTR (Click-Through Rate) — thumbnail + title\n2. Watch Time — kitna video dekha\n3. Engagement — likes, comments, shares\n4. Session Time — user kitna time YouTube pe raha\n5. Upload frequency — regular upload karo &#129302;'},
+  {k:['comment','engage','community'],a:'Engagement Badhane ke Tips:\n1. Har comment ka reply karo\n2. Video mein question poochho\n3. Polls use karo Community tab mein\n4. Pinned comment mein CTA rakho\n5. Live streams karo — algorithm boost milta hai &#128172;'},
+  {k:['niche','topic','content'],a:'Sahi Niche Choose Karne ke Tips:\n1. Passion + Knowledge + Demand = Perfect Niche\n2. Competition check karo (medium competition best)\n3. Long-term mein interest rahega?\n4. Popular niches: Tech, Finance, Education, Gaming, Cooking\n5. Micro-niche mein jao — jaldi grow hoga &#127919;'},
+  {k:['ytbooster','yt-booster','app','coin'],a:'YT-Booster App se:\n&#129689; Coins earn karo — videos watch/like/comment karke\n&#128640; Subscribers lo — coins spend karke\n&#127873; Daily bonus claim karo\n&#128101; Referral se extra coins\n\nYe app real YouTube growth ke liye best tool hai! &#128293;'},
+];
+function getReply(msg){
+  var m=msg.toLowerCase();
+  for(var i=0;i<qa.length;i++){
+    for(var j=0;j<qa[i].k.length;j++){
+      if(m.indexOf(qa[i].k[j])>=0) return qa[i].a;
+    }
+  }
+  return 'Ye sawaal samajh nahi aaya. &#128517;\n\nIn topics pe poochh sakte ho:\n&#128100; Subscribers badhana\n&#128065; Views increase\n&#128176; Monetization\n&#128269; SEO tips\n&#128444; Thumbnail\n&#128293; Viral videos\n&#127916; YouTube Shorts';
+}
+function addMsg(text,isUser){
+  var msgs=document.getElementById('msgs');
+  var div=document.createElement('div');
+  div.className='msg '+(isUser?'user':'bot');
+  var t=now();
+  if(isUser){
+    div.innerHTML='<div class="msg-avatar">&#128100;</div><div><div class="bubble">'+text+'</div><div class="msg-time">'+t+'</div></div>';
+  } else {
+    div.innerHTML='<div class="msg-avatar">&#129302;</div><div><div class="bubble">'+text.replace(/\n/g,'<br>')+'</div><div class="msg-time">'+t+'</div></div>';
+  }
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+function showTyping(){
+  var msgs=document.getElementById('msgs');
+  var div=document.createElement('div');
+  div.className='msg bot';div.id='typing-ind';
+  div.innerHTML='<div class="msg-avatar">&#129302;</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+}
+function removeTyping(){var t=document.getElementById('typing-ind');if(t)t.remove();}
+function ask(q){
+  document.getElementById('sugs').style.display='none';
+  addMsg(q,true);
+  showTyping();
+  setTimeout(function(){removeTyping();addMsg(getReply(q),false);},900);
+}
+function send(){
+  var inp=document.getElementById('inp');
+  var val=inp.value.trim();
+  if(!val)return;
+  inp.value='';
+  document.getElementById('sugs').style.display='none';
+  addMsg(val,true);
+  showTyping();
+  setTimeout(function(){removeTyping();addMsg(getReply(val),false);},900);
+}
+</script></body></html>

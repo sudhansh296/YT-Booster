@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sub-Admin Panel - YT Booster</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+    .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-card { background: #1a1a1a; border-radius: 16px; padding: 40px; width: 360px; border: 1px solid #FF000033; }
+    .login-card h2 { color: #FF0000; margin-bottom: 8px; font-size: 22px; }
+    .login-card p { color: #666; font-size: 13px; margin-bottom: 24px; }
+    input, select, textarea { width: 100%; padding: 12px 14px; background: #111; border: 1px solid #333; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 12px; outline: none; }
+    input:focus, textarea:focus { border-color: #FF0000; }
+    .btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
+    .btn-red { background: #FF0000; color: #fff; }
+    nav { background: #111; padding: 0 24px; display: flex; align-items: center; gap: 4px; border-bottom: 1px solid #222; flex-wrap: wrap; }
+    .nav-brand { color: #FF0000; font-weight: 700; font-size: 16px; padding: 16px 12px 16px 0; margin-right: 8px; border-right: 1px solid #333; }
+    .nav-btn { padding: 16px 14px; background: none; border: none; color: #888; cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+    .nav-btn.active { color: #FF0000; border-bottom-color: #FF0000; }
+    .nav-logout { margin-left: auto; padding: 8px 14px; background: #2a1a1a; border: 1px solid #FF000033; border-radius: 6px; color: #ff6b6b; cursor: pointer; font-size: 12px; }
+    .page { padding: 24px; max-width: 1100px; margin: 0 auto; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-card { background: #1a1a1a; border-radius: 12px; padding: 18px 14px; text-align: center; }
+    .growth-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .growth-card { background: #111; border-radius: 10px; padding: 16px 12px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 10px 12px; color: #aaa; font-weight: normal; text-align: left; background: #1a1a1a; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1a1a1a; font-size: 13px; }
+    .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #1a2a1a; color: #4CAF50; }
+    .badge-red { background: #2a1a1a; color: #ff6b6b; }
+    .badge-blue { background: #1a2a3a; color: #29B6F6; }
+    .card { background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .section-title { color: #FFD700; font-weight: 700; font-size: 15px; margin-bottom: 16px; }
+    .ref-box { background: #111; border: 1px solid #FF000033; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .copy-btn { padding: 6px 14px; background: #333; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-size: 12px; margin-top: 10px; margin-right: 8px; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; }
+    h2 { color: #FFD700; margin-bottom: 20px; }
+    .chart-bars { display: flex; align-items: flex-end; gap: 8px; height: 100px; margin-top: 12px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    label { color: #aaa; font-size: 12px; display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5000/subadm1n_m3r8q5'
+      : 'https://api.picrypto.in/subadm1n_m3r8q5';
+
+    function getHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'x-subadmin-token': localStorage.getItem('sa_token') || ''
+      };
+    }
+
+    async function apiCall(method, path, body) {
+      const res = await fetch(BASE + path, {
+        method,
+        headers: getHeaders(),
+        body: body ? JSON.stringify(body) : undefined
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error'); }
+      return res.json();
+    }
+
+    let state = {
+      authed: !!localStorage.getItem('sa_token'),
+      tab: 'dashboard',
+      stats: null, users: [], orders: [], notices: [], groups: [],
+      groupMessages: [], groupMsgId: null, groupMsgName: '',
+      loginCode: '', loginPass: '', loginError: '',
+      search: '', noticeTitle: '', noticeMsg: '',
+      noticeSending: false, noticeResult: '',
+      settings: null, settingsSaving: false, settingsMsg: '',
+      smmUrl: '', smmKey: '', smmServiceId: '',
+      communityMsgs: [], commMsg: ''
+    };
+
+    function setState(patch) { Object.assign(state, patch); render(); }
+
+    function render() {
+      document.getElementById('app').innerHTML = state.authed ? renderApp() : renderLogin();
+      bindEvents();
+    }
+
+    function renderLogin() {
+      return '<div class="login-wrap"><div class="login-card">' +
+        '<h2>🔐 Sub-Admin Login</h2>' +
+        '<p>YT Booster Sub-Admin Panel</p>' +
+        '<input id="inp-code" type="text" placeholder="Your Code (e.g. SUB001)" value="' + state.loginCode + '" style="text-transform:uppercase" />' +
+        '<input id="inp-pass" type="password" placeholder="Password" value="' + state.loginPass + '" />' +
+        (state.loginError ? '<div style="color:#ff6b6b;font-size:13px;margin-bottom:10px">' + state.loginError + '</div>' : '') +
+        '<button class="btn btn-red" id="btn-login" style="width:100%;margin-top:8px">Login</button>' +
+        '</div></div>';
+    }
+
+    function renderApp() {
+      const tabs = [
+        ['dashboard','📊 Dashboard'], ['users','👥 Users'], ['orders','📦 Orders'],
+        ['groups','💬 Groups'], ['notices','📢 Notices'], ['community','🔴 Community'], ['referral','🔗 Referral'], ['settings','⚙️ Settings']
+      ];
+      let html = '<nav><span class="nav-brand">YT Sub-Admin</span>';
+      tabs.forEach(function(t) {
+        html += '<button class="nav-btn ' + (state.tab === t[0] ? 'active' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>';
+      });
+      html += '<button class="nav-logout" id="btn-logout">Logout</button></nav><div>';
+      if (state.tab === 'dashboard') html += renderDashboard();
+      else if (state.tab === 'users') html += renderUsers();
+      else if (state.tab === 'orders') html += renderOrders();
+      else if (state.tab === 'groups') html += renderGroups();
+      else if (state.tab === 'notices') html += renderNotices();
+      else if (state.tab === 'community') html += renderCommunity();
+      else if (state.tab === 'referral') html += renderReferral();
+      else if (state.tab === 'settings') html += renderSettings();
+      html += '</div>';
+      return html;
+    }
+
+    function renderDashboard() {
+      var s = state.stats;
+      if (!s) return '<div class="page"><p style="color:#888">Loading...</p></div>';
+      var max = Math.max.apply(null, (s.chart && s.chart.signups || [1]).concat([1]));
+      var bars = '';
+      if (s.chart && s.chart.days) {
+        s.chart.days.forEach(function(d, i) {
+          var v = s.chart.signups[i] || 0;
+          var pct = max > 0 ? Math.max((v / max) * 100, 2) : 2;
+          bars += '<div class="bar-col">' +
+            '<div style="font-size:10px;color:#aaa">' + v + '</div>' +
+            '<div style="width:100%;background:#333;border-radius:4px;height:80px;display:flex;align-items:flex-end">' +
+            '<div style="width:100%;background:#FF0000;border-radius:4px;height:' + pct + '%;opacity:0.85"></div></div>' +
+            '<div style="font-size:9px;color:#555">' + d.slice(5) + '</div></div>';
+        });
+      }
+      return '<div class="page">' +
+        '<h2>📊 Dashboard — ' + (s.label || '') + '</h2>' +
+        '<div class="stats-grid">' +
+          sCard('👥', s.totalUsers, 'Total Users', '#FF0000') +
+          sCard('🎯', s.directUsers, 'Direct Joined', '#FFD700') +
+          sCard('🪙', s.totalCoins, 'Total Coins', '#FF9800') +
+          sCard('🚫', s.bannedCount, 'Banned', '#f44336') +
+        '</div>' +
+        '<div class="card" style="border:1px solid #FF000022;margin-bottom:20px">' +
+          '<div class="section-title">👤 User Growth</div>' +
+          '<div class="growth-grid">' +
+            gCard(s.dailyJoined, 'Aaj Joined', 'Today', '#4CAF50') +
+            gCard(s.weeklyJoined, 'Is Hafte', 'Last 7 days', '#29B6F6') +
+            gCard(s.monthlyJoined, 'Is Mahine', 'This month', '#FF9800') +
+            gCard(s.totalUsers, 'Total', 'All time', '#FF0000') +
+          '</div>' +
+        '</div>' +
+        '<div class="card"><div style="color:#aaa;font-size:14px;font-weight:600;margin-bottom:12px">📈 Daily Signups (7 days)</div>' +
+        '<div class="chart-bars">' + bars + '</div></div>' +
+        '</div>';
+    }
+
+    function sCard(icon, val, label, color) {
+      return '<div class="stat-card" style="border:1px solid ' + color + '22">' +
+        '<div style="font-size:24px">' + icon + '</div>' +
+        '<div style="font-size:26px;font-weight:700;color:' + color + ';margin:6px 0 4px">' + (val != null ? val : 0) + '</div>' +
+        '<div style="color:#666;font-size:12px">' + label + '</div></div>';
+    }
+
+    function gCard(num, name, sub, color) {
+      return '<div class="growth-card" style="border:1px solid ' + color + '33">' +
+        '<div style="font-size:32px;font-weight:700;color:' + color + ';line-height:1">' + (num != null ? num : 0) + '</div>' +
+        '<div style="font-size:13px;margin-top:6px;font-weight:600">' + name + '</div>' +
+        '<div style="color:#555;font-size:11px;margin-top:2px">' + sub + '</div></div>';
+    }
+
+    function renderUsers() {
+      var filtered = state.users.filter(function(u) {
+        return (u.channelName || '').toLowerCase().includes(state.search.toLowerCase());
+      });
+      var rows = filtered.length === 0 ? '<tr><td colspan="7" style="color:#555;padding:20px">Koi user nahi</td></tr>' :
+        filtered.map(function(u) {
+          return '<tr>' +
+            '<td><div style="display:flex;align-items:center;gap:8px"><img src="' + (u.profilePic || '') + '" class="avatar" onerror="this.style.display=\'none\'" /><span>' + u.channelName + '</span></div></td>' +
+            '<td style="color:#FFD700">' + u.coins + '</td>' +
+            '<td>' + u.totalEarned + '</td>' +
+            '<td style="color:#29B6F6;font-size:12px">' + (u.referralCode || '—') + '</td>' +
+            '<td style="color:#888;font-size:12px">' + (u.referralParent || '—') + '</td>' +
+            '<td><span class="badge ' + (u.isBanned ? 'badge-red' : 'badge-green') + '">' + (u.isBanned ? 'Banned' : 'Active') + '</span></td>' +
+            '<td style="color:#666;font-size:12px">' + new Date(u.createdAt).toLocaleDateString() + '</td>' +
+            '</tr>';
+        }).join('');
+      return '<div class="page"><h2>👥 Users (' + state.users.length + ')</h2>' +
+        '<input style="padding:10px 14px;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;width:280px;margin-bottom:16px" id="inp-search" placeholder="Search channel name..." value="' + state.search + '" />' +
+        '<div style="overflow-x:auto"><table><thead><tr><th>Channel</th><th>Coins</th><th>Earned</th><th>Ref Code</th><th>Parent</th><th>Status</th><th>Joined</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    function renderOrders() {
+      var rows = state.orders.length === 0 ? '<tr><td colspan="5" style="color:#555;padding:20px">Koi order nahi</td></tr>' :
+        state.orders.map(function(o) {
+          var statusClass = o.status === 'completed' ? 'badge-green' : o.status === 'failed' ? 'badge-red' : 'badge-blue';
+          return '<tr>' +
+            '<td><div style="display:flex;align-items:center;gap:8px"><img src="' + ((o.userId && o.userId.profilePic) || '') + '" class="avatar" onerror="this.style.display=\'none\'" /><span>' + ((o.userId && o.userId.channelName) || '—') + '</span></div></td>' +
+            '<td>' + o.quantity + '</td><td style="color:#FFD700">' + o.coinsSpent + '</td>' +
+            '<td><span class="badge ' + statusClass + '">' + o.status + '</span></td>' +
+            '<td style="color:#666;font-size:12px">' + new Date(o.createdAt).toLocaleDateString() + '</td></tr>';
+        }).join('');
+      return '<div class="page"><h2>📦 Orders (' + state.orders.length + ')</h2>' +
+        '<div style="overflow-x:auto"><table><thead><tr><th>Channel</th><th>Qty</th><th>Coins</th><th>Status</th><th>Date</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    function renderNotices() {
+      var sentList = state.notices.length === 0 ? '<p style="color:#555">Koi notice nahi bheja abhi</p>' :
+        state.notices.map(function(n) {
+          return '<div class="card" style="margin-bottom:10px">' +
+            '<div style="color:#FFD700;font-weight:600;margin-bottom:6px">' + n.title + '</div>' +
+            '<div style="color:#ccc;font-size:13px">' + n.message + '</div>' +
+            '<div style="color:#555;font-size:11px;margin-top:8px">' + new Date(n.createdAt).toLocaleString() + '</div></div>';
+        }).join('');
+      return '<div class="page"><h2>📢 Notices</h2>' +
+        '<div class="card">' +
+          '<div class="section-title">Apne Members ko Notice Bhejo</div>' +
+          '<input id="inp-ntitle" type="text" placeholder="Title" value="' + state.noticeTitle + '" />' +
+          '<textarea id="inp-nmsg" rows="4" placeholder="Message likho...">' + state.noticeMsg + '</textarea>' +
+          (state.noticeResult ? '<div style="color:' + (state.noticeResult.includes('✅') ? '#4CAF50' : '#ff6b6b') + ';font-size:13px;margin-bottom:10px">' + state.noticeResult + '</div>' : '') +
+          '<button class="btn btn-red" id="btn-send-notice" style="width:auto;padding:10px 24px">' +
+            (state.noticeSending ? 'Bhej raha hai...' : '📤 Send to All My Members') +
+          '</button>' +
+        '</div>' +
+        '<div class="section-title">Sent Notices (' + state.notices.length + ')</div>' +
+        sentList + '</div>';
+    }
+
+    function renderReferral() {
+      var s = state.stats;
+      var link = (s && s.referralLink) || '';
+      var sc = (s && s.shortCode) || '';
+      return '<div class="page"><h2>🔗 Mera Referral</h2>' +
+        (sc ? '<div class="ref-box" style="margin-bottom:16px">' +
+          '<div style="color:#aaa;font-size:12px;margin-bottom:8px">Mera App Code (users app mein enter kar sakte hain)</div>' +
+          '<div style="color:#FFD700;font-size:32px;font-weight:700;letter-spacing:6px;font-family:monospace;padding:12px;background:#0a0a0a;border-radius:8px;text-align:center">' + sc + '</div>' +
+          '<button class="copy-btn" id="btn-copy-code" style="margin-top:10px">📋 Copy Code</button>' +
+        '</div>' : '') +
+        '<div class="ref-box">' +
+          '<div style="color:#aaa;font-size:12px;margin-bottom:8px">Mera Referral Link</div>' +
+          '<div style="color:#29B6F6;font-size:13px;word-break:break-all;margin-top:8px;background:#0a0a0a;padding:12px;border-radius:8px;font-family:monospace">' + link + '</div>' +
+          '<div style="margin-top:12px">' +
+            '<button class="copy-btn" id="btn-copy-link">🔗 Copy Link</button>' +
+            '<button class="copy-btn" id="btn-share" style="background:#FF0000">📤 Share</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="card"><div class="section-title">Stats</div>' +
+          '<div style="display:flex;gap:32px">' +
+            '<div style="text-align:center"><div style="color:#FF0000;font-size:28px;font-weight:700">' + ((s && s.totalUsers) || 0) + '</div><div style="color:#666;font-size:12px">Total Joined</div></div>' +
+            '<div style="text-align:center"><div style="color:#FFD700;font-size:28px;font-weight:700">' + ((s && s.directUsers) || 0) + '</div><div style="color:#666;font-size:12px">Direct Joined</div></div>' +
+          '</div>' +
+        '</div></div>';
+    }
+
+    function renderGroups() {
+      var groups = state.groups;
+      if (state.groupMsgId) {
+        var msgs = state.groupMessages;
+        var msgRows = msgs.length === 0 ? '<p style="color:#555;padding:20px">Koi message nahi</p>' :
+          msgs.map(function(m) {
+            var isMine = false;
+            return '<div style="margin-bottom:12px;display:flex;gap:10px;align-items:flex-start">' +
+              '<div style="width:32px;height:32px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">' +
+                (m.senderName ? m.senderName[0].toUpperCase() : '?') +
+              '</div>' +
+              '<div>' +
+                '<div style="color:#FFD700;font-size:12px;font-weight:600;margin-bottom:3px">' + (m.senderName || 'Unknown') + '</div>' +
+                '<div style="background:#1a1a2e;border-radius:10px;padding:8px 12px;color:#fff;font-size:13px;max-width:400px">' + m.text + '</div>' +
+                '<div style="color:#444;font-size:10px;margin-top:3px">' + new Date(m.createdAt).toLocaleString() + '</div>' +
+              '</div></div>';
+          }).join('');
+        return '<div class="page">' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">' +
+            '<button class="btn" id="btn-back-groups" style="background:#222;color:#aaa;padding:8px 16px">← Back</button>' +
+            '<h2 style="margin:0">💬 ' + state.groupMsgName + ' — Messages</h2>' +
+          '</div>' +
+          '<div style="background:#111;border-radius:12px;padding:20px;max-height:600px;overflow-y:auto">' +
+            msgRows +
+          '</div></div>';
+      }
+
+      var rows = groups.length === 0 ? '<tr><td colspan="6" style="color:#555;padding:20px">Koi group nahi mila</td></tr>' :
+        groups.map(function(g) {
+          return '<tr>' +
+            '<td style="font-weight:600">' + g.name + '</td>' +
+            '<td style="color:#29B6F6">' + g.memberCount + '</td>' +
+            '<td style="color:#aaa;font-size:12px">' + (g.createdBy ? g.createdBy.name : '—') + '</td>' +
+            '<td style="color:#666;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (g.lastMessage || '—') + '</td>' +
+            '<td><span class="badge ' + (g.isBlocked ? 'badge-red' : 'badge-green') + '">' + (g.isBlocked ? '🚫 Blocked' : '✅ Active') + '</span></td>' +
+            '<td style="display:flex;gap:8px">' +
+              '<button class="btn" data-view-group="' + g._id + '" data-group-name="' + g.name + '" style="background:#1a2a3a;color:#29B6F6;padding:5px 12px;font-size:12px">👁 View</button>' +
+              '<button class="btn ' + (g.isBlocked ? '' : 'btn-red') + '" data-block-group="' + g._id + '" style="padding:5px 12px;font-size:12px;' + (g.isBlocked ? 'background:#1a2a1a;color:#4CAF50' : '') + '">' +
+                (g.isBlocked ? '✅ Unblock' : '🚫 Block') +
+              '</button>' +
+            '</td>' +
+            '</tr>';
+        }).join('');
+
+      return '<div class="page"><h2>💬 Groups (' + groups.length + ')</h2>' +
+        '<div style="overflow-x:auto"><table><thead><tr>' +
+          '<th>Group Name</th><th>Members</th><th>Created By</th><th>Last Message</th><th>Status</th><th>Actions</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    }
+
+    function renderCommunity() {
+      var msgs = state.communityMsgs || [];
+      var msgHtml = msgs.length === 0 ? '<p style="color:#555;text-align:center;padding:40px 0">Koi message nahi</p>' :
+        msgs.map(function(m) {
+          var isAdm = m.isAdmin || (m.senderId && (m.senderId === 'admin' || m.senderId.startsWith('subadmin_')));
+          return '<div style="display:flex;gap:10px;align-items:flex-start;background:' + (isAdm ? '#0d1a0d' : '#1a1a2e') + ';border-radius:8px;padding:8px 12px;margin-bottom:8px">' +
+            '<div style="width:30px;height:30px;border-radius:50%;background:#1a3a1a;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">' + (m.senderName?.[0]?.toUpperCase() || '?') + '</div>' +
+            '<div style="flex:1"><div style="color:' + (isAdm ? '#4CAF50' : '#29B6F6') + ';font-size:12px;font-weight:700;margin-bottom:3px">' + m.senderName + (isAdm ? ' <span style="background:#1a3a1a;color:#4CAF50;font-size:9px;padding:1px 5px;border-radius:3px">MOD</span>' : '') + '</div>' +
+            '<div style="color:#ddd;font-size:13px">' + m.text + '</div></div>' +
+            '<span style="color:#444;font-size:10px;flex-shrink:0">' + new Date(m.createdAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) + '</span>' +
+            '</div>';
+        }).join('');
+      return '<div class="page"><h2>🔴 Community Live</h2>' +
+        '<div class="card" style="margin-bottom:16px">' +
+          '<div style="color:#aaa;font-size:13px;margin-bottom:12px">⭐ Sub-Admin ke roop mein community mein message bhejo. Aapka message <b style="color:#FFD700">⭐ badge</b> ke saath dikhega.</div>' +
+          '<div style="display:flex;gap:10px">' +
+            '<input id="inp-comm-msg" type="text" placeholder="Community mein message likho..." style="flex:1;margin:0" />' +
+            '<button class="btn btn-red" id="btn-comm-send" style="padding:12px 20px;white-space:nowrap">🚀 Send</button>' +
+          '</div>' +
+          (state.commMsg ? '<div style="color:' + (state.commMsg.includes('✅') ? '#4CAF50' : '#ff6b6b') + ';font-size:13px;margin-top:8px">' + state.commMsg + '</div>' : '') +
+        '</div>' +
+        '<div class="card">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+            '<span style="font-weight:700">💬 Recent Messages</span>' +
+            '<button class="btn" id="btn-comm-refresh" style="background:#333;padding:6px 14px;font-size:12px">🔄 Refresh</button>' +
+          '</div>' +
+          '<div style="background:#0d0d0d;border-radius:8px;padding:12px;max-height:400px;overflow-y:auto">' + msgHtml + '</div>' +
+        '</div>' +
+        '</div>';
+    }
+
+    function renderSettings() {
+      return '<div class="page"><h2>⚙️ SMM Panel Settings</h2>' +
+        '<div class="card" style="max-width:600px">' +
+          '<div class="section-title">SMM API Configuration</div>' +
+          '<p style="color:#666;font-size:13px;margin-bottom:20px">Ye settings subscriber orders ke liye use hoti hain.</p>' +
+          '<label>SMM API URL</label>' +
+          '<input id="inp-smm-url" type="text" placeholder="https://smmpanel.com/api/v2" value="' + state.smmUrl + '" />' +
+          '<label>SMM API Key</label>' +
+          '<input id="inp-smm-key" type="text" placeholder="Your API Key" value="' + state.smmKey + '" />' +
+          '<label>SMM Service ID</label>' +
+          '<input id="inp-smm-sid" type="text" placeholder="Service ID (e.g. 123)" value="' + state.smmServiceId + '" />' +
+          (state.settingsMsg ? '<div style="color:' + (state.settingsMsg.includes('✅') ? '#4CAF50' : '#ff6b6b') + ';font-size:13px;margin:10px 0">' + state.settingsMsg + '</div>' : '') +
+          '<button class="btn btn-red" id="btn-save-settings" style="width:auto;padding:10px 24px;margin-top:8px">' +
+            (state.settingsSaving ? 'Saving...' : '💾 Save Settings') +
+          '</button>' +
+        '</div></div>';
+    }
+
+    function bindEvents() {
+      var el;
+      el = document.getElementById('btn-login');
+      if (el) el.onclick = doLogin;
+      el = document.getElementById('inp-code');
+      if (el) { el.oninput = function(e) { state.loginCode = e.target.value.toUpperCase(); }; el.onkeydown = function(e) { if (e.key === 'Enter') doLogin(); }; }
+      el = document.getElementById('inp-pass');
+      if (el) { el.oninput = function(e) { state.loginPass = e.target.value; }; el.onkeydown = function(e) { if (e.key === 'Enter') doLogin(); }; }
+      el = document.getElementById('btn-logout');
+      if (el) el.onclick = function() { localStorage.removeItem('sa_token'); setState({ authed: false, stats: null, users: [], orders: [], notices: [] }); };
+      document.querySelectorAll('[data-tab]').forEach(function(btn) {
+        btn.onclick = function() { setState({ tab: btn.dataset.tab }); loadTabData(btn.dataset.tab); };
+      });
+      el = document.getElementById('inp-search');
+      if (el) el.oninput = function(e) { setState({ search: e.target.value }); };
+      el = document.getElementById('inp-ntitle');
+      if (el) el.oninput = function(e) { state.noticeTitle = e.target.value; };
+      el = document.getElementById('inp-nmsg');
+      if (el) el.oninput = function(e) { state.noticeMsg = e.target.value; };
+      el = document.getElementById('btn-send-notice');
+      if (el) el.onclick = doSendNotice;
+      el = document.getElementById('btn-copy-code');
+      if (el) el.onclick = function() { navigator.clipboard.writeText((state.stats && state.stats.shortCode) || ''); el.textContent = '✓ Copied'; };
+      el = document.getElementById('btn-copy-link');
+      if (el) el.onclick = function() { navigator.clipboard.writeText((state.stats && state.stats.referralLink) || ''); el.textContent = '✓ Copied'; };
+      el = document.getElementById('btn-share');
+      if (el) el.onclick = function() {
+        var text = 'YT Booster se free subscribers pao!\nMere link se join karo +20 coins pao:\n' + ((state.stats && state.stats.referralLink) || '');
+        if (navigator.share) navigator.share({ text: text });
+        else { navigator.clipboard.writeText(text); el.textContent = '✓ Copied'; }
+      };
+      el = document.getElementById('inp-smm-url');
+      if (el) el.oninput = function(e) { state.smmUrl = e.target.value; };
+      el = document.getElementById('inp-smm-key');
+      if (el) el.oninput = function(e) { state.smmKey = e.target.value; };
+      el = document.getElementById('inp-smm-sid');
+      if (el) el.oninput = function(e) { state.smmServiceId = e.target.value; };
+      el = document.getElementById('btn-save-settings');
+      if (el) el.onclick = doSaveSettings;
+
+      // Community tab events
+      el = document.getElementById('btn-comm-send');
+      if (el) el.onclick = async function() {
+        var txt = (document.getElementById('inp-comm-msg') && document.getElementById('inp-comm-msg').value.trim()) || '';
+        if (!txt) return;
+        try {
+          var res = await fetch('https://api.picrypto.in/ytadm1n_x9k2p7/community/subadmin-send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-subadmin-token': localStorage.getItem('sa_token') || '' },
+            body: JSON.stringify({ text: txt })
+          });
+          var data = await res.json();
+          if (!res.ok) { setState({ commMsg: '❌ ' + (data.error || 'Error') }); return; }
+          setState({ commMsg: '✅ Message bhej diya!' });
+          document.getElementById('inp-comm-msg').value = '';
+          setTimeout(function() { setState({ commMsg: '' }); }, 3000);
+          loadTabData('community');
+        } catch(e) { setState({ commMsg: '❌ ' + e.message }); }
+      };
+      el = document.getElementById('btn-comm-refresh');
+      if (el) el.onclick = function() { loadTabData('community'); };
+
+      // Groups tab events
+      el = document.getElementById('btn-back-groups');
+      if (el) el.onclick = function() { setState({ groupMsgId: null, groupMessages: [], groupMsgName: '' }); };
+      document.querySelectorAll('[data-view-group]').forEach(function(btn) {
+        btn.onclick = async function() {
+          var id = btn.dataset.viewGroup;
+          var name = btn.dataset.groupName;
+          try {
+            var msgs = await apiCall('GET', '/groups/' + id + '/messages');
+            setState({ groupMsgId: id, groupMessages: msgs, groupMsgName: name });
+          } catch(e) { alert('Error: ' + e.message); }
+        };
+      });
+      document.querySelectorAll('[data-block-group]').forEach(function(btn) {
+        btn.onclick = async function() {
+          var id = btn.dataset.blockGroup;
+          try {
+            var res = await apiCall('POST', '/groups/' + id + '/block');
+            var updated = state.groups.map(function(g) {
+              return g._id === id ? Object.assign({}, g, { isBlocked: res.isBlocked }) : g;
+            });
+            setState({ groups: updated });
+          } catch(e) { alert('Error: ' + e.message); }
+        };
+      });
+    }
+
+    async function doLogin() {
+      var code = (document.getElementById('inp-code') && document.getElementById('inp-code').value.toUpperCase()) || state.loginCode;
+      var pass = (document.getElementById('inp-pass') && document.getElementById('inp-pass').value) || state.loginPass;
+      if (!code || !pass) return setState({ loginError: 'Code aur password dono bharo' });
+      try {
+        var res = await fetch(BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, password: pass }) });
+        var data = await res.json();
+        if (!res.ok) return setState({ loginError: data.error || 'Login failed' });
+        localStorage.setItem('sa_token', data.sessionToken);
+        setState({ authed: true, loginError: '', tab: 'dashboard' });
+        loadTabData('dashboard');
+      } catch (e) { setState({ loginError: 'Server se connect nahi ho pa raha' }); }
+    }
+
+    async function loadTabData(tab) {
+      try {
+        if (tab === 'dashboard' && !state.stats) { var s = await apiCall('GET', '/stats'); setState({ stats: s }); }
+        if (tab === 'users' && state.users.length === 0) { var u = await apiCall('GET', '/users'); setState({ users: u }); }
+        if (tab === 'orders' && state.orders.length === 0) { var o = await apiCall('GET', '/orders'); setState({ orders: o }); }
+        if (tab === 'groups') { var g = await apiCall('GET', '/groups'); setState({ groups: g, groupMsgId: null, groupMessages: [] }); }
+        if (tab === 'notices') { var n = await apiCall('GET', '/notices'); setState({ notices: n }); }
+        if (tab === 'community') { try { var cm = await fetch('https://api.picrypto.in/ytadm1n_x9k2p7/community/messages', { headers: { 'x-subadmin-token': localStorage.getItem('sa_token') || '' } }); var cmData = await cm.json(); setState({ communityMsgs: Array.isArray(cmData) ? cmData : [] }); } catch(e) {} }
+        if (tab === 'referral' && !state.stats) { var rs = await apiCall('GET', '/stats'); setState({ stats: rs }); }
+        if (tab === 'settings' && !state.settings) { var cfg = await apiCall('GET', '/settings'); setState({ settings: cfg, smmUrl: cfg.SMM_API_URL || '', smmKey: cfg.SMM_API_KEY || '', smmServiceId: cfg.SMM_SERVICE_ID || '' }); }
+      } catch (e) { console.error(e); }
+    }
+
+    async function doSendNotice() {
+      var title = (document.getElementById('inp-ntitle') && document.getElementById('inp-ntitle').value) || state.noticeTitle;
+      var msg = (document.getElementById('inp-nmsg') && document.getElementById('inp-nmsg').value) || state.noticeMsg;
+      if (!title || !msg) return setState({ noticeResult: '❌ Title aur message dono bharo' });
+      setState({ noticeSending: true, noticeResult: '' });
+      try {
+        var res = await apiCall('POST', '/notices', { title: title, message: msg });
+        setState({ noticeSending: false, noticeResult: '✅ Notice bhej diya! (' + res.sentTo + ' members ko)', noticeTitle: '', noticeMsg: '' });
+        var n = await apiCall('GET', '/notices'); setState({ notices: n });
+      } catch (e) { setState({ noticeSending: false, noticeResult: '❌ ' + e.message }); }
+    }
+
+    async function doSaveSettings() {
+      setState({ settingsSaving: true, settingsMsg: '' });
+      try {
+        await apiCall('POST', '/settings', { SMM_API_URL: state.smmUrl, SMM_API_KEY: state.smmKey, SMM_SERVICE_ID: state.smmServiceId });
+        setState({ settingsSaving: false, settingsMsg: '✅ Settings save ho gayi!', settings: null });
+      } catch (e) { setState({ settingsSaving: false, settingsMsg: '❌ ' + e.message }); }
+    }
+
+    render();
+    if (state.authed) loadTabData('dashboard');
+  </script>
+</body>
+</html>

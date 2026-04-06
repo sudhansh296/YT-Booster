@@ -1,0 +1,388 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT-Booster - View Exchange Demo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Segoe UI, sans-serif; background: #0f0f0f; color: #fff; min-height: 100vh; }
+.header { background: #1a1a2e; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e63946; }
+.header h1 { color: #e63946; font-size: 22px; }
+.coins-badge { background: #e63946; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 16px; }
+.tabs { display: flex; background: #1a1a2e; border-bottom: 1px solid #333; }
+.tab { flex: 1; padding: 14px; text-align: center; cursor: pointer; font-size: 14px; color: #aaa; border-bottom: 3px solid transparent; transition: all 0.2s; }
+.tab.active { color: #e63946; border-bottom-color: #e63946; background: #16213e; }
+.page { display: none; padding: 20px; max-width: 480px; margin: 0 auto; }
+.page.active { display: block; }
+.video-card { background: #1a1a2e; border-radius: 12px; overflow: hidden; margin-bottom: 16px; border: 1px solid #333; }
+.video-thumb { width: 100%; height: 180px; position: relative; cursor: pointer; overflow: hidden; }
+.video-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+.play-btn { width: 60px; height: 60px; background: rgba(230,57,70,0.95); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; transition: transform 0.2s; }
+.play-btn:hover { transform: scale(1.1); }
+.reward-pill { position: absolute; top: 8px; right: 8px; background: rgba(230,57,70,0.9); padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.video-info { padding: 14px; }
+.video-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.channel-name { color: #aaa; font-size: 13px; margin-bottom: 10px; }
+.reward-info { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.reward-badge { background: #0d3b2e; border: 1px solid #2ecc71; color: #2ecc71; padding: 3px 8px; border-radius: 10px; font-size: 11px; }
+.timer-bar { background: #333; height: 6px; border-radius: 3px; margin: 8px 0; overflow: hidden; }
+.timer-fill { height: 100%; background: linear-gradient(90deg, #e63946, #ff6b6b); width: 0%; transition: width 1s linear; border-radius: 3px; }
+.timer-text { font-size: 12px; color: #aaa; margin-bottom: 8px; }
+.watch-btn { width: 100%; padding: 12px; background: #e63946; border: none; color: #fff; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.watch-btn:hover { background: #c0392b; }
+.watch-btn:disabled { background: #555; cursor: not-allowed; }
+.watch-btn.done { background: #2ecc71; }
+.info-box { background: #16213e; border: 1px solid #2ecc71; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #2ecc71; }
+
+.like-card { background: #1a1a2e; border-radius: 12px; padding: 14px; margin-bottom: 14px; border: 1px solid #333; display: flex; gap: 12px; align-items: center; }
+.like-thumb { width: 90px; height: 65px; border-radius: 8px; flex-shrink: 0; overflow: hidden; position: relative; }
+.like-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.like-details { flex: 1; }
+.like-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.like-channel { color: #aaa; font-size: 12px; margin-bottom: 8px; }
+.like-actions { display: flex; gap: 8px; align-items: center; }
+.like-btn { padding: 7px 14px; background: #e63946; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.like-btn.done { background: #2ecc71; cursor: default; }
+.yt-link { padding: 7px 10px; background: #333; border: none; color: #aaa; border-radius: 6px; cursor: pointer; font-size: 12px; text-decoration: none; }
+.coin-tag { background: #0d3b2e; border: 1px solid #2ecc71; color: #2ecc71; padding: 4px 8px; border-radius: 10px; font-size: 12px; }
+
+.comment-card { background: #1a1a2e; border-radius: 12px; padding: 16px; margin-bottom: 16px; border: 1px solid #333; }
+.comment-video-info { display: flex; gap: 12px; margin-bottom: 14px; align-items: center; }
+.comment-thumb { width: 80px; height: 55px; border-radius: 6px; flex-shrink: 0; overflow: hidden; }
+.comment-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.comment-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.comment-channel { color: #aaa; font-size: 12px; }
+.comment-input { width: 100%; background: #0f0f0f; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; resize: none; height: 70px; margin-bottom: 10px; }
+.comment-input:focus { outline: none; border-color: #e63946; }
+.comment-actions { display: flex; gap: 8px; }
+.comment-submit { flex: 1; padding: 10px; background: #e63946; border: none; color: #fff; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.comment-submit.done { background: #2ecc71; }
+.comment-yt-link { padding: 10px 14px; background: #333; border: none; color: #aaa; border-radius: 8px; cursor: pointer; font-size: 13px; text-decoration: none; white-space: nowrap; }
+
+.submit-form { background: #1a1a2e; border-radius: 12px; padding: 20px; border: 1px solid #333; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 14px; color: #aaa; margin-bottom: 6px; }
+.form-input { width: 100%; background: #0f0f0f; border: 1px solid #444; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.form-input:focus { outline: none; border-color: #e63946; }
+.task-options { display: flex; flex-direction: column; gap: 8px; }
+.task-option { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #0f0f0f; border-radius: 8px; border: 1px solid #333; cursor: pointer; }
+.task-option:hover { border-color: #e63946; }
+.task-option input { accent-color: #e63946; width: 16px; height: 16px; cursor: pointer; }
+.task-option label { cursor: pointer; font-size: 14px; flex: 1; }
+.task-option .cost { color: #e63946; font-weight: bold; font-size: 13px; }
+.submit-video-btn { width: 100%; padding: 14px; background: #e63946; border: none; color: #fff; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.cost-preview { background: #0d3b2e; border: 1px solid #2ecc71; border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: center; font-size: 15px; }
+.cost-preview span { color: #2ecc71; font-size: 22px; font-weight: bold; }
+
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #2ecc71; color: #fff; padding: 12px 24px; border-radius: 24px; font-weight: 600; font-size: 15px; display: none; z-index: 999; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+.section-title { font-size: 12px; color: #aaa; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+.milestone-popup { position: fixed; top: 80px; right: 20px; background: #1a1a2e; border: 2px solid #2ecc71; border-radius: 12px; padding: 14px 18px; display: none; z-index: 998; animation: slideIn 0.3s; }
+.milestone-popup .big-coin { font-size: 32px; text-align: center; }
+.milestone-popup .coin-text { color: #2ecc71; font-weight: bold; font-size: 16px; text-align: center; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>&#128640; YT-Booster</h1>
+  <div class="coins-badge">&#129689; <span id="coinCount">50</span> Coins</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('watch',this)">&#128065; Watch</div>
+  <div class="tab" onclick="showTab('like',this)">&#128077; Like</div>
+  <div class="tab" onclick="showTab('comment',this)">&#128172; Comment</div>
+  <div class="tab" onclick="showTab('submit',this)">&#128228; Submit</div>
+</div>
+
+<!-- WATCH TAB -->
+<div id="tab-watch" class="page active">
+  <p class="section-title">Watch videos &amp; earn coins</p>
+  <div class="info-box">&#9432; Watch Now dabao &#8594; YouTube naye tab mein khulega &#8594; Yahan timer chalega &#8594; Coins milenge!</div>
+
+  <div class="video-card">
+    <div class="video-thumb" onclick="startWatch(1,'https://www.youtube.com/watch?v=dQw4w9WgXcQ')">
+      <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg" alt="thumbnail" onerror="this.style.background='linear-gradient(135deg,#e63946,#1a1a2e)';this.style.height='180px'">
+      <div class="thumb-overlay"><div class="play-btn">&#9654;</div></div>
+      <div class="reward-pill">&#129689; 30s=1 | 60s=2 | 90s=3</div>
+    </div>
+    <div class="video-info">
+      <div class="video-title">How to Grow YouTube Channel Fast in 2025</div>
+      <div class="channel-name">TechGuru India &bull; 12K views</div>
+      <div class="reward-info">
+        <span class="reward-badge">30s = 1 coin</span>
+        <span class="reward-badge">60s = 2 coins</span>
+        <span class="reward-badge">90s = 3 coins</span>
+      </div>
+      <div class="timer-bar"><div class="timer-fill" id="fill1"></div></div>
+      <div class="timer-text" id="timerText1">Watch Now dabao - YouTube khulega + timer chalega</div>
+      <button class="watch-btn" id="watchBtn1" onclick="startWatch(1,'https://www.youtube.com/watch?v=dQw4w9WgXcQ')">&#9654; Watch Now (YouTube mein khulega)</button>
+    </div>
+  </div>
+
+  <div class="video-card">
+    <div class="video-thumb" onclick="startWatch(2,'https://www.youtube.com/watch?v=9bZkp7q19f0')">
+      <img src="https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" alt="thumbnail" onerror="this.style.background='linear-gradient(135deg,#e63946,#1a1a2e)'">
+      <div class="thumb-overlay"><div class="play-btn">&#9654;</div></div>
+      <div class="reward-pill">&#129689; up to 3 coins</div>
+    </div>
+    <div class="video-info">
+      <div class="video-title">Best Android Apps 2025 - Must Have!</div>
+      <div class="channel-name">AppReviewer &bull; 8.5K views</div>
+      <div class="reward-info">
+        <span class="reward-badge">30s = 1 coin</span>
+        <span class="reward-badge">60s = 2 coins</span>
+        <span class="reward-badge">90s = 3 coins</span>
+      </div>
+      <div class="timer-bar"><div class="timer-fill" id="fill2"></div></div>
+      <div class="timer-text" id="timerText2">Watch Now dabao - YouTube khulega + timer chalega</div>
+      <button class="watch-btn" id="watchBtn2" onclick="startWatch(2,'https://www.youtube.com/watch?v=9bZkp7q19f0')">&#9654; Watch Now (YouTube mein khulega)</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIKE TAB -->
+<div id="tab-like" class="page">
+  <p class="section-title">Like karo, 2 coins earn karo</p>
+
+  <div class="like-card">
+    <div class="like-thumb"><img src="https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg" alt="thumb"></div>
+    <div class="like-details">
+      <div class="like-title">10 Tips for Better YouTube SEO</div>
+      <div class="like-channel">SEO Master &bull; 45K subs</div>
+      <div class="like-actions">
+        <button class="like-btn" id="likeBtn1" onclick="doLike(1,'https://www.youtube.com/watch?v=dQw4w9WgXcQ')">&#128077; Like</button>
+        <a class="yt-link" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank">&#128279; Open</a>
+        <span class="coin-tag">+2 &#129689;</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="like-card">
+    <div class="like-thumb"><img src="https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" alt="thumb"></div>
+    <div class="like-details">
+      <div class="like-title">Lofi Music for Coding - 2 Hours</div>
+      <div class="like-channel">ChillBeats &bull; 120K subs</div>
+      <div class="like-actions">
+        <button class="like-btn" id="likeBtn2" onclick="doLike(2,'https://www.youtube.com/watch?v=9bZkp7q19f0')">&#128077; Like</button>
+        <a class="yt-link" href="https://www.youtube.com/watch?v=9bZkp7q19f0" target="_blank">&#128279; Open</a>
+        <span class="coin-tag">+2 &#129689;</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="like-card">
+    <div class="like-thumb"><img src="https://img.youtube.com/vi/kJQP7kiw5Fk/mqdefault.jpg" alt="thumb"></div>
+    <div class="like-details">
+      <div class="like-title">React vs Vue vs Angular 2025</div>
+      <div class="like-channel">DevTalks &bull; 89K subs</div>
+      <div class="like-actions">
+        <button class="like-btn" id="likeBtn3" onclick="doLike(3,'https://www.youtube.com/watch?v=kJQP7kiw5Fk')">&#128077; Like</button>
+        <a class="yt-link" href="https://www.youtube.com/watch?v=kJQP7kiw5Fk" target="_blank">&#128279; Open</a>
+        <span class="coin-tag">+2 &#129689;</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMENT TAB -->
+<div id="tab-comment" class="page">
+  <p class="section-title">Comment karo, 3 coins earn karo</p>
+
+  <div class="comment-card">
+    <div class="comment-video-info">
+      <div class="comment-thumb"><img src="https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg" alt="thumb"></div>
+      <div>
+        <div class="comment-title">How I Got 1000 Subscribers in 30 Days</div>
+        <div class="comment-channel">GrowthHacker &bull; 200K subs</div>
+        <div style="margin-top:5px"><span class="coin-tag">+3 &#129689; for comment</span></div>
+      </div>
+    </div>
+    <textarea class="comment-input" id="commentInput1" placeholder="YouTube pe jaake comment karo, phir yahan paste karo..."></textarea>
+    <div class="comment-actions">
+      <a class="comment-yt-link" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank">&#128279; YouTube pe jaao</a>
+      <button class="comment-submit" id="commentBtn1" onclick="doComment(1)">&#128172; Submit (+3 &#129689;)</button>
+    </div>
+  </div>
+
+  <div class="comment-card">
+    <div class="comment-video-info">
+      <div class="comment-thumb"><img src="https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg" alt="thumb"></div>
+      <div>
+        <div class="comment-title">Top 5 Coding Apps for Android 2025</div>
+        <div class="comment-channel">MobileDev &bull; 55K subs</div>
+        <div style="margin-top:5px"><span class="coin-tag">+3 &#129689; for comment</span></div>
+      </div>
+    </div>
+    <textarea class="comment-input" id="commentInput2" placeholder="YouTube pe jaake comment karo, phir yahan paste karo..."></textarea>
+    <div class="comment-actions">
+      <a class="comment-yt-link" href="https://www.youtube.com/watch?v=9bZkp7q19f0" target="_blank">&#128279; YouTube pe jaao</a>
+      <button class="comment-submit" id="commentBtn2" onclick="doComment(2)">&#128172; Submit (+3 &#129689;)</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUBMIT TAB -->
+<div id="tab-submit" class="page">
+  <p class="section-title">Apna video submit karo promotion ke liye</p>
+  <div class="cost-preview">Total Cost: <span id="totalCost">0</span> &#129689; coins</div>
+  <div class="submit-form">
+    <div class="form-group">
+      <label class="form-label">YouTube Video URL</label>
+      <input type="url" class="form-input" id="videoUrl" placeholder="https://youtube.com/watch?v=..." oninput="previewVideo()" />
+    </div>
+    <div id="videoPreview" style="display:none;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid #333;">
+      <img id="previewThumb" src="" style="width:100%;height:160px;object-fit:cover;" alt="preview">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tasks select karo (coins deduct honge)</label>
+      <div class="task-options">
+        <div class="task-option"><input type="checkbox" id="taskWatch" onchange="calcCost()"><label for="taskWatch">&#128065; Watch Task (30 watchers)</label><span class="cost">-30 &#129689;</span></div>
+        <div class="task-option"><input type="checkbox" id="taskLike" onchange="calcCost()"><label for="taskLike">&#128077; Like Task (20 likes)</label><span class="cost">-40 &#129689;</span></div>
+        <div class="task-option"><input type="checkbox" id="taskComment" onchange="calcCost()"><label for="taskComment">&#128172; Comment Task (10 comments)</label><span class="cost">-30 &#129689;</span></div>
+      </div>
+    </div>
+    <button class="submit-video-btn" onclick="submitVideo()">&#128640; Submit Video</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="milestone-popup" id="milestonePopup">
+  <div class="big-coin">&#129689;</div>
+  <div class="coin-text" id="milestoneText">+1 Coin!</div>
+</div>
+
+<script>
+var coins = 50;
+var watchIntervals = {};
+
+function showTab(name, el) {
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('tab-'+name).classList.add('active');
+  el.classList.add('active');
+}
+
+function updateCoins(n) {
+  coins += n;
+  document.getElementById('coinCount').textContent = coins;
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(function(){ t.style.display = 'none'; }, 2500);
+}
+
+function showMilestone(text) {
+  var p = document.getElementById('milestonePopup');
+  document.getElementById('milestoneText').textContent = text;
+  p.style.display = 'block';
+  setTimeout(function(){ p.style.display = 'none'; }, 2000);
+}
+
+function startWatch(id, url) {
+  var btn = document.getElementById('watchBtn'+id);
+  var fill = document.getElementById('fill'+id);
+  var text = document.getElementById('timerText'+id);
+  if(btn.classList.contains('done')) return;
+
+  // YouTube naye tab mein kholo
+  window.open(url, '_blank');
+
+  if(watchIntervals[id]) return; // already running
+
+  btn.disabled = true;
+  btn.textContent = 'Timer chal raha hai... YouTube mein video dekho!';
+
+  var elapsed = 0, earned = 0;
+  var milestones = {30:1, 60:2, 90:3};
+
+  watchIntervals[id] = setInterval(function(){
+    elapsed++;
+    fill.style.width = (elapsed/90*100) + '%';
+    text.textContent = elapsed + 's / 90s - YouTube mein video dekho!';
+
+    if(milestones[elapsed]) {
+      var bonus = milestones[elapsed] - earned;
+      earned = milestones[elapsed];
+      updateCoins(bonus);
+      showMilestone('+' + bonus + ' Coin! (' + elapsed + 's)');
+    }
+
+    if(elapsed >= 90) {
+      clearInterval(watchIntervals[id]);
+      btn.classList.add('done');
+      btn.disabled = false;
+      btn.textContent = 'Completed! +3 coins earned';
+      text.textContent = 'Complete! Tumne 3 coins earn kiye.';
+    }
+  }, 1000);
+}
+
+function doLike(id, url) {
+  var btn = document.getElementById('likeBtn'+id);
+  if(btn.classList.contains('done')) return;
+  window.open(url, '_blank');
+  btn.classList.add('done');
+  btn.textContent = 'Liked';
+  updateCoins(2);
+  showToast('+2 coins! Like karne ke liye shukriya');
+}
+
+function doComment(id) {
+  var inp = document.getElementById('commentInput'+id);
+  var btn = document.getElementById('commentBtn'+id);
+  if(btn.classList.contains('done')) return;
+  if(inp.value.trim().length < 5) { showToast('Thoda lamba comment likho (5+ chars)!'); return; }
+  btn.classList.add('done');
+  btn.textContent = 'Submitted!';
+  inp.disabled = true;
+  updateCoins(3);
+  showToast('+3 coins! Comment ke liye shukriya');
+}
+
+function previewVideo() {
+  var url = document.getElementById('videoUrl').value;
+  var match = url.match(/[?&]v=([^&]+)/);
+  var preview = document.getElementById('videoPreview');
+  var thumb = document.getElementById('previewThumb');
+  if(match) {
+    thumb.src = 'https://img.youtube.com/vi/' + match[1] + '/mqdefault.jpg';
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function calcCost() {
+  var c = 0;
+  if(document.getElementById('taskWatch').checked) c += 30;
+  if(document.getElementById('taskLike').checked) c += 40;
+  if(document.getElementById('taskComment').checked) c += 30;
+  document.getElementById('totalCost').textContent = c;
+}
+
+function submitVideo() {
+  var url = document.getElementById('videoUrl').value.trim();
+  if(!url || url.indexOf('youtube.com') < 0) { showToast('Valid YouTube URL daalo!'); return; }
+  var cost = parseInt(document.getElementById('totalCost').textContent);
+  if(cost === 0) { showToast('Koi task select karo!'); return; }
+  if(coins < cost) { showToast('Coins kam hain! Pehle earn karo.'); return; }
+  updateCoins(-cost);
+  showToast('Video submit! ' + cost + ' coins use hue. Ab doosre watch/like/comment karenge!');
+  document.getElementById('videoUrl').value = '';
+  document.getElementById('videoPreview').style.display = 'none';
+  document.getElementById('taskWatch').checked = false;
+  document.getElementById('taskLike').checked = false;
+  document.getElementById('taskComment').checked = false;
+  calcCost();
+}
+</script>
+</body>
+</html>
