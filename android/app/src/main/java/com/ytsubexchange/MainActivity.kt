@@ -272,8 +272,18 @@ class MainActivity : ComponentActivity() {
                     val isOnChatScreen = currentScreen is Screen.Chat || currentScreen is Screen.ChatWithCommunity
                     val isInChatWindow = isOnChatScreen && openRoom != null
 
-                    // Sirf jab chat window open ho tab bottom nav hide karo
-                    Box(modifier = Modifier.fillMaxSize().padding(bottom = if (isInChatWindow) 0.dp else 68.dp).imePadding()) {
+                    // Keyboard state detect karo
+                    val imeVisible = androidx.compose.foundation.layout.WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+
+                    // Keyboard open hone pe bottom padding 0 karo (navbar space hide)
+                    val bottomPad = when {
+                        isInChatWindow -> 0.dp
+                        imeVisible -> 0.dp
+                        else -> 68.dp
+                    }
+
+
+                    Box(modifier = Modifier.fillMaxSize().padding(bottom = bottomPad).imePadding()) {
                         when (currentScreen) {
                             is Screen.Home -> HomeScreen(
                                 viewModel = viewModel,
@@ -295,8 +305,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Bottom Navigation Bar — sirf chat window open hone pe hide karo
-                    if (!isInChatWindow) {
+                    // Bottom Navigation Bar — chat window ya keyboard open hone pe hide karo
+                    val hideNavForKeyboard = imeVisible && (
+                        currentScreen is Screen.ChatWithCommunity ||
+                        currentScreen is Screen.Chat
+                    )
+                    if (!isInChatWindow && !hideNavForKeyboard) {
                         BottomNavBar(
                             currentScreen = currentScreen,
                             onSelect = { currentScreen = it },
