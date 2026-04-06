@@ -773,17 +773,7 @@ fun ChatWindowScreen(
                 // Emoji panel — hide during recording
                 if (showEmojiPanel && !isVoiceRecording) {
                     EmojiPickerPanel(
-                        onEmojiSelected = { emoji -> inputText += emoji },
-                        onBackspace = {
-                            if (inputText.isNotEmpty()) {
-                                val breakIter = java.text.BreakIterator.getCharacterInstance()
-                                breakIter.setText(inputText)
-                                val end = breakIter.last()
-                                val start = breakIter.previous()
-                                if (start != java.text.BreakIterator.DONE) inputText = inputText.substring(0, start)
-                            }
-                        },
-                        onDismiss = { showEmojiPanel = false }
+                        onEmojiSelected = { emoji -> inputText += emoji }
                     )
                 }
                 // Attachment popup — floats above 📎 button in one column
@@ -846,7 +836,17 @@ fun ChatWindowScreen(
                         onRecordingStateChanged = { isVoiceRecording = it }
                     )
                     if (!isVoiceRecording) {
-                        // Backspace button — send se PEHLE, sirf emoji panel open hone pe
+                        Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                            if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
+                            BasicTextField(value = inputText, onValueChange = { inputText = it; viewModel.onTyping(room._id, true) },
+                                textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                keyboardActions = KeyboardActions(onSend = {
+                                    if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false }
+                                }),
+                                maxLines = 4, modifier = Modifier.fillMaxWidth())
+                        }
+                        // ⌫ send ke LEFT mein — sirf emoji panel open hone pe
                         if (showEmojiPanel) {
                             Box(
                                 Modifier.size(42.dp).clip(CircleShape)
@@ -862,16 +862,6 @@ fun ChatWindowScreen(
                                     },
                                 contentAlignment = Alignment.Center
                             ) { Text(text = "⌫", fontSize = 20.sp, color = Color(0xFFFF6B6B)) }
-                        }
-                        Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
-                            if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
-                            BasicTextField(value = inputText, onValueChange = { inputText = it; viewModel.onTyping(room._id, true) },
-                                textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                keyboardActions = KeyboardActions(onSend = {
-                                    if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false }
-                                }),
-                                maxLines = 4, modifier = Modifier.fillMaxWidth())
                         }
                         Box(Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))),
                             contentAlignment = Alignment.Center) {
@@ -2245,9 +2235,7 @@ fun AttachOption(emoji: String, label: String, onClick: () -> Unit) {
 
 @Composable
 fun EmojiPickerPanel(
-    onEmojiSelected: (String) -> Unit,
-    onBackspace: () -> Unit = {},
-    onDismiss: () -> Unit = {}
+    onEmojiSelected: (String) -> Unit
 ) {
     val categoryEmojis = listOf("😊","👋","❤️","🎉","🔥","🍕","🐶")
     val categories = listOf(
@@ -2266,7 +2254,7 @@ fun EmojiPickerPanel(
             Modifier.fillMaxWidth().background(CardAlt).padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 categoryEmojis.forEachIndexed { i, emoji ->
                     Box(
                         Modifier.clip(RoundedCornerShape(8.dp))
@@ -2276,17 +2264,6 @@ fun EmojiPickerPanel(
                     ) { Text(text = emoji, fontSize = 18.sp) }
                 }
             }
-            Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF2A1A1A)).clickable { onBackspace() },
-                contentAlignment = Alignment.Center
-            ) { Text(text = "⌫", fontSize = 18.sp, color = Color(0xFFFF6B6B)) }
-            Spacer(Modifier.width(4.dp))
-            Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1A1A2E)).clickable { onDismiss() },
-                contentAlignment = Alignment.Center
-            ) { Text(text = "✕", fontSize = 16.sp, color = TextSec) }
         }
         val emojis: List<String> = categories[selectedCat].second
         Box(
