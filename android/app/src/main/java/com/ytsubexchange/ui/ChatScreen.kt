@@ -443,7 +443,7 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
     LaunchedEffect(Unit) { viewModel.joinCommunity() }
     LaunchedEffect(communityMessages.size) { if (communityMessages.isNotEmpty()) listState.animateScrollToItem(communityMessages.size - 1) }
 
-    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
+    Column(Modifier.fillMaxSize().background(BgDark)) {
         Row(Modifier.fillMaxWidth().background(CardDark).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Star, null, tint = AccentRed, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
@@ -472,7 +472,7 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
                 items(communityMessages) { msg -> MessageBubble(msg = msg, myId = viewModel.myId, onLongClick = {}) }
             }
         }
-        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp),
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).imePadding(),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
                 if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
