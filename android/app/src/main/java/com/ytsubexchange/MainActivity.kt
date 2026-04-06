@@ -660,7 +660,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // ytsubexchange://auth?token=...&ref=...
+            // ytsubexchange://join-group/TOKEN - from landing page "Open in App" button
+            if (scheme == "ytsubexchange" && host == "join-group") {
+                val inviteToken = uri.pathSegments.firstOrNull() ?: uri.lastPathSegment ?: ""
+                if (inviteToken.isNotEmpty()) {
+                    val authToken = getSharedPreferences("prefs", Context.MODE_PRIVATE).getString("token", null)
+                    if (authToken != null) {
+                        chatViewModel.joinGroupByLink(inviteToken)
+                    } else {
+                        getSharedPreferences("prefs", Context.MODE_PRIVATE).edit()
+                            .putString("pending_group_invite", inviteToken)
+                            .apply()
+                    }
+                }
+                return
+            }
+
+            // ytsubexchange://auth?token=...
             val token = uri.getQueryParameter("token")
             val ref = uri.getQueryParameter("ref")
             val newUser = uri.getQueryParameter("newUser")

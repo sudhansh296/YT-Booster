@@ -62,6 +62,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="api.picrypto.in" android:pathPrefix="/join-group/" />
             </intent-filter>
+
+            <!-- Deep link for group invite - ytsubexchange://join-group/TOKEN (from landing page) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ytsubexchange" android:host="join-group" />
+            </intent-filter>
         </activity>
 
         <service
