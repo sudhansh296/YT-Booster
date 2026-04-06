@@ -4,11 +4,9 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,12 +28,14 @@ import coil.compose.AsyncImage
 import com.ytsubexchange.data.VoiceChatParticipant
 import com.ytsubexchange.viewmodel.GroupVoiceChatViewModel
 
-private val VcBg     = Color(0xFF0D0D0D)
-private val VcCard   = Color(0xFF1A1A2E)
-private val VcAccent = Color(0xFF7B2FF7)
-private val VcGreen  = Color(0xFF4CAF50)
-private val VcRed    = Color(0xFFE53935)
-private val VcMuted  = Color(0xFF616161)
+private val VcBg      = Color(0xFF0D0D0D)
+private val VcCard    = Color(0xFF1A1A2E)
+private val VcCardAlt = Color(0xFF16213E)
+private val VcAccent  = Color(0xFF7B2FF7)
+private val VcGreen   = Color(0xFF4CAF50)
+private val VcRed     = Color(0xFFE53935)
+private val VcBlue    = Color(0xFF29B6F6)
+private val VcGold    = Color(0xFFFFD700)
 
 @Composable
 fun GroupVoiceChatScreen(
@@ -45,10 +45,13 @@ fun GroupVoiceChatScreen(
 ) {
     val participants by viewModel.participants.collectAsState()
     val isMuted by viewModel.isMuted.collectAsState()
+    val isSpeakerOn by viewModel.isSpeakerOn.collectAsState()
+    val raisedHands by viewModel.raisedHands.collectAsState()
     val toastMsg by viewModel.toastMsg.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val isAdmin = viewModel.isGroupAdmin()
     var adminTargetParticipant by remember { mutableStateOf<VoiceChatParticipant?>(null) }
+    var myHandRaised by remember { mutableStateOf(false) }
 
     LaunchedEffect(toastMsg) {
         val msg = toastMsg
@@ -57,25 +60,34 @@ fun GroupVoiceChatScreen(
 
     Box(Modifier.fillMaxSize().background(VcBg).statusBarsPadding().navigationBarsPadding()) {
         Column(Modifier.fillMaxSize()) {
+
             // ── Header ────────────────────────────────────────
             Box(
                 Modifier.fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(VcCard, VcBg)))
-                    .padding(16.dp, 12.dp)
+                    .background(Brush.verticalGradient(listOf(Color(0xFF1A1A3E), VcBg)))
+                    .padding(16.dp, 16.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Live indicator
-                        val inf = rememberInfiniteTransition(label = "live")
-                        val alpha by inf.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "a")
+                    // Live pulse dot
+                    val inf = rememberInfiniteTransition(label = "live")
+                    val alpha by inf.animateFloat(0.3f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "a")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Box(Modifier.size(8.dp).clip(CircleShape).background(VcGreen.copy(alpha)))
-                        Text("Voice Chat", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Voice Chat", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     }
-                    Spacer(Modifier.height(2.dp))
-                    Text(roomName, color = Color(0xFF9E9E9E), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(3.dp))
+                    Text(roomName, color = Color(0xFF9E9E9E), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(4.dp))
-                    Text("${participants.size} participant${if (participants.size != 1) "s" else ""}",
-                        color = VcAccent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.clip(RoundedCornerShape(8.dp)).background(VcAccent.copy(0.2f)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                            Text("${participants.size} participants", color = VcAccent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        if (raisedHands.isNotEmpty()) {
+                            Box(Modifier.clip(RoundedCornerShape(8.dp)).background(VcGold.copy(0.2f)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                Text("✋ ${raisedHands.size}", color = VcGold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -84,62 +96,55 @@ fun GroupVoiceChatScreen(
             // ── Participants Grid ─────────────────────────────
             if (participants.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🎙️", fontSize = 48.sp)
-                        Spacer(Modifier.height(12.dp))
-                        Text("Koi nahi hai abhi", color = Color(0xFF555555), fontSize = 14.sp)
-                        Text("Invite karo doston ko!", color = Color(0xFF444444), fontSize = 12.sp)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("🎙️", fontSize = 52.sp)
+                        Text("Koi nahi hai abhi", color = Color(0xFF555555), fontSize = 15.sp)
+                        Text("Doston ko invite karo!", color = Color(0xFF444444), fontSize = 12.sp)
                     }
                 }
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
-                    modifier = Modifier.weight(1f).padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
                     items(count = participants.size) { i ->
+                        val p = participants[i]
                         VoiceParticipantCard(
-                            participant = participants[i],
+                            participant = p,
                             isAdmin = isAdmin,
-                            onAdminAction = { adminTargetParticipant = participants[i] }
+                            hasRaisedHand = raisedHands.contains(p.userId),
+                            onAdminAction = { adminTargetParticipant = p }
                         )
                     }
                 }
             }
 
             // ── Bottom Controls ───────────────────────────────
-            Box(
+            Column(
                 Modifier.fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.9f))))
-                    .padding(bottom = 32.dp, top = 16.dp)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.95f))))
+                    .padding(bottom = 28.dp, top = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Row 1: Main controls
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 40.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Mute/Unmute
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            Modifier.size(60.dp).clip(CircleShape)
-                                .background(if (isMuted) Color(0xFF3A1A1A) else Color(0xFF1A2A1A))
-                                .clickable { viewModel.toggleMute() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-                                null,
-                                tint = if (isMuted) VcRed else VcGreen,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(if (isMuted) "Unmute" else "Mute", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                    }
+                    // Mute
+                    VcControlBtn(
+                        icon = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                        label = if (isMuted) "Unmute" else "Mute",
+                        bg = if (isMuted) Color(0xFF3A1A1A) else Color(0xFF1A2A1A),
+                        tint = if (isMuted) VcRed else VcGreen,
+                        size = 60
+                    ) { viewModel.toggleMute() }
 
-                    // Leave button
+                    // Leave (big red)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             Modifier.size(68.dp).clip(CircleShape)
@@ -153,71 +158,88 @@ fun GroupVoiceChatScreen(
                         Text("Leave", color = VcRed, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
 
-                    // Speaker toggle (placeholder — audio always on speaker in group voice)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            Modifier.size(60.dp).clip(CircleShape).background(Color(0xFF1A2A3A)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.VolumeUp, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(26.dp))
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text("Speaker", color = Color(0xFF9E9E9E), fontSize = 11.sp)
+                    // Speaker
+                    VcControlBtn(
+                        icon = if (isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
+                        label = if (isSpeakerOn) "Speaker" else "Earpiece",
+                        bg = if (isSpeakerOn) Color(0xFF1A2A3A) else Color(0xFF2A2A2A),
+                        tint = if (isSpeakerOn) VcBlue else Color(0xFF9E9E9E),
+                        size = 60
+                    ) { viewModel.toggleSpeaker() }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Row 2: Secondary controls
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 40.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Raise hand
+                    VcControlBtn(
+                        icon = Icons.Default.PanTool,
+                        label = if (myHandRaised) "Lower Hand" else "Raise Hand",
+                        bg = if (myHandRaised) Color(0xFF2A2A00) else Color(0xFF1A1A2E),
+                        tint = if (myHandRaised) VcGold else Color(0xFF9E9E9E),
+                        size = 50
+                    ) {
+                        myHandRaised = !myHandRaised
+                        viewModel.raiseHand(myHandRaised)
                     }
 
-                    // Admin: End Voice Chat
+                    // Admin: End chat
                     if (isAdmin) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                Modifier.size(60.dp).clip(CircleShape).background(Color(0xFF2A1A1A))
-                                    .clickable { viewModel.adminEndVoiceChat(); onLeave() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Close, null, tint = VcRed, modifier = Modifier.size(26.dp))
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            Text("End Chat", color = VcRed, fontSize = 11.sp)
-                        }
+                        VcControlBtn(
+                            icon = Icons.Default.Close,
+                            label = "End Chat",
+                            bg = Color(0xFF2A1A1A),
+                            tint = VcRed,
+                            size = 50
+                        ) { viewModel.adminEndVoiceChat(); onLeave() }
                     }
                 }
             }
         }
 
-        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp))
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 140.dp)
+        )
     }
 
     // Admin action dialog
     adminTargetParticipant?.let { target ->
+        val isHandRaised = raisedHands.contains(target.userId)
         androidx.compose.ui.window.Dialog(onDismissRequest = { adminTargetParticipant = null }) {
-            androidx.compose.material3.Card(
-                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = VcCard),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            Card(
+                colors = CardDefaults.cardColors(containerColor = VcCard),
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("🛡️ Admin: ${target.name}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Spacer(Modifier.height(12.dp))
-                    // Mute/Unmute
-                    Box(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                        .background(if (target.muted) Color(0xFF1A3A1A) else Color(0xFF3A1A1A))
-                        .clickable {
-                            viewModel.adminMuteUser(target.userId, !target.muted)
-                            adminTargetParticipant = null
-                        }.padding(12.dp)) {
-                        Text(if (target.muted) "🔊 Unmute" else "🔇 Mute", color = if (target.muted) VcGreen else VcRed, fontSize = 14.sp)
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(Brush.linearGradient(listOf(VcAccent, Color(0xFF4A1A8A)))), contentAlignment = Alignment.Center) {
+                            Text(target.name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        }
+                        Column {
+                            Text(target.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            if (isHandRaised) Text("✋ Hand raised", color = VcGold, fontSize = 11.sp)
+                        }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    // Kick
-                    Box(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                        .background(Color(0xFF2A1A1A))
-                        .clickable {
-                            viewModel.adminKickUser(target.userId)
-                            adminTargetParticipant = null
-                        }.padding(12.dp)) {
-                        Text("❌ Voice Chat se Hatao", color = VcRed, fontSize = 14.sp)
+                    Divider(color = Color(0xFF2A2A3E))
+
+                    AdminActionRow(
+                        icon = if (target.muted) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                        label = if (target.muted) "Unmute" else "Mute",
+                        color = if (target.muted) VcGreen else VcRed
+                    ) { viewModel.adminMuteUser(target.userId, !target.muted); adminTargetParticipant = null }
+
+                    AdminActionRow(Icons.Default.PersonRemove, "Voice Chat se Hatao", VcRed) {
+                        viewModel.adminKickUser(target.userId); adminTargetParticipant = null
                     }
-                    Spacer(Modifier.height(8.dp))
-                    androidx.compose.material3.TextButton(onClick = { adminTargetParticipant = null }, modifier = Modifier.align(Alignment.End)) {
+
+                    TextButton(onClick = { adminTargetParticipant = null }, modifier = Modifier.align(Alignment.End)) {
                         Text("Cancel", color = Color(0xFF9E9E9E))
                     }
                 }
@@ -226,13 +248,57 @@ fun GroupVoiceChatScreen(
     }
 }
 
+@Composable
+private fun VcControlBtn(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    bg: Color,
+    tint: Color,
+    size: Int = 56,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(size.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size((size * 0.43f).dp))
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(label, color = Color(0xFF9E9E9E), fontSize = 10.sp, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun AdminActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(color.copy(0.1f)).clickable(onClick = onClick).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+        Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun VoiceParticipantCard(participant: VoiceChatParticipant, isAdmin: Boolean = false, onAdminAction: (() -> Unit)? = null) {
+private fun VoiceParticipantCard(
+    participant: VoiceChatParticipant,
+    isAdmin: Boolean = false,
+    hasRaisedHand: Boolean = false,
+    onAdminAction: (() -> Unit)? = null
+) {
     val inf = rememberInfiniteTransition(label = "speak")
     val ringScale by inf.animateFloat(
-        1f, 1.12f,
-        infiniteRepeatable(tween(600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        1f, 1.15f,
+        infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "ring"
     )
 
@@ -241,65 +307,68 @@ private fun VoiceParticipantCard(participant: VoiceChatParticipant, isAdmin: Boo
         modifier = Modifier.padding(4.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            // Speaking ring (always subtle for now — can add audio level detection later)
+            // Speaking ring
             if (!participant.muted) {
                 Box(
-                    Modifier.size((56 * ringScale).dp).clip(CircleShape)
-                        .background(VcAccent.copy(alpha = 0.15f))
+                    Modifier.size((58 * ringScale).dp).clip(CircleShape)
+                        .background(VcAccent.copy(alpha = 0.18f))
+                )
+                Box(
+                    Modifier.size((54 * ringScale).dp).clip(CircleShape)
+                        .background(VcAccent.copy(alpha = 0.10f))
                 )
             }
+
             // Avatar
             Box(
-                Modifier.size(52.dp).clip(CircleShape)
+                Modifier.size(54.dp).clip(CircleShape)
                     .background(
                         Brush.radialGradient(
                             if (participant.muted)
-                                listOf(Color(0xFF333333), Color(0xFF222222))
+                                listOf(Color(0xFF2A2A2A), Color(0xFF1A1A1A))
                             else
                                 listOf(VcAccent, Color(0xFF4A1A8A))
                         )
                     )
-                    .then(if (isAdmin && onAdminAction != null)
-                        Modifier.combinedClickable(onClick = {}, onLongClick = onAdminAction)
-                    else Modifier),
+                    .then(
+                        if (isAdmin && onAdminAction != null)
+                            Modifier.combinedClickable(onClick = {}, onLongClick = onAdminAction)
+                        else Modifier
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 if (participant.pic.isNotEmpty()) {
-                    AsyncImage(
-                        model = participant.pic,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
-                    )
+                    AsyncImage(model = participant.pic, contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape))
                 } else {
-                    Text(
-                        participant.name.take(1).uppercase(),
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(participant.name.take(1).uppercase(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            // Mute badge
-            if (participant.muted) {
+
+            // Raised hand badge (top-left)
+            if (hasRaisedHand) {
                 Box(
-                    Modifier.align(Alignment.BottomEnd)
-                        .size(18.dp).clip(CircleShape)
-                        .background(Color(0xFF1A1A1A)),
+                    Modifier.align(Alignment.TopStart).size(20.dp).clip(CircleShape).background(VcGold),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.MicOff, null, tint = VcRed, modifier = Modifier.size(11.dp))
+                    Text("✋", fontSize = 10.sp)
                 }
-            } else {
-                Box(
-                    Modifier.align(Alignment.BottomEnd)
-                        .size(18.dp).clip(CircleShape)
-                        .background(VcGreen),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.size(11.dp))
-                }
+            }
+
+            // Mic badge (bottom-right)
+            Box(
+                Modifier.align(Alignment.BottomEnd).size(20.dp).clip(CircleShape)
+                    .background(if (participant.muted) Color(0xFF1A1A1A) else VcGreen),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (participant.muted) Icons.Default.MicOff else Icons.Default.Mic,
+                    null,
+                    tint = if (participant.muted) VcRed else Color.White,
+                    modifier = Modifier.size(12.dp)
+                )
             }
         }
+
         Spacer(Modifier.height(6.dp))
         Text(
             participant.name,
@@ -310,5 +379,8 @@ private fun VoiceParticipantCard(participant: VoiceChatParticipant, isAdmin: Boo
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
         )
+        if (!participant.muted) {
+            Text("speaking", color = VcAccent.copy(0.7f), fontSize = 9.sp)
+        }
     }
 }

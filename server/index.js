@@ -1014,6 +1014,12 @@ io.on('connection', (socket) => {
     socket.emit('voice_chat_participants', { roomId, participants });
   });
 
+  // Raise hand in voice chat
+  socket.on('voice_chat_raise_hand', ({ roomId, userId, raised }) => {
+    if (!roomId) return;
+    io.to(`voice_${roomId}`).emit('voice_chat_hand_raised', { roomId, userId, raised });
+  });
+
   // ── Community Chat Socket ─────────────────────────────────
   socket.on('join_community', async () => {
     socket.join('community_global');

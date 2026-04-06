@@ -23,6 +23,10 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
     val participants: StateFlow<List<VoiceChatParticipant>> = _participants
     private val _isMuted = MutableStateFlow(false)
     val isMuted: StateFlow<Boolean> = _isMuted
+    private val _isSpeakerOn = MutableStateFlow(true)
+    val isSpeakerOn: StateFlow<Boolean> = _isSpeakerOn
+    private val _raisedHands = MutableStateFlow<Set<String>>(emptySet())
+    val raisedHands: StateFlow<Set<String>> = _raisedHands
     private val _isActive = MutableStateFlow(false)
     val isActive: StateFlow<Boolean> = _isActive
     private val _toastMsg = MutableStateFlow<String?>(null)
@@ -68,6 +72,22 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
         localAudioTrack?.setEnabled(!_isMuted.value)
         SocketManager.sendVoiceChatMute(currentRoomId, _isMuted.value)
         _participants.value = _participants.value.map { if (it.userId == myUserId) it.copy(muted = _isMuted.value) else it }
+    }
+
+    fun toggleSpeaker() {
+        _isSpeakerOn.value = !_isSpeakerOn.value
+        try {
+            val am = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.isSpeakerphoneOn = _isSpeakerOn.value
+        } catch (e: Exception) {}
+    }
+
+    fun raiseHand(raised: Boolean) {
+        SocketManager.emit("voice_chat_raise_hand", org.json.JSONObject().apply {
+            put("roomId", currentRoomId)
+            put("userId", myUserId)
+            put("raised", raised)
+        })
     }
 
     fun isGroupAdmin() = isAdmin
@@ -227,13 +247,29 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
                 cleanup()
             }
         }
+
+        // Raise hand
+        SocketManager.on("voice_chat_hand_raised") { args ->
+            try {
+                val data = args[0] as JSONObject
+                val uid = data.optString("userId")
+                val raised = data.optBoolean("raised")
+                mainHandler.post {
+                    _raisedHands.value = if (raised) _raisedHands.value + uid else _raisedHands.value - uid
+                    if (raised && uid != myUserId) {
+                        val name = _participants.value.firstOrNull { it.userId == uid }?.name ?: uid
+                        _toastMsg.value = "✋ $name ne haath uthaya"
+                    }
+                }
+            } catch (e: Exception) {}
+        }
     }
 
     private fun cleanup() {
         _isActive.value = false; _participants.value = emptyList(); _isMuted.value = false
         Thread { try { peerConnections.values.forEach { it.close() }; peerConnections.clear(); pendingIce.clear(); localAudioTrack?.dispose(); localAudioTrack = null; peerConnectionFactory?.dispose(); peerConnectionFactory = null; eglBase?.release(); eglBase = null; webrtcInitialized = false } catch (e: Exception) {}; mainHandler.post { try { val am = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as AudioManager; am.mode = AudioManager.MODE_NORMAL; am.isSpeakerphoneOn = false } catch (e: Exception) {} } }.start()
         listOf("voice_chat_participants","voice_chat_user_joined","voice_chat_user_left","voice_chat_mute_changed","voice_chat_offer","voice_chat_answer","voice_chat_ice",
-            "voice_chat_admin_muted_you","voice_chat_kicked","voice_chat_ended_by_admin"
+            "voice_chat_admin_muted_you","voice_chat_kicked","voice_chat_ended_by_admin","voice_chat_hand_raised"
         ).forEach { SocketManager.off(it) }
     }
 
