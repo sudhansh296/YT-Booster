@@ -470,34 +470,59 @@ private fun MemberActionRow(icon: androidx.compose.ui.graphics.vector.ImageVecto
 
 @Composable
 private fun WallpaperPickerDialog(roomId: String, viewModel: ChatViewModel, onDismiss: () -> Unit) {
+    // (name, gradient colors, emoji label)
     val wallpapers = listOf(
-        "default" to Color(0xFF0D0D0D),
-        "dark_blue" to Color(0xFF0A1628),
-        "dark_green" to Color(0xFF0A1A0A),
-        "dark_purple" to Color(0xFF1A0A2E),
-        "dark_red" to Color(0xFF1A0A0A),
-        "midnight" to Color(0xFF050510),
+        Triple("default",        listOf(Color(0xFF0D0D0D), Color(0xFF0D0D0D)),                    "⬛ Default"),
+        Triple("midnight_blue",  listOf(Color(0xFF0A0A2E), Color(0xFF1A1A4E), Color(0xFF0D0D1A)), "🌌 Midnight"),
+        Triple("deep_purple",    listOf(Color(0xFF1A0A2E), Color(0xFF3D1A6E), Color(0xFF1A0A2E)), "💜 Purple"),
+        Triple("ocean",          listOf(Color(0xFF001A2E), Color(0xFF003D5C), Color(0xFF001A2E)), "🌊 Ocean"),
+        Triple("forest",         listOf(Color(0xFF0A1A0A), Color(0xFF1A3A1A), Color(0xFF0A1A0A)), "🌿 Forest"),
+        Triple("sunset",         listOf(Color(0xFF2E0A0A), Color(0xFF5C1A00), Color(0xFF2E0A0A)), "🌅 Sunset"),
+        Triple("rose_gold",      listOf(Color(0xFF2E1A1A), Color(0xFF5C2A2A), Color(0xFF2E1A1A)), "🌹 Rose"),
+        Triple("galaxy",         listOf(Color(0xFF0A0A1A), Color(0xFF1A0A3E), Color(0xFF2E0A2E)), "🌠 Galaxy"),
+        Triple("aurora",         listOf(Color(0xFF001A1A), Color(0xFF003D2E), Color(0xFF001A3D)), "🌈 Aurora"),
+        Triple("lava",           listOf(Color(0xFF1A0000), Color(0xFF3D0A00), Color(0xFF1A0000)), "🔥 Lava"),
+        Triple("teal_dark",      listOf(Color(0xFF001A1A), Color(0xFF004D4D), Color(0xFF001A1A)), "🩵 Teal"),
+        Triple("indigo_night",   listOf(Color(0xFF0A0A2E), Color(0xFF1A1A5E), Color(0xFF0A0A2E)), "🔷 Indigo"),
+        Triple("emerald",        listOf(Color(0xFF001A0A), Color(0xFF004D1A), Color(0xFF001A0A)), "💚 Emerald"),
+        Triple("crimson",        listOf(Color(0xFF1A0000), Color(0xFF4D0000), Color(0xFF1A0000)), "❤️ Crimson"),
+        Triple("cosmic",         listOf(Color(0xFF0A001A), Color(0xFF1A003D), Color(0xFF2E001A)), "✨ Cosmic"),
+        Triple("slate",          listOf(Color(0xFF0A0F14), Color(0xFF1A2A3A), Color(0xFF0A0F14)), "🩶 Slate"),
     )
+
     Dialog(onDismissRequest = onDismiss) {
         Card(colors = CardDefaults.cardColors(containerColor = CardD), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                Text("Chat Wallpaper", color = TxtP, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("🎨 Chat Wallpaper", color = TxtP, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Apna favourite theme choose karo", color = TxtS, fontSize = 12.sp)
                 Spacer(Modifier.height(16.dp))
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.height(160.dp)
+                    modifier = Modifier.height(240.dp)
                 ) {
                     items(wallpapers.size) { i ->
-                        val (name, color) = wallpapers[i]
-                        Box(
-                            Modifier.aspectRatio(1f).clip(RoundedCornerShape(10.dp))
-                                .background(color)
-                                .clickable { viewModel.setChatWallpaper(roomId, name); onDismiss() },
-                            contentAlignment = Alignment.Center
+                        val (name, colors, label) = wallpapers[i]
+                        val gradient = if (colors.size == 1) Brush.linearGradient(listOf(colors[0], colors[0]))
+                                       else Brush.linearGradient(colors)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(name.replace("_", "\n"), color = Color.White.copy(0.6f), fontSize = 9.sp)
+                            Box(
+                                Modifier.size(60.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(gradient)
+                                    .clickable { viewModel.setChatWallpaper(roomId, name); onDismiss() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(label.split(" ")[0], fontSize = 22.sp)
+                            }
+                            Text(
+                                label.split(" ").drop(1).joinToString(" "),
+                                color = TxtS, fontSize = 9.sp,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
