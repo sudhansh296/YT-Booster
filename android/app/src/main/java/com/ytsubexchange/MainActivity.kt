@@ -273,7 +273,7 @@ class MainActivity : ComponentActivity() {
                     val isInChatWindow = isOnChatScreen && openRoom != null
 
                     // Sirf jab chat window open ho tab bottom nav hide karo
-                    Box(modifier = Modifier.fillMaxSize().padding(bottom = if (isInChatWindow) 0.dp else 68.dp)) {
+                    Box(modifier = Modifier.fillMaxSize().padding(bottom = if (isInChatWindow) 0.dp else 68.dp).imePadding()) {
                         when (currentScreen) {
                             is Screen.Home -> HomeScreen(
                                 viewModel = viewModel,

@@ -443,7 +443,7 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
     LaunchedEffect(Unit) { viewModel.joinCommunity() }
     LaunchedEffect(communityMessages.size) { if (communityMessages.isNotEmpty()) listState.animateScrollToItem(communityMessages.size - 1) }
 
-    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
+    Column(Modifier.fillMaxSize().background(BgDark)) {
         Row(Modifier.fillMaxWidth().background(CardDark).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Star, null, tint = AccentRed, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
@@ -2142,7 +2142,7 @@ fun AiCompanionChatTab(viewModel: ChatViewModel) {
     val listState = rememberLazyListState()
     LaunchedEffect(aiMessages.size) { if (aiMessages.isNotEmpty()) listState.animateScrollToItem(aiMessages.size - 1) }
 
-    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
+    Column(Modifier.fillMaxSize().background(BgDark)) {
         Row(Modifier.fillMaxWidth().background(CardDark).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("🤖", fontSize = 20.sp)
             Spacer(Modifier.width(8.dp))
