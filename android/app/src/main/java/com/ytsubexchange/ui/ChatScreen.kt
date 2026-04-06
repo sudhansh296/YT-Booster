@@ -1641,6 +1641,206 @@ fun NewChatDialog(
         Card(
             colors = CardDefaults.cardColors(containerColor = CardDark),
             shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(if (selectedTab == 0) "New Chat" else "Groups", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.height(10.dp))
+
+                // Tabs
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SearchBg)) {
+                    listOf("👤 Users", "👥 Groups").forEachIndexed { i, label ->
+                        Box(
+                            Modifier.weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (selectedTab == i) AccentRed else Color.Transparent)
+                                .clickable {
+                                    selectedTab = i; query = ""
+                                    if (i == 0) onSearchUsers("") else onSearchGroups("")
+                                }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(label, color = if (selectedTab == i) Color.White else TextSec, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                if (selectedTab == 0) {
+                    // ── Users Tab ─────────────────────────────
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                        if (query.isEmpty()) Text("User search karo...", color = TextSec, fontSize = 13.sp)
+                        BasicTextField(value = query, onValueChange = { query = it; onSearchUsers(it) },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
+                            singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn(Modifier.weight(1f, false)) {
+                        if (users.isEmpty()) {
+                            item {
+                                Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+                                    Text(if (query.isEmpty()) "Koi user nahi mila" else "\"$query\" nahi mila", color = TextSec, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                        itemsIndexed(users) { i, user ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { onDm(user); onDismiss() }.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(Modifier.size(40.dp).clip(CircleShape).background(avatarGradient(i)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text(user.channelName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("Tap to send chat request", color = TextSec, fontSize = 11.sp)
+                                }
+                                Icon(Icons.Default.ChevronRight, null, tint = TextSec, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                } else {
+                    // ── Groups Tab ────────────────────────────
+                    // Create Group button
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .background(Brush.linearGradient(listOf(AccentRed.copy(0.15f), Color(0xFFFF6B6B).copy(0.1f))))
+                            .clickable { onCreateGroup(); onDismiss() }
+                            .padding(14.dp, 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(Modifier.size(36.dp).clip(CircleShape).background(AccentRed), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Create Group", color = AccentRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("Naya group banao, members add karo", color = TextSec, fontSize = 11.sp)
+                        }
+                        Icon(Icons.Default.ChevronRight, null, tint = AccentRed, modifier = Modifier.size(18.dp))
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+                    Divider(color = Divider2)
+                    Spacer(Modifier.height(8.dp))
+
+                    // Group search
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
+                        if (query.isEmpty()) Text("Group search karo...", color = TextSec, fontSize = 13.sp)
+                        BasicTextField(value = query, onValueChange = { query = it; onSearchGroups(it) },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 13.sp),
+                            singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    Spacer(Modifier.height(8.dp))
+
+                    LazyColumn(Modifier.weight(1f, false)) {
+                        if (query.length < 2) {
+                            item {
+                                Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                                    Text("2+ characters type karo group dhundne ke liye", color = TextSec, fontSize = 12.sp)
+                                }
+                            }
+                        } else {
+                            if (groupResults.isEmpty()) {
+                                item {
+                                    Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                                        Text("\"$query\" naam ka koi group nahi mila", color = TextSec, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                            itemsIndexed(groupResults) { i, group ->
+                                Row(
+                                    Modifier.fillMaxWidth().clickable { selectedGroup = group }.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(Modifier.size(42.dp).clip(CircleShape).background(avatarGradient(i)), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Group, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(22.dp))
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(group.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                        Text("${group.memberCount} members", color = TextSec, fontSize = 11.sp)
+                                    }
+                                    if (group.isMember) {
+                                        Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFF1A3A1A)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                            Text("Joined", color = Color(0xFF4CAF50), fontSize = 10.sp)
+                                        }
+                                    } else {
+                                        Icon(Icons.Default.ChevronRight, null, tint = TextSec, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                    Text("Cancel", color = TextSec)
+                }
+            }
+        }
+    }
+
+    // Group action bottom sheet
+    selectedGroup?.let { group ->
+        Dialog(onDismissRequest = { selectedGroup = null }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Group, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                        Column {
+                            Text(group.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("${group.memberCount} members", color = TextSec, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Divider(color = Divider2)
+                    Spacer(Modifier.height(8.dp))
+
+                    if (!group.isMember) {
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF1A2A1A))
+                                .clickable { onJoinGroup(group._id); selectedGroup = null; onDismiss() }.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Default.GroupAdd, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp))
+                            Column {
+                                Text("Join Group", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Is group mein join ho jao", color = TextSec, fontSize = 11.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF1A1A2A))
+                            .clickable { onInviteToGroup(group._id); selectedGroup = null; onDismiss() }.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.PersonAdd, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(22.dp))
+                        Column {
+                            Text("Add Member", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Kisi ko is group mein invite karo", color = TextSec, fontSize = 11.sp)
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { selectedGroup = null }, modifier = Modifier.align(Alignment.End)) { Text("Cancel", color = TextSec) }
+                }
+            }
+        }
+    }
+}
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardDark),
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)
         ) {
             Column(Modifier.padding(16.dp)) {
