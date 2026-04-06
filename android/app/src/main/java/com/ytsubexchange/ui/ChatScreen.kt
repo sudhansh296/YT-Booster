@@ -605,7 +605,21 @@ fun ChatWindowScreen(
             }
             // Call buttons
             if (callViewModel != null && !isBlockedByMe && !isBlockedByThem) {
-                IconButton(onClick = { callViewModel.startCall(room._id, room.name, "audio") }) {
+                IconButton(onClick = {
+                    if (room.isGroup) {
+                        // Group call — sirf owner start kare, admins join kar sakte hain
+                        val isOwner = groupInfo?.isAdmin == true
+                        val isAdmin = groupInfo?.room?.subAdmins?.any { it.userId == myId } == true
+                        val canJoin = isOwner || isAdmin
+                        if (canJoin) {
+                            callViewModel.startCall(room._id, room.name, "audio")
+                        } else {
+                            viewModel.setToast("📞 Sirf Owner aur Admins call mein join kar sakte hain")
+                        }
+                    } else {
+                        callViewModel.startCall(room._id, room.name, "audio")
+                    }
+                }) {
                     Icon(Icons.Default.Call, null, tint = TextSec, modifier = Modifier.size(20.dp))
                 }
                 if (!room.isGroup) {
@@ -614,16 +628,17 @@ fun ChatWindowScreen(
                     }
                 }
             }
-            // Group voice chat button
+            // Group voice chat button — owner/admin start kar sake, member join kar sake agar active ho
             if (room.isGroup && voiceChatViewModel != null) {
                 IconButton(onClick = {
                     val isOwner = groupInfo?.isAdmin == true
                     val subAdmin = groupInfo?.room?.subAdmins?.firstOrNull { it.userId == myId }
                     val canStart = isOwner || subAdmin?.canStartVoiceChat == true
-                    if (canStart) {
-                        voiceChatViewModel.join(room._id, myId, "", "")
-                    } else {
-                        viewModel.setToast("🎙️ Sirf Owner ya permitted Admin voice chat start kar sakte hain")
+                    val vcActive = voiceChatViewModel.isActive.value
+                    when {
+                        canStart -> voiceChatViewModel.join(room._id, myId, "", "")
+                        vcActive -> voiceChatViewModel.join(room._id, myId, "", "") // join existing
+                        else -> viewModel.setToast("🎙️ Voice chat abhi active nahi hai. Sirf Owner/Admin start kar sakte hain")
                     }
                 }) {
                     Icon(Icons.Default.Mic, null, tint = TextSec, modifier = Modifier.size(20.dp))

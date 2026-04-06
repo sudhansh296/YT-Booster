@@ -908,13 +908,14 @@ io.on('connection', (socket) => {
       const room = await ChatRoom.findById(roomId).select('members isGroup admins subAdmins').lean();
       if (!room || !room.members.some(m => m.toString() === userId)) return;
 
-      // Permission check: only owner/admin or subadmin with canStartVoiceChat
+      // Permission check: owner/admin start kar sake, member join kar sake agar active ho
       if (room.isGroup) {
         const isAdmin = room.admins?.some(a => a.toString() === userId);
         const subAdmin = room.subAdmins?.find(s => s.userId.toString() === userId);
         const canStart = isAdmin || subAdmin?.canStartVoiceChat;
-        if (!canStart) {
-          socket.emit('voice_chat_error', { message: 'Sirf Owner ya permitted Admin voice chat start kar sakte hain' });
+        const isAlreadyActive = io.voiceChats.has(roomId) && io.voiceChats.get(roomId).size > 0;
+        if (!canStart && !isAlreadyActive) {
+          socket.emit('voice_chat_error', { message: 'Voice chat abhi active nahi hai. Sirf Owner/Admin start kar sakte hain' });
           return;
         }
       }

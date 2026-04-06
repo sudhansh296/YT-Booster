@@ -306,6 +306,14 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
+        // Permission error
+        SocketManager.on("voice_chat_error") { args ->
+            try {
+                val data = args[0] as JSONObject
+                mainHandler.post { _toastMsg.value = data.optString("message", "Voice chat join nahi ho saka") }
+            } catch (e: Exception) {}
+        }
+
         // Raise hand
         SocketManager.on("voice_chat_hand_raised") { args ->
             try {
@@ -345,7 +353,7 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
         _isActive.value = false; _participants.value = emptyList(); _isMuted.value = false
         Thread { try { peerConnections.values.forEach { it.close() }; peerConnections.clear(); pendingIce.clear(); localAudioTrack?.dispose(); localAudioTrack = null; peerConnectionFactory?.dispose(); peerConnectionFactory = null; eglBase?.release(); eglBase = null; webrtcInitialized = false } catch (e: Exception) {}; mainHandler.post { try { val am = getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as AudioManager; am.mode = AudioManager.MODE_NORMAL; am.isSpeakerphoneOn = false } catch (e: Exception) {} } }.start()
         listOf("voice_chat_participants","voice_chat_user_joined","voice_chat_user_left","voice_chat_mute_changed","voice_chat_offer","voice_chat_answer","voice_chat_ice",
-            "voice_chat_admin_muted_you","voice_chat_kicked","voice_chat_ended_by_admin","voice_chat_hand_raised","voice_chat_screen_share"
+            "voice_chat_admin_muted_you","voice_chat_kicked","voice_chat_ended_by_admin","voice_chat_hand_raised","voice_chat_screen_share","voice_chat_error"
         ).forEach { SocketManager.off(it) }
     }
 
