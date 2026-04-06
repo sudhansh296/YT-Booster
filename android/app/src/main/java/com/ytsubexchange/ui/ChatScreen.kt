@@ -1876,18 +1876,27 @@ fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwi
             }
         }
 
-        // Reactions display
+        // Reactions display — WhatsApp style, message bubble ke neeche
         if (msg.reactions.isNotEmpty()) {
             Row(
                 modifier = Modifier
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .align(if (isMine) Alignment.End else Alignment.Start)
+                    .offset(y = (-6).dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(CardDark.copy(0.9f))
+                    .background(CardDark)
                     .padding(horizontal = 6.dp, vertical = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                msg.reactions.entries.take(5).forEach { (emoji, users) ->
-                    Text("$emoji ${users.size}", fontSize = 12.sp, color = Color.White)
+                msg.reactions.entries.take(6).forEach { (emoji, users) ->
+                    val count = users.size
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(emoji, fontSize = 14.sp)
+                        if (count > 1) Text("$count", fontSize = 11.sp, color = Color(0xFFBBBBBB))
+                    }
                 }
             }
         }

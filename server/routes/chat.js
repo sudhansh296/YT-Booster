@@ -835,11 +835,21 @@ router.post('/react', authMiddleware, async (req, res) => {
     const msg = await ChatMessage.findById(msgId);
     if (!msg) return res.status(404).json({ error: 'Message not found' });
 
-    const current = msg.reactions.get(emoji) || 0;
-    msg.reactions.set(emoji, current + 1);
+    const userId = req.user._id.toString();
+    const current = msg.reactions.get(emoji) || [];
+    if (current.includes(userId)) {
+      // Toggle off
+      const updated = current.filter(id => id !== userId);
+      if (updated.length === 0) msg.reactions.delete(emoji);
+      else msg.reactions.set(emoji, updated);
+    } else {
+      msg.reactions.set(emoji, [...current, userId]);
+    }
     await msg.save();
 
-    res.json({ success: true, reactions: Object.fromEntries(msg.reactions) });
+    const reactionsObj = {};
+    msg.reactions.forEach((users, key) => { reactionsObj[key] = users; });
+    res.json({ success: true, reactions: reactionsObj });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

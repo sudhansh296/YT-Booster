@@ -8,7 +8,7 @@ const chatMessageSchema = new mongoose.Schema({
   text: { type: String, default: '' },
   read: { type: Boolean, default: false },
   readBy: [{ type: String }],                            // userIds who read this message
-  reactions: { type: Map, of: Number, default: {} },
+  reactions: { type: Map, of: [String], default: {} },
   replyTo: { msgId: String, text: String, senderName: String },
   forwardedFrom: { type: String, default: null },        // original sender name if forwarded
   disappearsAt: { type: Date, default: null },           // auto-delete time
