@@ -143,11 +143,17 @@ fun ChatListScreen(
     Column(Modifier.fillMaxSize().background(BgDark).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
         Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable { viewModel.showNewChatDialog() }) {
+            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable {
+                if (selectedTab == 1) {
+                    viewModel.showNewChatDialog(); viewModel.searchGroups("")
+                } else {
+                    viewModel.showNewChatDialog()
+                }
+            }) {
                 Row(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Search, null, tint = TextSec, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("User search karo...", color = TextSec, fontSize = 14.sp)
+                    Text(if (selectedTab == 1) "Group search karo..." else "User search karo...", color = TextSec, fontSize = 14.sp)
                 }
             }
             Box {
@@ -291,6 +297,7 @@ fun ChatListScreen(
         onCreateGroup = { viewModel.showCreateGroupDialog() },
         onJoinGroup = { groupId -> viewModel.joinGroupDirect(groupId) },
         onInviteToGroup = { groupId -> /* open group invite flow */ },
+        initialTab = if (selectedTab == 1) 1 else 0,
         onDismiss = { viewModel.hideNewChatDialog() }
     )
     if (showCreateGroup) CreateGroupDialog(users, { viewModel.loadUsers(it) }, { n, ids -> viewModel.createGroup(n, ids) }, { viewModel.hideCreateGroupDialog() })
@@ -1623,10 +1630,11 @@ fun NewChatDialog(
     onCreateGroup: () -> Unit,
     onJoinGroup: (String) -> Unit,
     onInviteToGroup: (String) -> Unit,
+    initialTab: Int = 0,
     onDismiss: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedTab by remember { mutableStateOf(0) } // 0=Users, 1=Groups
+    var selectedTab by remember { mutableStateOf(initialTab) }
     var selectedGroup by remember { mutableStateOf<com.ytsubexchange.data.GroupSearchResult?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
