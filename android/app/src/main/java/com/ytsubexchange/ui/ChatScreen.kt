@@ -142,7 +142,7 @@ fun ChatListScreen(
     var showChatMenu by remember { mutableStateOf(false) }
     var chatMenuScreen by remember { mutableStateOf("") } // "sent" | "received" | "blocked"
 
-    Column(Modifier.fillMaxSize().background(BgDark).navigationBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(BgDark)) {
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
         Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable {
@@ -241,7 +241,7 @@ fun ChatListScreen(
                 if (isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AccentRed) }
                 } else {
-                    LazyColumn(Modifier.fillMaxSize()) {
+                    LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
                         // Pending requests section (Direct tab only)
                         if (selectedTab == 0 && pendingRequests.isNotEmpty()) {
                             item {
