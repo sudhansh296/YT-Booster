@@ -590,6 +590,24 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun searchUsersForGroup(query: String, onResult: (List<ChatUser>) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val resp = RetrofitClient.api.getChatUsers(token, query)
+                onResult(resp.users)
+            } catch (e: Exception) { onResult(emptyList()) }
+        }
+    }
+
+    fun inviteMemberToGroup(roomId: String, targetUserId: String) {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.api.groupInvite(token, com.ytsubexchange.data.GroupInviteRequest(roomId, targetUserId))
+                _toastMsg.value = "Invite bhej diya ✅"
+            } catch (e: Exception) { _toastMsg.value = "Invite nahi bheja ja saka" }
+        }
+    }
+
     fun sendChatRequest(user: ChatUser) {
         _showNewChat.value = false
         viewModelScope.launch {

@@ -55,6 +55,9 @@ fun GroupProfileScreen(
     var showInviteLinkDialog by remember { mutableStateOf(false) }
 
     var showWallpaperPicker by remember { mutableStateOf(false) }
+    var showAddMemberDialog by remember { mutableStateOf(false) }
+    var addMemberQuery by remember { mutableStateOf("") }
+    var addMemberUsers by remember { mutableStateOf<List<com.ytsubexchange.data.ChatUser>>(emptyList()) }
     var permDeleteMsg by remember { mutableStateOf(true) }
     var permBanMembers by remember { mutableStateOf(false) }
     var permInviteMembers by remember { mutableStateOf(true) }
@@ -149,6 +152,13 @@ fun GroupProfileScreen(
                                     showInviteLinkDialog = true
                                 }
                             }
+
+                            ActionCard(
+                                icon = Icons.Default.PersonAdd,
+                                label = "Add Member",
+                                color = Color(0xFF4CAF50),
+                                modifier = Modifier.weight(1f)
+                            ) { showAddMemberDialog = true }
 
                             // Wallpaper
                             ActionCard(
@@ -336,6 +346,67 @@ fun GroupProfileScreen(
 
                     TextButton(onClick = { showInviteLinkDialog = false }, modifier = Modifier.align(Alignment.End)) {
                         Text("Close", color = TxtS)
+                    }
+                }
+            }
+        }
+    }
+
+    // Add Member dialog
+    if (showAddMemberDialog) {
+        Dialog(onDismissRequest = { showAddMemberDialog = false; addMemberQuery = ""; addMemberUsers = emptyList() }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardD), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("👤 Add Member", color = TxtP, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    OutlinedTextField(
+                        value = addMemberQuery,
+                        onValueChange = { q ->
+                            addMemberQuery = q
+                            if (q.length >= 2) {
+                                viewModel.searchUsersForGroup(q) { users -> addMemberUsers = users }
+                            } else {
+                                addMemberUsers = emptyList()
+                            }
+                        },
+                        label = { Text("User search karo", color = TxtS) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccR, unfocusedBorderColor = Div2,
+                            focusedTextColor = TxtP, unfocusedTextColor = TxtP
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (addMemberUsers.isNotEmpty()) {
+                        androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 200.dp)) {
+                            androidx.compose.foundation.lazy.items(addMemberUsers) { user ->
+                                Row(
+                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            viewModel.inviteMemberToGroup(roomId, user._id)
+                                            showAddMemberDialog = false
+                                            addMemberQuery = ""
+                                            addMemberUsers = emptyList()
+                                        }
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(Modifier.size(36.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccR, Color(0xFFFF6B6B)))), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(user.channelName, color = TxtP, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                        Text("Tap to invite", color = TxtS, fontSize = 11.sp)
+                                    }
+                                    Icon(Icons.Default.PersonAdd, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    } else if (addMemberQuery.length >= 2) {
+                        Text("Koi user nahi mila", color = TxtS, fontSize = 13.sp)
+                    }
+                    TextButton(onClick = { showAddMemberDialog = false; addMemberQuery = ""; addMemberUsers = emptyList() }, modifier = Modifier.align(Alignment.End)) {
+                        Text("Cancel", color = TxtS)
                     }
                 }
             }

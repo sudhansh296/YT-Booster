@@ -732,6 +732,11 @@ router.post('/group/remove', authMiddleware, async (req, res) => {
     if (!isAdmin && !subAdmin?.canBanMembers) {
       return res.status(403).json({ error: 'Permission denied' });
     }
+    // Owner (first admin / createdBy) ko kick nahi kar sakte
+    const ownerId = room.createdBy?.toString() || room.admins?.[0]?.toString();
+    if (targetUserId === ownerId) {
+      return res.status(403).json({ error: 'Owner ko remove nahi kar sakte' });
+    }
     await ChatRoom.findByIdAndUpdate(roomId, { $pull: { members: targetUserId } });
     const target = await User.findById(targetUserId).select('channelName').lean();
     const sysMsg = await ChatMessage.create({
