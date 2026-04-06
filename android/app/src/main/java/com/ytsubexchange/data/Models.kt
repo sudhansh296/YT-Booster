@@ -118,7 +118,8 @@ data class ChatMessage(
     val disappearsAt: String? = null,
     val fileUrl: String? = null,
     val fileType: String? = null,
-    val fileName: String? = null
+    val fileName: String? = null,
+    val fileSize: Long? = null
 )
 data class ChatRoom(
     val _id: String,
@@ -148,7 +149,7 @@ data class GroupSubAdmin(
     val canChangeGroupInfo: Boolean = false
 )
 
-data class GroupSearchResult(val _id: String, val name: String, val pic: String = "", val description: String? = null, val memberCount: Int = 0, val hasInviteLink: Boolean = false)
+data class GroupSearchResult(val _id: String, val name: String, val pic: String = "", val description: String? = null, val memberCount: Int = 0, val hasInviteLink: Boolean = false, val isMember: Boolean = false)
 data class GroupSearchResponse(val groups: List<GroupSearchResult>)
 data class GroupInviteLinkResponse(val success: Boolean, val inviteLink: String = "", val token: String = "")
 data class SubAdminPermissions(
@@ -242,6 +243,7 @@ data class SentRequest(
 )
 data class SentRequestsResponse(val requests: List<SentRequest>)
 
+data class SetDisappearingRequest(val roomId: String, val seconds: Int)
 data class GroupInviteNotif(val roomId: String, val roomName: String, val invitedBy: String, val invitedByPic: String)
 
 data class OnlineStatusResponse(val onlineUsers: List<String>)

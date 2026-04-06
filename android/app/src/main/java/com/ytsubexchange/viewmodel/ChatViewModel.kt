@@ -740,6 +740,19 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun joinGroupDirect(roomId: String) {
+        viewModelScope.launch {
+            try {
+                val resp = RetrofitClient.api.joinGroupDirect(token, mapOf("roomId" to roomId))
+                if (resp.success) {
+                    _toastMsg.value = if (resp.alreadyMember) "Aap pehle se is group mein hain" else "Group join kar liya! 🎉"
+                    loadRooms()
+                    resp.room?.let { openRoom(it) }
+                }
+            } catch (e: Exception) { _toastMsg.value = "Join nahi ho saka: ${e.message?.take(40)}" }
+        }
+    }
+
     // ── Forward / Disappearing / Read ────────────────────────
     fun forwardMessage(msgId: String, targetRoomIds: List<String>) {
         viewModelScope.launch {

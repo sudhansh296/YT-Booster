@@ -614,7 +614,43 @@ router.post('/group/invite', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Accept group invite ───────────────────────────────────────
+// ── Join group directly by roomId ────────────────────────────
+router.post('/group/join', authMiddleware, async (req, res) => {
+  try {
+    const { roomId } = req.body;
+    if (!roomId) return res.status(400).json({ error: 'roomId required' });
+
+    const room = await ChatRoom.findById(roomId);
+    if (!room || !room.isGroup) return res.status(404).json({ error: 'Group not found' });
+    if (room.isBlocked) return res.status(403).json({ error: 'Group blocked' });
+
+    const alreadyMember = room.members.some(m => m.toString() === req.user._id.toString());
+    if (alreadyMember) return res.json({ success: true, alreadyMember: true, room });
+
+    await ChatRoom.findByIdAndUpdate(roomId, { $addToSet: { members: req.user._id } });
+
+    const sysMsg = await ChatMessage.create({
+      roomId: room._id, senderId: req.user._id, senderName: 'System', senderPic: '',
+      text: `${req.user.channelName} group mein join ho gaya! 🎉`
+    });
+    await ChatRoom.findByIdAndUpdate(roomId, { lastMessage: sysMsg.text, lastTime: new Date() });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat_${roomId}`).emit('chat_message', {
+        _id: sysMsg._id, roomId, senderId: req.user._id, senderName: 'System',
+        senderPic: '', text: sysMsg.text, createdAt: sysMsg.createdAt, replyTo: null
+      });
+    }
+
+    const updatedRoom = await ChatRoom.findById(roomId).lean();
+    res.json({ success: true, alreadyMember: false, room: updatedRoom });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 router.post('/group/accept', authMiddleware, async (req, res) => {
   try {
     const { roomId } = req.body;
@@ -757,7 +793,34 @@ router.get('/users', authMiddleware, async (req, res) => {
   }
 });
 
-// ── React to message ──────────────────────────────────────────
+// ── Search public groups ──────────────────────────────────────
+router.get('/groups/search', authMiddleware, async (req, res) => {
+  try {
+    const { q } = req.query;
+    const filter = { isGroup: true, isBlocked: { $ne: true } };
+    if (q) filter.name = { $regex: q, $options: 'i' };
+
+    const groups = await ChatRoom.find(filter)
+      .select('name pic members createdAt')
+      .limit(20)
+      .lean();
+
+    const myId = req.user._id.toString();
+    const result = groups.map(g => ({
+      _id: g._id,
+      name: g.name,
+      pic: g.pic || '',
+      memberCount: g.members?.length || 0,
+      isMember: g.members?.some(m => m.toString() === myId) || false
+    }));
+
+    res.json({ groups: result });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 router.post('/react', authMiddleware, async (req, res) => {
   try {
     const { msgId, emoji } = req.body;

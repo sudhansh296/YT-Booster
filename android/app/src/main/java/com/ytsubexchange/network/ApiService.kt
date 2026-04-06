@@ -279,6 +279,12 @@ interface ApiService {
         @Body body: Map<String, String>
     ): com.ytsubexchange.data.GroupInviteLinkResponse
 
+    @POST("chat/group/join")
+    suspend fun joinGroupDirect(
+        @Header("Authorization") token: String,
+        @Body body: Map<String, String>
+    ): com.ytsubexchange.data.GroupJoinByLinkResponse
+
     @POST("chat/group/join-by-link")
     suspend fun joinGroupByLink(
         @Header("Authorization") token: String,
@@ -301,7 +307,7 @@ interface ApiService {
     @POST("chat/disappearing")
     suspend fun setDisappearing(
         @Header("Authorization") token: String,
-        @Body body: Map<String, Any>
+        @Body body: com.ytsubexchange.data.SetDisappearingRequest
     ): com.ytsubexchange.data.DeleteMsgResponse
 
     @POST("chat/read")
