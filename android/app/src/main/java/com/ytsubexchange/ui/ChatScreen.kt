@@ -738,12 +738,19 @@ fun ChatWindowScreen(
             }
         }
 
-        // Messages list
-        LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
-            items(displayMessages) { msg ->
-                MessageBubble(msg = msg, myId = myId, onLongClick = { viewModel.onMsgLongPress(msg) },
-                    onSwipeReply = { swipedMsg -> viewModel.setReply(swipedMsg) })
+        // Messages list — emoji panel open hone pe bahar tap se close
+        Box(
+            Modifier.weight(1f)
+                .then(if (showEmojiPanel) Modifier.pointerInput(Unit) {
+                    detectTapGestures { showEmojiPanel = false }
+                } else Modifier)
+        ) {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                items(displayMessages) { msg ->
+                    MessageBubble(msg = msg, myId = myId, onLongClick = { viewModel.onMsgLongPress(msg) },
+                        onSwipeReply = { swipedMsg -> viewModel.setReply(swipedMsg) })
+                }
             }
         }
 
@@ -762,8 +769,7 @@ fun ChatWindowScreen(
         // Input row
         if (!isBlockedByMe && !isBlockedByThem) {
             var isVoiceRecording by remember { mutableStateOf(false) }
-            Box(Modifier.fillMaxWidth()) {
-                Column {
+            Column {
                 // Emoji panel — hide during recording
                 if (showEmojiPanel && !isVoiceRecording) {
                     EmojiPickerPanel(
@@ -876,19 +882,6 @@ fun ChatWindowScreen(
                     }
                 }
             }
-            // Transparent overlay — emoji panel ke upar bahar tap se close
-            if (showEmojiPanel) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(300.dp) // emoji panel height se thoda zyada
-                        .align(Alignment.TopCenter)
-                        .pointerInput(Unit) {
-                            detectTapGestures { showEmojiPanel = false }
-                        }
-                )
-            }
-            } // Box end
         } else {
             Box(Modifier.fillMaxWidth().background(CardDark).padding(16.dp).navigationBarsPadding(), contentAlignment = Alignment.Center) {
                 Text("Message nahi bhej sakte", color = TextSec, fontSize = 13.sp)
