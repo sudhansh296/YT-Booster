@@ -569,7 +569,8 @@ router.post('/group/invite', authMiddleware, async (req, res) => {
     const room = await ChatRoom.findById(roomId);
     if (!room || !room.isGroup) return res.status(404).json({ error: 'Group not found' });
     if (!room.admins.some(a => a.toString() === req.user._id.toString())) {
-      return res.status(403).json({ error: 'Only admins can invite' });
+      const subAdmin = room.subAdmins?.find(s => s.userId.toString() === req.user._id.toString());
+      if (!subAdmin?.canInviteMembers) return res.status(403).json({ error: 'Permission denied' });
     }
     if (room.members.some(m => m.toString() === targetUserId)) {
       return res.status(400).json({ error: 'Already a member' });
@@ -720,14 +721,16 @@ router.get('/group/info/:roomId', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Remove member (admin only) ────────────────────────────────
+// ── Remove member (admin or subadmin with canBanMembers) ─────
 router.post('/group/remove', authMiddleware, async (req, res) => {
   try {
     const { roomId, targetUserId } = req.body;
     const room = await ChatRoom.findById(roomId);
     if (!room || !room.isGroup) return res.status(404).json({ error: 'Group not found' });
-    if (!room.admins.some(a => a.toString() === req.user._id.toString())) {
-      return res.status(403).json({ error: 'Only admins can remove members' });
+    const isAdmin = room.admins.some(a => a.toString() === req.user._id.toString());
+    const subAdmin = room.subAdmins?.find(s => s.userId.toString() === req.user._id.toString());
+    if (!isAdmin && !subAdmin?.canBanMembers) {
+      return res.status(403).json({ error: 'Permission denied' });
     }
     await ChatRoom.findByIdAndUpdate(roomId, { $pull: { members: targetUserId } });
     const target = await User.findById(targetUserId).select('channelName').lean();
@@ -874,6 +877,16 @@ router.get('/starred/:roomId', authMiddleware, async (req, res) => {
 router.post('/pin', authMiddleware, async (req, res) => {
   try {
     const { msgId, roomId } = req.body;
+    const room = await ChatRoom.findById(roomId);
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+
+    // Permission check: admin or subadmin with canPinMessages
+    if (room.isGroup) {
+      const isAdmin = room.admins.some(a => a.toString() === req.user._id.toString());
+      const subAdmin = room.subAdmins?.find(s => s.userId.toString() === req.user._id.toString());
+      if (!isAdmin && !subAdmin?.canPinMessages) return res.status(403).json({ error: 'Permission denied' });
+    }
+
     await ChatMessage.updateMany({ roomId }, { pinned: false });
     if (msgId) {
       await ChatMessage.findByIdAndUpdate(msgId, { pinned: true });
@@ -889,9 +902,20 @@ router.delete('/message/:msgId', authMiddleware, async (req, res) => {
   try {
     const msg = await ChatMessage.findById(req.params.msgId);
     if (!msg) return res.status(404).json({ error: 'Not found' });
-    if (msg.senderId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Only sender can delete' });
+
+    const isSender = msg.senderId.toString() === req.user._id.toString();
+    if (!isSender) {
+      // Check if admin or subadmin with canDeleteMessages in group
+      const room = await ChatRoom.findById(msg.roomId);
+      if (room?.isGroup) {
+        const isAdmin = room.admins.some(a => a.toString() === req.user._id.toString());
+        const subAdmin = room.subAdmins?.find(s => s.userId.toString() === req.user._id.toString());
+        if (!isAdmin && !subAdmin?.canDeleteMessages) return res.status(403).json({ error: 'Permission denied' });
+      } else {
+        return res.status(403).json({ error: 'Only sender can delete' });
+      }
     }
+
     await msg.deleteOne();
     res.json({ success: true });
   } catch (e) {
