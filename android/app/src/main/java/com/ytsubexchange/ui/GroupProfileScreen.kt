@@ -184,7 +184,7 @@ fun GroupProfileScreen(
                 val isOwner = groupInfo.isAdmin && member._id == myId
                 val role = when {
                     isOwner -> "Owner"
-                    isSubAdmin -> "Sub-Admin ⭐"
+                    isSubAdmin -> "Admin ⭐"
                     else -> "Member"
                 }
                 val roleColor = when {
@@ -297,13 +297,13 @@ fun GroupProfileScreen(
                         }
                         Column {
                             Text(member.channelName, color = TxtP, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text(if (isSubAdmin) "Sub-Admin ⭐" else "Member", color = if (isSubAdmin) Color(0xFF29B6F6) else TxtS, fontSize = 12.sp)
+                            Text(if (isSubAdmin) "Admin ⭐" else "Member", color = if (isSubAdmin) Color(0xFF29B6F6) else TxtS, fontSize = 12.sp)
                         }
                     }
                     Divider(color = Div2)
 
                     MemberActionRow(Icons.Default.AdminPanelSettings, Color(0xFF29B6F6),
-                        if (isSubAdmin) "Edit Sub-Admin Rights" else "Make Sub-Admin") {
+                        if (isSubAdmin) "Edit Admin Rights" else "Make Admin") {
                         subAdminTarget = member
                         val existing = subAdmins.firstOrNull { it.userId == member._id }
                         permDeleteMsg = existing?.canDeleteMessages ?: true
@@ -316,7 +316,7 @@ fun GroupProfileScreen(
                     }
 
                     if (isSubAdmin) {
-                        MemberActionRow(Icons.Default.RemoveModerator, Color(0xFFFF9800), "Remove Sub-Admin") {
+                        MemberActionRow(Icons.Default.RemoveModerator, Color(0xFFFF9800), "Remove Admin") {
                             viewModel.manageSubAdmin(roomId, member._id, "remove")
                             selectedMember = null
                         }
@@ -340,7 +340,7 @@ fun GroupProfileScreen(
         Dialog(onDismissRequest = { showSubAdminPerms = false }) {
             Card(colors = CardDefaults.cardColors(containerColor = CardD), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp)) {
-                    Text("⭐ Sub-Admin Rights", color = TxtP, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("⭐ Admin Rights", color = TxtP, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(subAdminTarget!!.channelName, color = Color(0xFF29B6F6), fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                     listOf(
