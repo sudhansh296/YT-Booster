@@ -107,10 +107,11 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
 
                 val surfaceTextureHelper = org.webrtc.SurfaceTextureHelper.create("ScreenCapture", egl.eglBaseContext)
                 val screenSource = factory.createVideoSource(true)
+                val surface = android.view.Surface(surfaceTextureHelper.surfaceTexture)
                 projection.createVirtualDisplay(
-                    "ScreenShare", 720, 1280, android.util.DisplayMetrics.DENSITY_DEFAULT,
+                    "ScreenShare", 720, 1280, 160,
                     android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                    surfaceTextureHelper.getSurface(), null, null
+                    surface, null, null
                 )
                 surfaceTextureHelper.startListening { frame ->
                     screenSource.capturerObserver.onFrameCaptured(frame)
