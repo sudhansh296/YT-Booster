@@ -762,7 +762,8 @@ fun ChatWindowScreen(
         // Input row
         if (!isBlockedByMe && !isBlockedByThem) {
             var isVoiceRecording by remember { mutableStateOf(false) }
-            Column {
+            Box(Modifier.fillMaxWidth()) {
+                Column {
                 // Emoji panel — hide during recording
                 if (showEmojiPanel && !isVoiceRecording) {
                     EmojiPickerPanel(
@@ -839,6 +840,23 @@ fun ChatWindowScreen(
                         onRecordingStateChanged = { isVoiceRecording = it }
                     )
                     if (!isVoiceRecording) {
+                        // Backspace button — send se PEHLE, sirf emoji panel open hone pe
+                        if (showEmojiPanel) {
+                            Box(
+                                Modifier.size(42.dp).clip(CircleShape)
+                                    .background(Color(0xFF2A1A1A))
+                                    .clickable {
+                                        if (inputText.isNotEmpty()) {
+                                            val breakIter = java.text.BreakIterator.getCharacterInstance()
+                                            breakIter.setText(inputText)
+                                            breakIter.last()
+                                            val start = breakIter.previous()
+                                            if (start != java.text.BreakIterator.DONE) inputText = inputText.substring(0, start)
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) { Text(text = "⌫", fontSize = 20.sp, color = Color(0xFFFF6B6B)) }
+                        }
                         Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
                             if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
                             BasicTextField(value = inputText, onValueChange = { inputText = it; viewModel.onTyping(room._id, true) },
@@ -858,6 +876,19 @@ fun ChatWindowScreen(
                     }
                 }
             }
+            // Transparent overlay — emoji panel ke upar bahar tap se close
+            if (showEmojiPanel) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(300.dp) // emoji panel height se thoda zyada
+                        .align(Alignment.TopCenter)
+                        .pointerInput(Unit) {
+                            detectTapGestures { showEmojiPanel = false }
+                        }
+                )
+            }
+            } // Box end
         } else {
             Box(Modifier.fillMaxWidth().background(CardDark).padding(16.dp).navigationBarsPadding(), contentAlignment = Alignment.Center) {
                 Text("Message nahi bhej sakte", color = TextSec, fontSize = 13.sp)
