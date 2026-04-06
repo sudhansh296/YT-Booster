@@ -378,7 +378,8 @@ fun GroupProfileScreen(
                     )
                     if (addMemberUsers.isNotEmpty()) {
                         androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 200.dp)) {
-                            androidx.compose.foundation.lazy.items(addMemberUsers) { user ->
+                            items(count = addMemberUsers.size) { i ->
+                                val user = addMemberUsers[i]
                                 Row(
                                     Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
                                         .clickable {
