@@ -1064,5 +1064,43 @@ io.on('connection', (socket) => {
 
 }); // end io.on('connection')
 
+// ── 48hr Auto-delete uploaded chat files ─────────────────────
+const uploadDir = require('path').join(__dirname, 'public/uploads/chat');
+
+function deleteOldFiles() {
+  try {
+    const fs = require('fs');
+    if (!fs.existsSync(uploadDir)) return;
+    const now = Date.now();
+    const limit = 48 * 60 * 60 * 1000; // 48 hours in ms
+    fs.readdirSync(uploadDir).forEach(file => {
+      const filePath = require('path').join(uploadDir, file);
+      try {
+        const stat = fs.statSync(filePath);
+        if (now - stat.mtimeMs > limit) {
+          fs.unlinkSync(filePath);
+          console.log(`Auto-deleted: ${file}`);
+        }
+      } catch (e) {}
+    });
+  } catch (e) {}
+}
+
+// ── 7-day auto-delete all chat messages ──────────────────────
+async function deleteOldMessages() {
+  try {
+    const ChatMessage = require('./models/ChatMessage');
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const result = await ChatMessage.deleteMany({ createdAt: { $lt: sevenDaysAgo } });
+    if (result.deletedCount > 0) console.log(`Auto-deleted ${result.deletedCount} old messages`);
+  } catch (e) {}
+}
+
+// Run every hour
+setInterval(deleteOldFiles, 60 * 60 * 1000);
+setInterval(deleteOldMessages, 60 * 60 * 1000);
+deleteOldFiles(); // Run on startup too
+deleteOldMessages();
+
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
