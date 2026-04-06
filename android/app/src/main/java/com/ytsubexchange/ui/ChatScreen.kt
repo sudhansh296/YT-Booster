@@ -84,6 +84,7 @@ fun ChatScreen(
     voiceChatViewModel: GroupVoiceChatViewModel? = null,
     openCommunity: Boolean = false,
     onPickFile: (String, (android.net.Uri, String, String) -> Unit) -> Unit = { _, _ -> },
+    onRequestScreenCapture: (() -> Unit)? = null,
 ) {
     val rooms by viewModel.rooms.collectAsState()
     val openRoom by viewModel.openRoom.collectAsState()
@@ -101,7 +102,8 @@ fun ChatScreen(
                 onBack = { viewModel.closeRoom() },
                 callViewModel = callViewModel,
                 voiceChatViewModel = voiceChatViewModel,
-                onPickFile = onPickFile
+                onPickFile = onPickFile,
+                onRequestScreenCapture = onRequestScreenCapture
             )
         } else {
             ChatListScreen(
@@ -534,7 +536,8 @@ fun ChatWindowScreen(
     onBack: () -> Unit,
     callViewModel: CallViewModel? = null,
     voiceChatViewModel: GroupVoiceChatViewModel? = null,
-    onPickFile: (String, (android.net.Uri, String, String) -> Unit) -> Unit = { _, _ -> }
+    onPickFile: (String, (android.net.Uri, String, String) -> Unit) -> Unit = { _, _ -> },
+    onRequestScreenCapture: (() -> Unit)? = null
 ) {
     val messages by viewModel.messages.collectAsState()
     val myId by viewModel.myIdFlow.collectAsState()
@@ -1120,6 +1123,20 @@ fun ChatWindowScreen(
                     }
                 }
             }
+        }
+    }
+
+    // Group voice chat — full screen overlay
+    if (voiceChatViewModel != null) {
+        val vcActive by voiceChatViewModel.isActive.collectAsState()
+        if (vcActive) {
+            GroupVoiceChatScreen(
+                roomName = room.name,
+                viewModel = voiceChatViewModel,
+                onLeave = { /* stays in chat */ },
+                onRequestScreenCapture = onRequestScreenCapture
+            )
+            return
         }
     }
 

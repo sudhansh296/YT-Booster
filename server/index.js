@@ -1031,6 +1031,12 @@ io.on('connection', (socket) => {
     io.to(`voice_${roomId}`).emit('voice_chat_hand_raised', { roomId, userId, raised });
   });
 
+  // Screen share in voice chat
+  socket.on('voice_chat_screen_share', ({ roomId, userId, sharing }) => {
+    if (!roomId) return;
+    socket.to(`voice_${roomId}`).emit('voice_chat_screen_share', { roomId, userId, sharing });
+  });
+
   // ── Community Chat Socket ─────────────────────────────────
   socket.on('join_community', async () => {
     socket.join('community_global');

@@ -138,6 +138,23 @@ class MainActivity : ComponentActivity() {
         screenCaptureLauncher.launch(mgr.createScreenCaptureIntent())
     }
 
+    // Voice chat screen capture
+    private val voiceChatScreenCaptureLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
+            ScreenCaptureService.start(this)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                groupVoiceChatViewModel.startScreenShare(result.resultCode, result.data!!)
+            }, 300)
+        }
+    }
+
+    fun requestVoiceChatScreenCapture() {
+        val mgr = getSystemService(android.media.projection.MediaProjectionManager::class.java)
+        voiceChatScreenCaptureLauncher.launch(mgr.createScreenCaptureIntent())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -265,8 +282,8 @@ class MainActivity : ComponentActivity() {
                             is Screen.Leaderboard -> LeaderboardScreen(viewModel)
                             is Screen.Referral -> ReferralScreen(viewModel)
                             is Screen.History -> TransactionScreen(viewModel)
-                            is Screen.Chat -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) })
-                            is Screen.ChatWithCommunity -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, openCommunity = (currentScreen as Screen.ChatWithCommunity).openCommunity, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) })
+                            is Screen.Chat -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) }, onRequestScreenCapture = { requestVoiceChatScreenCapture() })
+                            is Screen.ChatWithCommunity -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, openCommunity = (currentScreen as Screen.ChatWithCommunity).openCommunity, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) }, onRequestScreenCapture = { requestVoiceChatScreenCapture() })
                             is Screen.Exchange -> ExchangeScreen(viewModel)
                             is Screen.Profile -> ProfileScreen(
                                 viewModel = viewModel,
