@@ -51,8 +51,10 @@ fun GroupProfileScreen(
     var subAdminTarget by remember { mutableStateOf<GroupMember?>(null) }
     var showEditName by remember { mutableStateOf(false) }
     var editNameText by remember { mutableStateOf(groupInfo.room.name) }
-    var showWallpaperPicker by remember { mutableStateOf(false) }
+    var inviteLink by remember { mutableStateOf("") }
+    var showInviteLinkDialog by remember { mutableStateOf(false) }
 
+    var showWallpaperPicker by remember { mutableStateOf(false) }
     var permDeleteMsg by remember { mutableStateOf(true) }
     var permBanMembers by remember { mutableStateOf(false) }
     var permInviteMembers by remember { mutableStateOf(true) }
@@ -60,8 +62,11 @@ fun GroupProfileScreen(
     var permChangeInfo by remember { mutableStateOf(false) }
 
     val subAdmins = groupInfo.room.subAdmins ?: emptyList()
+    var permChangeInfo by remember { mutableStateOf(false) }
 
-    // Image picker for group pic
+    var permDeleteMsg by remember { mutableStateOf(true) }
+
+    val subAdmins = groupInfo.room.subAdmins ?: emptyList()
     val picLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { viewModel.updateGroupPic(roomId, it, ctx) }
     }
@@ -142,7 +147,12 @@ fun GroupProfileScreen(
                                 label = "Invite Link",
                                 color = Color(0xFF29B6F6),
                                 modifier = Modifier.weight(1f)
-                            ) { viewModel.getGroupInviteLink(roomId) {} }
+                            ) {
+                                viewModel.getGroupInviteLink(roomId) { link ->
+                                    inviteLink = link
+                                    showInviteLinkDialog = true
+                                }
+                            }
 
                             // Wallpaper
                             ActionCard(
@@ -270,6 +280,66 @@ fun GroupProfileScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = AccR)
                         ) { Text("Save") }
+                    }
+                }
+            }
+        }
+    }
+
+    // Invite link dialog
+    if (showInviteLinkDialog && inviteLink.isNotEmpty()) {
+        Dialog(onDismissRequest = { showInviteLinkDialog = false }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardD), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("🔗 Invite Link", color = TxtP, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
+                    // Link display box
+                    Box(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(CardA).padding(12.dp)
+                    ) {
+                        Text(inviteLink, color = Color(0xFF29B6F6), fontSize = 12.sp)
+                    }
+
+                    // Copy button
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF1A2A1A))
+                            .clickable {
+                                val clipboard = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("invite_link", inviteLink))
+                                showInviteLinkDialog = false
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp))
+                        Text("Copy Link", color = TxtP, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    // Share button
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF1A1A2A))
+                            .clickable {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, "Join my group: $inviteLink")
+                                }
+                                ctx.startActivity(android.content.Intent.createChooser(intent, "Share invite link"))
+                                showInviteLinkDialog = false
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Share, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(20.dp))
+                        Text("Share Link", color = TxtP, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    TextButton(onClick = { showInviteLinkDialog = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text("Close", color = TxtS)
                     }
                 }
             }
