@@ -146,7 +146,8 @@ data class GroupSubAdmin(
     val canBanMembers: Boolean = false,
     val canInviteMembers: Boolean = true,
     val canPinMessages: Boolean = false,
-    val canChangeGroupInfo: Boolean = false
+    val canChangeGroupInfo: Boolean = false,
+    val canStartVoiceChat: Boolean = false
 )
 
 data class GroupSearchResult(val _id: String, val name: String, val pic: String = "", val description: String? = null, val memberCount: Int = 0, val hasInviteLink: Boolean = false, val isMember: Boolean = false)
@@ -157,7 +158,8 @@ data class SubAdminPermissions(
     val canBanMembers: Boolean = false,
     val canInviteMembers: Boolean = true,
     val canPinMessages: Boolean = false,
-    val canChangeGroupInfo: Boolean = false
+    val canChangeGroupInfo: Boolean = false,
+    val canStartVoiceChat: Boolean = false
 )
 data class ManageSubAdminRequest(
     val roomId: String,

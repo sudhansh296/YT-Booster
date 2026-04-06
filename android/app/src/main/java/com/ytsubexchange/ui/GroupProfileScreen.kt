@@ -60,6 +60,7 @@ fun GroupProfileScreen(
     var permInviteMembers by remember { mutableStateOf(true) }
     var permPinMessages by remember { mutableStateOf(false) }
     var permChangeInfo by remember { mutableStateOf(false) }
+    var permStartVoiceChat by remember { mutableStateOf(false) }
 
     val subAdmins = groupInfo.room.subAdmins ?: emptyList()
     val picLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -376,6 +377,7 @@ fun GroupProfileScreen(
                         permInviteMembers = existing?.canInviteMembers ?: true
                         permPinMessages = existing?.canPinMessages ?: false
                         permChangeInfo = existing?.canChangeGroupInfo ?: false
+                        permStartVoiceChat = existing?.canStartVoiceChat ?: false
                         showSubAdminPerms = true
                         selectedMember = null
                     }
@@ -413,7 +415,8 @@ fun GroupProfileScreen(
                         Triple("Ban Members", permBanMembers, { v: Boolean -> permBanMembers = v }),
                         Triple("Invite Members", permInviteMembers, { v: Boolean -> permInviteMembers = v }),
                         Triple("Pin Messages", permPinMessages, { v: Boolean -> permPinMessages = v }),
-                        Triple("Change Group Info", permChangeInfo, { v: Boolean -> permChangeInfo = v })
+                        Triple("Change Group Info", permChangeInfo, { v: Boolean -> permChangeInfo = v }),
+                        Triple("Start Voice Chat 🎙️", permStartVoiceChat, { v: Boolean -> permStartVoiceChat = v })
                     ).forEach { (label, value, onChange) ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(label, color = TxtP, fontSize = 14.sp)
@@ -430,7 +433,7 @@ fun GroupProfileScreen(
                                 viewModel.manageSubAdmin(roomId, subAdminTarget!!._id, "add",
                                     mapOf("canDeleteMessages" to permDeleteMsg, "canBanMembers" to permBanMembers,
                                         "canInviteMembers" to permInviteMembers, "canPinMessages" to permPinMessages,
-                                        "canChangeGroupInfo" to permChangeInfo))
+                                        "canChangeGroupInfo" to permChangeInfo, "canStartVoiceChat" to permStartVoiceChat))
                                 showSubAdminPerms = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = AccR)

@@ -905,8 +905,19 @@ io.on('connection', (socket) => {
       if (!userId) return;
 
       const ChatRoom = require('./models/ChatRoom');
-      const room = await ChatRoom.findById(roomId).select('members isGroup').lean();
+      const room = await ChatRoom.findById(roomId).select('members isGroup admins subAdmins').lean();
       if (!room || !room.members.some(m => m.toString() === userId)) return;
+
+      // Permission check: only owner/admin or subadmin with canStartVoiceChat
+      if (room.isGroup) {
+        const isAdmin = room.admins?.some(a => a.toString() === userId);
+        const subAdmin = room.subAdmins?.find(s => s.userId.toString() === userId);
+        const canStart = isAdmin || subAdmin?.canStartVoiceChat;
+        if (!canStart) {
+          socket.emit('voice_chat_error', { message: 'Sirf Owner ya permitted Admin voice chat start kar sakte hain' });
+          return;
+        }
+      }
 
       const user = await User.findById(userId).select('channelName profilePic').lean();
       if (!user) return;

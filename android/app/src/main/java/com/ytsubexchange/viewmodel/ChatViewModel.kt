@@ -149,6 +149,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _toastMsg = MutableStateFlow<String?>(null)
     val toastMsg: StateFlow<String?> = _toastMsg
+    fun setToast(msg: String) { _toastMsg.value = msg }
 
     data class InAppNotif(val senderName: String, val text: String, val roomId: String, val room: ChatRoom)
     private val _inAppNotif = MutableStateFlow<InAppNotif?>(null)

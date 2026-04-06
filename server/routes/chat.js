@@ -1181,7 +1181,8 @@ router.post('/group/subadmin', authMiddleware, async (req, res) => {
           canBanMembers: permissions?.canBanMembers ?? false,
           canInviteMembers: permissions?.canInviteMembers ?? true,
           canPinMessages: permissions?.canPinMessages ?? false,
-          canChangeGroupInfo: permissions?.canChangeGroupInfo ?? false
+          canChangeGroupInfo: permissions?.canChangeGroupInfo ?? false,
+          canStartVoiceChat: permissions?.canStartVoiceChat ?? false
         }];
       }
     } else if (action === 'update') {

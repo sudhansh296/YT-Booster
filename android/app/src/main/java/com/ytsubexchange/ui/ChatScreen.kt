@@ -614,7 +614,14 @@ fun ChatWindowScreen(
             // Group voice chat button
             if (room.isGroup && voiceChatViewModel != null) {
                 IconButton(onClick = {
-                    voiceChatViewModel.join(room._id, myId, "", "")
+                    val isOwner = groupInfo?.isAdmin == true
+                    val subAdmin = groupInfo?.room?.subAdmins?.firstOrNull { it.userId == myId }
+                    val canStart = isOwner || subAdmin?.canStartVoiceChat == true
+                    if (canStart) {
+                        voiceChatViewModel.join(room._id, myId, "", "")
+                    } else {
+                        viewModel.setToast("🎙️ Sirf Owner ya permitted Admin voice chat start kar sakte hain")
+                    }
                 }) {
                     Icon(Icons.Default.Mic, null, tint = TextSec, modifier = Modifier.size(20.dp))
                 }
