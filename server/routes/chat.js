@@ -249,10 +249,15 @@ router.post('/upload', authMiddleware, (req, res, next) => {
         createdAt: msg.createdAt,
         replyTo: null
       };
-      // Broadcast to chat room
-      io.to(`chat_${roomId}`).emit('chat_message', msgPayload);
-      // Notify members not in chat room
+      // Broadcast to chat room — sender ko exclude karo (usse REST response se already milega)
       const chatRoomSockets = io.sockets.adapter.rooms.get(`chat_${roomId}`) || new Set();
+      const senderUserRoom = io.sockets.adapter.rooms.get(`user_${req.user._id.toString()}`) || new Set();
+      for (const sid of chatRoomSockets) {
+        if (!senderUserRoom.has(sid)) {
+          io.to(sid).emit('chat_message', msgPayload);
+        }
+      }
+      // Notify members not in chat room
       room.members.forEach(memberId => {
         const mId = memberId.toString();
         if (mId === req.user._id.toString()) return;
@@ -282,7 +287,8 @@ router.post('/upload', authMiddleware, (req, res, next) => {
       replyTo: null,
       fileUrl: msg.fileUrl || null,
       fileType: msg.fileType || null,
-      fileName: msg.fileName || null
+      fileName: msg.fileName || null,
+      fileSize: req.file.size || null
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1203,7 +1209,12 @@ router.post('/disappearing', authMiddleware, async (req, res) => {
     const io = req.app.get('io');
     if (io) io.to(`chat_${roomId}`).emit('disappearing_changed', { roomId, seconds: parseInt(seconds) || 0 });
 
-    const sysText = seconds > 0 ? `Disappearing messages on (${seconds}s)` : 'Disappearing messages off';
+    const sysText = seconds > 0 
+      ? (seconds === 1 ? 'Messages after viewing delete honge' 
+        : seconds === 86400 ? 'Messages 24 hours baad delete honge'
+        : seconds === 604800 ? 'Messages 7 days baad delete honge'
+        : `Disappearing messages on`)
+      : 'Disappearing messages off';
     const sysMsg = await ChatMessage.create({ roomId, senderId: req.user._id.toString(), senderName: 'System', senderPic: '', text: sysText });
     if (io) io.to(`chat_${roomId}`).emit('chat_message', { _id: sysMsg._id, roomId, senderId: req.user._id, senderName: 'System', senderPic: '', text: sysText, createdAt: sysMsg.createdAt });
 

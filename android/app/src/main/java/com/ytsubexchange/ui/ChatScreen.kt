@@ -131,15 +131,64 @@ fun ChatListScreen(
     val pendingRequests by viewModel.pendingRequests.collectAsState()
     val sentRequests by viewModel.sentRequests.collectAsState()
     var selectedTab by remember { mutableStateOf(if (openCommunity) 2 else 0) }
-    val filtered = rooms.filter { if (selectedTab == 0) !it.isGroup else it.isGroup }
+    val filtered = rooms.filter { r -> 
+        (if (selectedTab == 0) !r.isGroup else r.isGroup) && !r.isBlockedByMe
+    }
+
+    val blockedUsers by viewModel.blockedUsers.collectAsState()
+    var showChatMenu by remember { mutableStateOf(false) }
+    var chatMenuScreen by remember { mutableStateOf("") } // "sent" | "received" | "blocked"
 
     Column(Modifier.fillMaxSize().background(BgDark).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
-        Box(Modifier.fillMaxWidth().padding(12.dp, 8.dp).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable { viewModel.showNewChatDialog() }) {
-            Row(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Search, null, tint = TextSec, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("User search karo...", color = TextSec, fontSize = 14.sp)
+        Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable { viewModel.showNewChatDialog() }) {
+                Row(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Search, null, tint = TextSec, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("User search karo...", color = TextSec, fontSize = 14.sp)
+                }
+            }
+            Box {
+                IconButton(onClick = { showChatMenu = true }) {
+                    Icon(Icons.Default.MoreVert, null, tint = TextSec)
+                }
+                DropdownMenu(
+                    expanded = showChatMenu,
+                    onDismissRequest = { showChatMenu = false },
+                    modifier = Modifier.background(CardDark)
+                ) {
+                    DropdownMenuItem(
+                        text = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Send, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                            Text("Sent Requests", color = TextPrimary, fontSize = 14.sp)
+                            if (sentRequests.isNotEmpty()) Box(Modifier.size(18.dp).clip(CircleShape).background(AccentRed), contentAlignment = Alignment.Center) {
+                                Text("${sentRequests.size}", color = Color.White, fontSize = 9.sp)
+                            }
+                        }},
+                        onClick = { showChatMenu = false; chatMenuScreen = "sent" }
+                    )
+                    DropdownMenuItem(
+                        text = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CallReceived, null, tint = AccentRed, modifier = Modifier.size(16.dp))
+                            Text("Received Requests", color = TextPrimary, fontSize = 14.sp)
+                            if (pendingRequests.isNotEmpty()) Box(Modifier.size(18.dp).clip(CircleShape).background(AccentRed), contentAlignment = Alignment.Center) {
+                                Text("${pendingRequests.size}", color = Color.White, fontSize = 9.sp)
+                            }
+                        }},
+                        onClick = { showChatMenu = false; chatMenuScreen = "received" }
+                    )
+                    DropdownMenuItem(
+                        text = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Block, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(16.dp))
+                            Text("Blocked Users", color = TextPrimary, fontSize = 14.sp)
+                            if (blockedUsers.isNotEmpty()) Box(Modifier.size(18.dp).clip(CircleShape).background(Color(0xFF444444)), contentAlignment = Alignment.Center) {
+                                Text("${blockedUsers.size}", color = Color.White, fontSize = 9.sp)
+                            }
+                        }},
+                        onClick = { showChatMenu = false; chatMenuScreen = "blocked"; viewModel.loadBlockedUsers() }
+                    )
+                }
             }
         }
         Row(Modifier.fillMaxWidth().padding(12.dp, 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -217,32 +266,8 @@ fun ChatListScreen(
                                 Divider(color = Divider2, thickness = 0.5.dp)
                             }
                         }
-                        // Sent requests section (Direct tab only)
-                        if (selectedTab == 0 && sentRequests.isNotEmpty()) {
-                            item {
-                                Column(Modifier.fillMaxWidth().background(Color(0xFF0A1A0A)).padding(12.dp, 8.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Sent Requests (${sentRequests.size})", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    }
-                                    Spacer(Modifier.height(6.dp))
-                                    sentRequests.forEach { req ->
-                                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(1)), contentAlignment = Alignment.Center) {
-                                                Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
-                                            }
-                                            Column(Modifier.weight(1f)) {
-                                                Text(req.toName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                Text("Request pending ⏳", color = TextSec, fontSize = 12.sp)
-                                            }
-                                        }
-                                    }
-                                }
-                                Divider(color = Divider2, thickness = 0.5.dp)
-                            }
-                        }
-                        if (filtered.isEmpty() && pendingRequests.isEmpty() && sentRequests.isEmpty()) {
+                        // Sent requests section removed — visible in 3-dot menu only
+                        if (filtered.isEmpty() && pendingRequests.isEmpty()) {
                             item { Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { Text("Koi chat nahi", color = TextSec, fontSize = 14.sp) } }
                         } else {
                             itemsIndexed(filtered) { i, room ->
@@ -258,6 +283,135 @@ fun ChatListScreen(
     }
     if (showNewChat) NewChatDialog(users, { viewModel.loadUsers(it) }, { viewModel.sendChatRequest(it) }, { viewModel.showCreateGroupDialog() }, { viewModel.hideNewChatDialog() })
     if (showCreateGroup) CreateGroupDialog(users, { viewModel.loadUsers(it) }, { n, ids -> viewModel.createGroup(n, ids) }, { viewModel.hideCreateGroupDialog() })
+
+    // Sent Requests Dialog
+    if (chatMenuScreen == "sent") {
+        Dialog(onDismissRequest = { chatMenuScreen = "" }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("📤 Sent Requests", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        IconButton(onClick = { chatMenuScreen = "" }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (sentRequests.isEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("Koi sent request nahi", color = TextSec, fontSize = 14.sp)
+                        }
+                    } else {
+                        LazyColumn(Modifier.weight(1f, false), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(sentRequests) { req ->
+                                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CardAlt).padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Box(Modifier.size(40.dp).clip(CircleShape).background(avatarGradient(1)), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(22.dp))
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(req.toName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Pending ⏳", color = TextSec, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Received Requests Dialog
+    if (chatMenuScreen == "received") {
+        Dialog(onDismissRequest = { chatMenuScreen = "" }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("📥 Received Requests", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        IconButton(onClick = { chatMenuScreen = "" }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (pendingRequests.isEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("Koi received request nahi", color = TextSec, fontSize = 14.sp)
+                        }
+                    } else {
+                        LazyColumn(Modifier.weight(1f, false), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(pendingRequests) { req ->
+                                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CardAlt).padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Box(Modifier.size(40.dp).clip(CircleShape).background(avatarGradient(0)), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(22.dp))
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(req.fromName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Chat karna chahta hai", color = TextSec, fontSize = 12.sp)
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF4CAF50))
+                                            .clickable { viewModel.acceptChatRequest(req.requestId); if (pendingRequests.size == 1) chatMenuScreen = "" }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                            Text("✓", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF2A1A1A))
+                                            .clickable { viewModel.rejectChatRequest(req.requestId) }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                            Text("✕", color = AccentRed, fontSize = 14.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Blocked Users Dialog
+    if (chatMenuScreen == "blocked") {
+        Dialog(onDismissRequest = { chatMenuScreen = "" }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("🚫 Blocked Users", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        IconButton(onClick = { chatMenuScreen = "" }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (blockedUsers.isEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("Koi blocked user nahi", color = TextSec, fontSize = 14.sp)
+                        }
+                    } else {
+                        LazyColumn(Modifier.weight(1f, false), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(blockedUsers) { user ->
+                                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CardAlt).padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    // No profile pic for blocked users
+                                    Box(Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Block, null, tint = Color(0xFF666666), modifier = Modifier.size(22.dp))
+                                    }
+                                    Text(user.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF1A2A1A))
+                                        .clickable { viewModel.unblockUserById(user.userId, user.roomId) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                        Text("Unblock", color = Color(0xFF4CAF50), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -388,6 +542,7 @@ fun ChatWindowScreen(
     var forwardMsgId by remember { mutableStateOf("") }
     var showEmojiPanel by remember { mutableStateOf(false) }
     var showAttachMenu by remember { mutableStateOf(false) }
+    var showDeleteChatsMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1) }
     val displayMessages = if (showSearchBar && searchQuery.isNotBlank())
@@ -455,10 +610,11 @@ fun ChatWindowScreen(
                     add("Pinned Messages")
                     if (room.isGroup) { add("Group Info"); add("Invite Link") }
                     if (!room.isGroup) { if (isBlockedByMe) add("Unblock User") else add("Block User") }
+                    add("Delete Chats ⏱")
                     add("Clear Chat")
                 }
                 menuItems.forEach { item ->
-                    DropdownMenuItem(text = { Text(item, color = if (item.contains("Block") || item == "Clear Chat") Color(0xFFFF6B6B) else TextPrimary, fontSize = 14.sp) },
+                    DropdownMenuItem(text = { Text(item, color = if (item.contains("Block") || item == "Clear Chat") Color(0xFFFF6B6B) else if (item == "Delete Chats ⏱") Color(0xFFFFAA00) else TextPrimary, fontSize = 14.sp) },
                         onClick = {
                             showMoreMenu = false
                             when (item) {
@@ -469,6 +625,7 @@ fun ChatWindowScreen(
                                 "Invite Link" -> viewModel.getGroupInviteLink(room._id) { link -> showInviteLink = link }
                                 "Block User" -> viewModel.blockUser {}
                                 "Unblock User" -> viewModel.unblockUser {}
+                                "Delete Chats ⏱" -> showDeleteChatsMenu = true
                                 "Clear Chat" -> viewModel.clearChat()
                             }
                         })
@@ -545,65 +702,84 @@ fun ChatWindowScreen(
                 if (showEmojiPanel && !isVoiceRecording) {
                     EmojiPickerPanel(onEmojiSelected = { emoji -> inputText += emoji })
                 }
-                // Attachment menu — hide during recording
+                // Attachment popup — floats above 📎 button in one column
                 if (showAttachMenu && !isVoiceRecording) {
-                    Row(
-                        Modifier.fillMaxWidth().background(CardAlt).padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                    androidx.compose.ui.window.Popup(
+                        alignment = Alignment.BottomStart,
+                        onDismissRequest = { showAttachMenu = false }
                     ) {
-                        AttachOption("🖼", "Photo") {
-                            showAttachMenu = false
-                            onPickFile("image/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
-                        }
-                        AttachOption("🎥", "Video") {
-                            showAttachMenu = false
-                            onPickFile("video/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
-                        }
-                        AttachOption("📄", "Document") {
-                            showAttachMenu = false
-                            onPickFile("*/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
-                        }
-                        AttachOption("🎵", "Audio") {
-                            showAttachMenu = false
-                            onPickFile("audio/*") { uri, mimeType, displayName -> viewModel.sendFile(room._id, uri, mimeType, displayName) }
+                        Column(
+                            Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(CardAlt)
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            listOf(
+                                Triple("🖼", "Photo", "image/*"),
+                                Triple("🎥", "Video", "video/*"),
+                                Triple("📄", "Document", "*/*"),
+                                Triple("🎵", "Audio", "audio/*")
+                            ).forEach { (emoji, label, mime) ->
+                                Row(
+                                    Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            showAttachMenu = false
+                                            onPickFile(mime) { uri, mimeType, displayName ->
+                                                // Actual mimeType use karo — document picker se bhi image/video/pdf sahi detect ho
+                                                viewModel.sendFile(room._id, uri, mimeType, displayName)
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        Modifier.size(36.dp).clip(CircleShape).background(BgDark),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = emoji, fontSize = 18.sp)
+                                    }
+                                    Text(label, color = TextPrimary, fontSize = 14.sp)
+                                }
+                            }
                         }
                     }
                 }
-                if (isVoiceRecording) {
-                    // Full-width recording bar — no other elements
-                    Box(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding()) {
-                        VoiceRecordButton(
-                            onVoiceSent = { file -> viewModel.sendVoiceFile(room._id, file) },
-                            onRecordingStateChanged = { isVoiceRecording = it }
-                        )
-                    }
-                } else {
-                    Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding(),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Single Row — VoiceRecordButton always present, others hide during recording
+                Row(
+                    Modifier.fillMaxWidth().background(CardDark).padding(horizontal = 8.dp, vertical = 4.dp).navigationBarsPadding(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (!isVoiceRecording) {
                         Text("📎", fontSize = 20.sp, modifier = Modifier.clickable { showAttachMenu = !showAttachMenu; showEmojiPanel = false }.padding(4.dp))
                         Text("😊", fontSize = 20.sp, modifier = Modifier.clickable { showEmojiPanel = !showEmojiPanel; showAttachMenu = false }.padding(4.dp))
-                        VoiceRecordButton(
-                            onVoiceSent = { file -> viewModel.sendVoiceFile(room._id, file) },
-                            onRecordingStateChanged = { isVoiceRecording = it }
-                        )
+                    }
+                    VoiceRecordButton(
+                        onVoiceSent = { file -> viewModel.sendVoiceFile(room._id, file) },
+                        onRecordingStateChanged = { isVoiceRecording = it }
+                    )
+                    if (!isVoiceRecording) {
                         Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
                             if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
                             BasicTextField(value = inputText, onValueChange = { inputText = it; viewModel.onTyping(room._id, true) },
                                 textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = {
-                                if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false }
-                            }),
-                            maxLines = 4, modifier = Modifier.fillMaxWidth())
-                    }
-                    Box(Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))),
-                        contentAlignment = Alignment.Center) {
-                        IconButton(onClick = { if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false } }) {
-                            Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                keyboardActions = KeyboardActions(onSend = {
+                                    if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false }
+                                }),
+                                maxLines = 4, modifier = Modifier.fillMaxWidth())
+                        }
+                        Box(Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))),
+                            contentAlignment = Alignment.Center) {
+                            IconButton(onClick = { if (inputText.isNotBlank()) { viewModel.sendMessage(room._id, inputText.trim()); inputText = ""; showEmojiPanel = false } }) {
+                                Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
-                } // end else (not recording)
             }
         } else {
             Box(Modifier.fillMaxWidth().background(CardDark).padding(16.dp).navigationBarsPadding(), contentAlignment = Alignment.Center) {
@@ -926,6 +1102,56 @@ fun ChatWindowScreen(
     if (showGroupInfo && groupInfo != null) {
         GroupInfoPanel(groupInfo = groupInfo!!, viewModel = viewModel, roomId = room._id, myId = myId)
     }
+
+    // Delete Chats (Disappearing Messages) Dialog — Snapchat style
+    if (showDeleteChatsMenu) {
+        Dialog(onDismissRequest = { showDeleteChatsMenu = false }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("⏱ Delete Chats", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Messages automatically delete ho jayenge", color = TextSec, fontSize = 12.sp)
+                    Spacer(Modifier.height(16.dp))
+                    listOf(
+                        Triple("After viewing", 1, "Dekhe ke baad delete"),
+                        Triple("After 24 hours", 86400, "1 din baad delete"),
+                        Triple("After 7 days", 604800, "7 din baad delete"),
+                        Triple("Off", 0, "Auto-delete band karo")
+                    ).forEach { (label, seconds, desc) ->
+                        val currentSecs = room.disappearingSeconds
+                        val isSelected = currentSecs == seconds
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) AccentRed.copy(0.15f) else Color.Transparent)
+                                .clickable {
+                                    viewModel.setDisappearing(room._id, seconds)
+                                    showDeleteChatsMenu = false
+                                }
+                                .padding(12.dp, 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(Modifier.size(20.dp).clip(CircleShape)
+                                .background(if (isSelected) AccentRed else Color(0xFF333333)),
+                                contentAlignment = Alignment.Center) {
+                                if (isSelected) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            }
+                            Column {
+                                Text(label, color = if (isSelected) AccentRed else TextPrimary, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                Text(desc, color = TextSec, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { showDeleteChatsMenu = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text("Cancel", color = TextSec)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -1149,28 +1375,36 @@ fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwi
                             }
                         }
                         msg.fileType?.startsWith("video") == true -> {
+                            val sizeLabel = msg.fileSize?.let {
+                                if (it > 50 * 1024 * 1024) "📥 ${it / (1024 * 1024)}MB - Tap to download" else "▶ Tap to play"
+                            } ?: "▶ Tap to play"
                             Row(
                                 Modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(0.3f))
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onTap = {
-                                                // Download then open via DownloadManager
-                                                try {
-                                                    val fileName = msg.fileName ?: "video_${System.currentTimeMillis()}.mp4"
-                                                    val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
-                                                        setTitle(fileName)
-                                                        setDescription("Video download ho raha hai...")
-                                                        setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                                        setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_MOVIES, "YTBooster/$fileName")
-                                                        setAllowedOverMetered(true)
-                                                        setAllowedOverRoaming(true)
+                                                val fileSizeBytes = msg.fileSize ?: 0L
+                                                if (fileSizeBytes > 50 * 1024 * 1024) {
+                                                    // >50MB — download via DownloadManager
+                                                    try {
+                                                        val fileName = msg.fileName ?: "video_${System.currentTimeMillis()}.mp4"
+                                                        val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
+                                                            setTitle(fileName)
+                                                            setDescription("Downloading...")
+                                                            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_MOVIES, "YTBooster/$fileName")
+                                                            setAllowedOverMetered(true)
+                                                        }
+                                                        val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                                        dm.enqueue(request)
+                                                    } catch (e: Exception) { }
+                                                } else {
+                                                    // <=50MB — stream directly
+                                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                        setDataAndType(android.net.Uri.parse(fullUrl), "video/*")
                                                     }
-                                                    val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-                                                    dm.enqueue(request)
-                                                } catch (e: Exception) {
-                                                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))
-                                                    intent.setDataAndType(android.net.Uri.parse(fullUrl), "video/*")
-                                                    ctx.startActivity(Intent.createChooser(intent, "Play video"))
+                                                    try { ctx.startActivity(intent) }
+                                                    catch (e: Exception) { ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))) }
                                                 }
                                             },
                                             onLongPress = { onLongClick() }
@@ -1182,7 +1416,7 @@ fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwi
                                 Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(28.dp))
                                 Column {
                                     Text("🎥 Video", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    Text("Tap to play", color = Color.White.copy(0.6f), fontSize = 10.sp)
+                                    Text(sizeLabel, color = Color.White.copy(0.6f), fontSize = 10.sp)
                                 }
                             }
                         }
@@ -1233,41 +1467,73 @@ fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwi
                             }
                         }
                         else -> {
-                            // Document / other file
+                            // Document / other file — WhatsApp style with extension badge
+                            val fileName = msg.fileName ?: "file"
+                            val ext = fileName.substringAfterLast('.', "").uppercase().take(4)
+                            val extColor = when (ext.lowercase()) {
+                                "pdf" -> Color(0xFFE53935)
+                                "doc", "docx" -> Color(0xFF1565C0)
+                                "xls", "xlsx" -> Color(0xFF2E7D32)
+                                "ppt", "pptx" -> Color(0xFFE65100)
+                                "zip", "rar" -> Color(0xFF6A1B9A)
+                                "jpg", "jpeg", "png", "gif", "webp" -> Color(0xFF00838F)
+                                "mp4", "mkv", "mov", "avi" -> Color(0xFF37474F)
+                                "mp3", "m4a", "ogg", "wav" -> Color(0xFF4527A0)
+                                "txt" -> Color(0xFF546E7A)
+                                else -> Color(0xFF29B6F6)
+                            }
+                            val docSizeLabel = msg.fileSize?.let {
+                                if (it > 50 * 1024 * 1024) "${it / (1024 * 1024)} MB" else "${it / 1024} KB"
+                            } ?: ""
                             Row(
                                 Modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(0.2f))
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onTap = {
-                                                try {
-                                                    val fileName = msg.fileName ?: "file_${System.currentTimeMillis()}"
-                                                    val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
-                                                        setTitle(fileName)
-                                                        setDescription("File download ho raha hai...")
-                                                        setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                                        setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "YTBooster/$fileName")
-                                                        setAllowedOverMetered(true)
-                                                        setAllowedOverRoaming(true)
-                                                    }
-                                                    val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-                                                    dm.enqueue(request)
-                                                } catch (e: Exception) {
-                                                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))
-                                                    ctx.startActivity(Intent.createChooser(intent, "Open with"))
+                                                val fileSizeBytes = msg.fileSize ?: 0L
+                                                if (fileSizeBytes > 50 * 1024 * 1024) {
+                                                    try {
+                                                        val request = android.app.DownloadManager.Request(android.net.Uri.parse(fullUrl)).apply {
+                                                            setTitle(fileName)
+                                                            setDescription("Downloading...")
+                                                            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "YTBooster/$fileName")
+                                                            setAllowedOverMetered(true)
+                                                        }
+                                                        val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                                        dm.enqueue(request)
+                                                    } catch (e: Exception) { }
+                                                } else {
+                                                    try {
+                                                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(fullUrl))
+                                                        ctx.startActivity(Intent.createChooser(intent, "Open with"))
+                                                    } catch (e: Exception) { }
                                                 }
                                             },
                                             onLongPress = { onLongClick() }
                                         )
-                                    }.padding(10.dp, 8.dp),
+                                    }.padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Icon(Icons.Default.InsertDriveFile, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(28.dp))
-                                Column(Modifier.widthIn(max = 160.dp)) {
-                                    Text(msg.fileName ?: "File", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2)
-                                    Text("Tap to open / download", color = Color.White.copy(0.6f), fontSize = 10.sp)
+                                // File type badge
+                                Box(
+                                    Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).background(extColor),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        if (ext.isNotEmpty()) ext else "FILE",
+                                        color = Color.White,
+                                        fontSize = if (ext.length <= 3) 11.sp else 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                                Icon(Icons.Default.Download, null, tint = Color.White.copy(0.7f), modifier = Modifier.size(18.dp))
+                                Column(Modifier.widthIn(max = 150.dp)) {
+                                    Text(fileName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                                    if (docSizeLabel.isNotEmpty()) {
+                                        Text(docSizeLabel, color = Color.White.copy(0.6f), fontSize = 10.sp)
+                                    }
+                                }
                             }
                         }
                     }

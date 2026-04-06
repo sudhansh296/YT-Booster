@@ -753,12 +753,17 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun setDisappearing(roomId: String, seconds: Int) {
         viewModelScope.launch {
             try {
-                RetrofitClient.api.setDisappearing(token, mapOf("roomId" to roomId, "seconds" to seconds))
-                _toastMsg.value = if (seconds == 0) "Disappearing messages off" else "Disappearing: ${seconds}s ✅"
-                // Update local room
+                RetrofitClient.api.setDisappearing(token, com.ytsubexchange.data.SetDisappearingRequest(roomId, seconds))
+                _toastMsg.value = when (seconds) {
+                    0 -> "Auto-delete off ✓"
+                    1 -> "Messages dekhe ke baad delete honge ✓"
+                    86400 -> "Messages 24 hours baad delete honge ✓"
+                    604800 -> "Messages 7 days baad delete honge ✓"
+                    else -> "Auto-delete set ho gaya ✅"
+                }
                 _rooms.value = _rooms.value.map { if (it._id == roomId) it.copy(disappearingSeconds = seconds) else it }
                 _openRoom.value = _openRoom.value?.let { if (it._id == roomId) it.copy(disappearingSeconds = seconds) else it }
-            } catch (e: Exception) { _toastMsg.value = "Set nahi hua" }
+            } catch (e: Exception) { _toastMsg.value = "Set nahi hua: ${e.message?.take(30)}" }
         }
     }
 
@@ -891,9 +896,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 RetrofitClient.api.blockUser(token, mapOf("roomId" to roomId))
                 _isBlockedByMe.value = true
                 _openRoom.value = _openRoom.value?.copy(isBlockedByMe = true)
-                _rooms.value = _rooms.value.map {
-                    if (it._id == roomId) it.copy(isBlockedByMe = true) else it
-                }
+                // Remove from chat list — blocked user should not appear
+                _rooms.value = _rooms.value.filter { it._id != roomId }
                 _toastMsg.value = "User block ho gaya 🚫"
                 loadBlockedUsers()
                 onDone()
@@ -910,7 +914,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 _openRoom.value = _openRoom.value?.copy(isBlockedByMe = false)
                 _toastMsg.value = "User unblock ho gaya ✅"
                 loadBlockedUsers()
-                loadRooms()
+                loadRooms() // Reload to show unblocked user's room again
                 onDone()
             } catch (e: Exception) { _toastMsg.value = "Unblock nahi ho saka" }
         }
@@ -921,16 +925,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 RetrofitClient.api.unblockUser(token, mapOf("roomId" to roomId))
                 _blockedUsers.value = _blockedUsers.value.filter { it.userId != userId }
-                // Agar current open room same hai toh isBlockedByMe reset karo
-                if (_openRoom.value?._id == roomId) {
-                    _isBlockedByMe.value = false
-                    _openRoom.value = _openRoom.value?.copy(isBlockedByMe = false)
-                }
-                _rooms.value = _rooms.value.map {
-                    if (it._id == roomId) it.copy(isBlockedByMe = false) else it
-                }
                 _toastMsg.value = "User unblock ho gaya ✅"
-                loadRooms()
+                loadRooms() // Reload to show unblocked user's room
             } catch (e: Exception) { _toastMsg.value = "Unblock nahi ho saka" }
         }
     }
@@ -1005,11 +1001,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (isCurrentRoom && !isNotify) {
             // Room open hai aur direct chat_message — temp replace karo ya add karo
             val updated = if (isMyMsg) {
-                val withoutTemp = _messages.value.filter { !(it._id.startsWith("temp_") && it.text == msg.text) }
-                // Preserve replyTo from temp message if server didn't send it
-                val tempReplyTo = _messages.value.firstOrNull { it._id.startsWith("temp_") && it.text == msg.text }?.replyTo
-                val finalMsg = if (msg.replyTo == null && tempReplyTo != null) msg.copy(replyTo = tempReplyTo) else msg
-                if (withoutTemp.any { it._id == msg._id }) withoutTemp else withoutTemp + finalMsg
+                // Agar _id already list mein hai (REST response se already add ho chuka) toh skip
+                if (_messages.value.any { it._id == msg._id }) {
+                    _messages.value
+                } else {
+                    val withoutTemp = _messages.value.filter { !(it._id.startsWith("temp_") && it.text == msg.text) }
+                    // Preserve replyTo from temp message if server didn't send it
+                    val tempReplyTo = _messages.value.firstOrNull { it._id.startsWith("temp_") && it.text == msg.text }?.replyTo
+                    val finalMsg = if (msg.replyTo == null && tempReplyTo != null) msg.copy(replyTo = tempReplyTo) else msg
+                    withoutTemp + finalMsg
+                }
             } else {
                 if (_messages.value.any { it._id == msg._id }) _messages.value else _messages.value + msg
             }
