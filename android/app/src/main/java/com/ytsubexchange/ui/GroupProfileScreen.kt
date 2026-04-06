@@ -62,11 +62,6 @@ fun GroupProfileScreen(
     var permChangeInfo by remember { mutableStateOf(false) }
 
     val subAdmins = groupInfo.room.subAdmins ?: emptyList()
-    var permChangeInfo by remember { mutableStateOf(false) }
-
-    var permDeleteMsg by remember { mutableStateOf(true) }
-
-    val subAdmins = groupInfo.room.subAdmins ?: emptyList()
     val picLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { viewModel.updateGroupPic(roomId, it, ctx) }
     }
