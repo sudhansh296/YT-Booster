@@ -1174,65 +1174,264 @@ fun ChatWindowScreen(
 
 @Composable
 fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomId: String, myId: String) {
+    var selectedMember by remember { mutableStateOf<GroupMember?>(null) }
+    var showSubAdminPerms by remember { mutableStateOf(false) }
+    var subAdminTarget by remember { mutableStateOf<GroupMember?>(null) }
+
+    // SubAdmin permissions state
+    var permDeleteMsg by remember { mutableStateOf(true) }
+    var permBanMembers by remember { mutableStateOf(false) }
+    var permInviteMembers by remember { mutableStateOf(true) }
+    var permPinMessages by remember { mutableStateOf(false) }
+    var permChangeInfo by remember { mutableStateOf(false) }
+
+    val subAdmins = groupInfo.room.subAdmins ?: emptyList()
+
+    fun memberRole(member: GroupMember): String {
+        val isAdmin = groupInfo.room.members?.firstOrNull() == member._id ||
+            groupInfo.isAdmin && member._id == myId
+        return when {
+            member._id == (groupInfo.room.members?.firstOrNull() ?: "") -> "Owner"
+            subAdmins.any { it.userId == member._id } -> "Sub-Admin"
+            else -> "Member"
+        }
+    }
+
+    fun roleColor(role: String) = when (role) {
+        "Owner" -> Color(0xFFFFD700)
+        "Sub-Admin" -> Color(0xFF29B6F6)
+        else -> TextSec
+    }
+
     Dialog(onDismissRequest = { viewModel.hideGroupInfo() }) {
-        Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardDark),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp)
+        ) {
             Column(Modifier.padding(16.dp)) {
+                // Header
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("👥 Group Info", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     IconButton(onClick = { viewModel.hideGroupInfo() }, modifier = Modifier.size(24.dp)) {
                         Icon(Icons.Default.Close, null, tint = TextSec, modifier = Modifier.size(16.dp))
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(groupInfo.room.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 if (!groupInfo.room.description.isNullOrEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(groupInfo.room.description, color = TextSec, fontSize = 13.sp)
+                    Text(groupInfo.room.description, color = TextSec, fontSize = 12.sp)
                 }
                 Spacer(Modifier.height(12.dp))
+
+                // Members list
                 Text("Members (${groupInfo.members.size})", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Spacer(Modifier.height(6.dp))
-                LazyColumn(Modifier.heightIn(max = 250.dp)) {
+                LazyColumn(Modifier.heightIn(max = 280.dp)) {
                     items(groupInfo.members) { member ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(groupInfo.members.indexOf(member))),
-                                contentAlignment = Alignment.Center) {
+                        val role = when {
+                            subAdmins.any { it.userId == member._id } -> "Sub-Admin"
+                            groupInfo.isAdmin && member._id == myId -> "Owner"
+                            else -> "Member"
+                        }
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = groupInfo.isAdmin && member._id != myId) {
+                                    selectedMember = member
+                                }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(Modifier.size(38.dp).clip(CircleShape).background(avatarGradient(groupInfo.members.indexOf(member))), contentAlignment = Alignment.Center) {
                                 if (member.profilePic.isNotEmpty()) {
                                     AsyncImage(model = member.profilePic, contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape))
                                 } else {
                                     Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
                                 }
                             }
-                            Text(member.channelName, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            Column(Modifier.weight(1f)) {
+                                Text(member.channelName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text(role, color = roleColor(role), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            }
                             if (groupInfo.isAdmin && member._id != myId) {
-                                IconButton(onClick = { viewModel.removeMemberFromGroup(roomId, member._id) }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.Default.PersonRemove, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(16.dp))
-                                }
+                                Icon(Icons.Default.MoreVert, null, tint = TextSec, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
                 }
+
+                // Admin actions
                 if (groupInfo.isAdmin) {
                     Spacer(Modifier.height(8.dp))
                     Divider(color = Divider2)
                     Spacer(Modifier.height(8.dp))
-                    Text("Admin Actions", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { viewModel.getGroupInviteLink(roomId) {} },
+                        Button(
+                            onClick = { viewModel.getGroupInviteLink(roomId) {} },
                             colors = ButtonDefaults.buttonColors(containerColor = CardAlt),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Link, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
                             Text("Invite Link", color = TextPrimary, fontSize = 12.sp)
                         }
                     }
                 }
+
                 Spacer(Modifier.height(8.dp))
-                // Leave group button (non-admin)
-                if (!groupInfo.isAdmin) {
-                    TextButton(onClick = { viewModel.leaveGroup { viewModel.hideGroupInfo() } }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Leave Group", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
+                TextButton(onClick = { viewModel.hideGroupInfo() }, modifier = Modifier.align(Alignment.End)) {
+                    Text("Close", color = TextSec)
+                }
+            }
+        }
+    }
+
+    // Member action sheet (Telegram style)
+    selectedMember?.let { member ->
+        val isSubAdmin = subAdmins.any { it.userId == member._id }
+        Dialog(onDismissRequest = { selectedMember = null }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Member header
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(avatarGradient(0)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                        Column {
+                            Text(member.channelName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(if (isSubAdmin) "Sub-Admin" else "Member", color = if (isSubAdmin) Color(0xFF29B6F6) else TextSec, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Divider(color = Divider2)
+                    Spacer(Modifier.height(8.dp))
+
+                    // Promote to SubAdmin / Edit permissions
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF1A1A2A))
+                            .clickable {
+                                subAdminTarget = member
+                                // Load existing perms if already subadmin
+                                val existing = subAdmins.firstOrNull { it.userId == member._id }
+                                permDeleteMsg = existing?.canDeleteMessages ?: true
+                                permBanMembers = existing?.canBanMembers ?: false
+                                permInviteMembers = existing?.canInviteMembers ?: true
+                                permPinMessages = existing?.canPinMessages ?: false
+                                permChangeInfo = existing?.canChangeGroupInfo ?: false
+                                showSubAdminPerms = true
+                                selectedMember = null
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.AdminPanelSettings, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(22.dp))
+                        Column {
+                            Text(if (isSubAdmin) "Edit Sub-Admin Rights" else "Make Sub-Admin", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Telegram style permissions set karo", color = TextSec, fontSize = 11.sp)
+                        }
+                    }
+
+                    Spacer(Modifier.height(6.dp))
+
+                    // Remove SubAdmin role
+                    if (isSubAdmin) {
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF2A1A1A))
+                                .clickable {
+                                    viewModel.manageSubAdmin(roomId, member._id, "remove")
+                                    selectedMember = null
+                                }
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Default.RemoveModerator, null, tint = Color(0xFFFF9800), modifier = Modifier.size(22.dp))
+                            Text("Remove Sub-Admin", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                    }
+
+                    // Remove from group
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF2A1A1A))
+                            .clickable {
+                                viewModel.removeMemberFromGroup(roomId, member._id)
+                                selectedMember = null
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.PersonRemove, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(22.dp))
+                        Text("Remove from Group", color = Color(0xFFFF6B6B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { selectedMember = null }, modifier = Modifier.align(Alignment.End)) {
+                        Text("Cancel", color = TextSec)
+                    }
+                }
+            }
+        }
+    }
+
+    // SubAdmin permissions dialog (Telegram style)
+    if (showSubAdminPerms && subAdminTarget != null) {
+        Dialog(onDismissRequest = { showSubAdminPerms = false }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("⭐ Sub-Admin Rights", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(subAdminTarget!!.channelName, color = Color(0xFF29B6F6), fontSize = 13.sp)
+                    Spacer(Modifier.height(16.dp))
+
+                    // Permission toggles
+                    listOf(
+                        Triple("Delete Messages", permDeleteMsg, { v: Boolean -> permDeleteMsg = v }),
+                        Triple("Ban Members", permBanMembers, { v: Boolean -> permBanMembers = v }),
+                        Triple("Invite Members", permInviteMembers, { v: Boolean -> permInviteMembers = v }),
+                        Triple("Pin Messages", permPinMessages, { v: Boolean -> permPinMessages = v }),
+                        Triple("Change Group Info", permChangeInfo, { v: Boolean -> permChangeInfo = v })
+                    ).forEach { (label, value, onChange) ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(label, color = TextPrimary, fontSize = 14.sp)
+                            Switch(
+                                checked = value,
+                                onCheckedChange = onChange,
+                                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AccentRed, uncheckedTrackColor = Color(0xFF333333))
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showSubAdminPerms = false }) { Text("Cancel", color = TextSec) }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                viewModel.manageSubAdmin(
+                                    roomId, subAdminTarget!!._id, "add",
+                                    mapOf(
+                                        "canDeleteMessages" to permDeleteMsg,
+                                        "canBanMembers" to permBanMembers,
+                                        "canInviteMembers" to permInviteMembers,
+                                        "canPinMessages" to permPinMessages,
+                                        "canChangeGroupInfo" to permChangeInfo
+                                    )
+                                )
+                                showSubAdminPerms = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                        ) { Text("Save", color = Color.White) }
                     }
                 }
             }
