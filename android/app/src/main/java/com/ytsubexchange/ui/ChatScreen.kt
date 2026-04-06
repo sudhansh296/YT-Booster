@@ -472,7 +472,7 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
                 items(communityMessages) { msg -> MessageBubble(msg = msg, myId = viewModel.myId, onLongClick = {}) }
             }
         }
-        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding(),
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
                 if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
