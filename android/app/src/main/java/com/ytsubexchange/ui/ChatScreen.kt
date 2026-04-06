@@ -142,7 +142,7 @@ fun ChatListScreen(
     var showChatMenu by remember { mutableStateOf(false) }
     var chatMenuScreen by remember { mutableStateOf("") } // "sent" | "received" | "blocked"
 
-    Column(Modifier.fillMaxSize().background(BgDark)) {
+    Column(Modifier.fillMaxSize().background(BgDark).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
         Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable {
@@ -234,11 +234,10 @@ fun ChatListScreen(
             }
         }
         Divider(color = Divider2, thickness = 0.5.dp)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (selectedTab) {
-                2 -> CommunityChatScreen(viewModel = viewModel)
-                3 -> AiCompanionChatTab(viewModel = viewModel)
-                else -> {
+        when (selectedTab) {
+            2 -> CommunityChatScreen(viewModel = viewModel)
+            3 -> AiCompanionChatTab(viewModel = viewModel)
+            else -> {
                 if (isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AccentRed) }
                 } else {
@@ -2194,7 +2193,7 @@ fun AiCompanionChatTab(viewModel: ChatViewModel) {
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).navigationBarsPadding(),
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
                 if (inputText.isEmpty()) Text("AI se pucho...", color = TextSec, fontSize = 14.sp)
