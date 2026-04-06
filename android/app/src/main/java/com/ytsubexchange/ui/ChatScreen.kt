@@ -142,7 +142,7 @@ fun ChatListScreen(
     var showChatMenu by remember { mutableStateOf(false) }
     var chatMenuScreen by remember { mutableStateOf("") } // "sent" | "received" | "blocked"
 
-    Column(Modifier.fillMaxSize().background(BgDark).navigationBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(BgDark)) {
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
         Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).clickable {
@@ -443,7 +443,7 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
     LaunchedEffect(Unit) { viewModel.joinCommunity() }
     LaunchedEffect(communityMessages.size) { if (communityMessages.isNotEmpty()) listState.animateScrollToItem(communityMessages.size - 1) }
 
-    Column(Modifier.fillMaxSize().background(BgDark)) {
+    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
         Row(Modifier.fillMaxWidth().background(CardDark).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Star, null, tint = AccentRed, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
@@ -472,7 +472,7 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
                 items(communityMessages) { msg -> MessageBubble(msg = msg, myId = viewModel.myId, onLongClick = {}) }
             }
         }
-        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp).imePadding(),
+        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
                 if (inputText.isEmpty()) Text("Message...", color = TextSec, fontSize = 14.sp)
