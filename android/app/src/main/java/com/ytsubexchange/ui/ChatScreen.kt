@@ -2136,81 +2136,37 @@ fun CreateGroupDialog(users: List<ChatUser>, onSearch: (String) -> Unit, onCreat
 
 @Composable
 fun AiCompanionChatTab(viewModel: ChatViewModel) {
-    val aiMessages by viewModel.aiMessages.collectAsState()
-    var inputText by remember { mutableStateOf("") }
-    val isLoading by viewModel.aiLoading.collectAsState()
-    val listState = rememberLazyListState()
-    LaunchedEffect(aiMessages.size) { if (aiMessages.isNotEmpty()) listState.animateScrollToItem(aiMessages.size - 1) }
-
-    Column(Modifier.fillMaxSize().background(BgDark).navigationBarsPadding()) {
-        Row(Modifier.fillMaxWidth().background(CardDark).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("🤖", fontSize = 20.sp)
-            Spacer(Modifier.width(8.dp))
-            Column {
-                Text("AI Companion", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text("YT-Booster Assistant", color = Color(0xFF4CAF50), fontSize = 11.sp)
+    Box(
+        Modifier.fillMaxSize().background(BgDark).navigationBarsPadding(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text("🤖", fontSize = 64.sp)
+            Text(
+                "AI Companion",
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp
+            )
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A))))
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Text("Coming Soon", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
-        }
-        Divider(color = Divider2, thickness = 0.5.dp)
-        if (aiMessages.isEmpty()) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🤖", fontSize = 48.sp)
-                    Text("AI Companion", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("Koi bhi sawaal pucho!", color = TextSec, fontSize = 14.sp)
-                }
-            }
-        } else {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
-                items(aiMessages) { msg ->
-                    val isUser = msg.role == "user"
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start) {
-                        if (!isUser) {
-                            Box(Modifier.size(32.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))),
-                                contentAlignment = Alignment.Center) { Text("🤖", fontSize = 16.sp) }
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        Box(Modifier.widthIn(max = 260.dp)
-                            .clip(RoundedCornerShape(18.dp, 18.dp, if (isUser) 4.dp else 18.dp, if (isUser) 18.dp else 4.dp))
-                            .background(if (isUser) Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B))) else Brush.linearGradient(listOf(CardDark, CardAlt)))
-                            .padding(12.dp, 8.dp)) {
-                            Text(msg.text, color = Color.White, fontSize = 14.sp)
-                        }
-                    }
-                }
-                if (isLoading) {
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                            Box(Modifier.size(32.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))),
-                                contentAlignment = Alignment.Center) { Text("🤖", fontSize = 16.sp) }
-                            Spacer(Modifier.width(8.dp))
-                            Box(Modifier.clip(RoundedCornerShape(18.dp)).background(CardDark).padding(16.dp, 12.dp)) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = AccentRed, strokeWidth = 2.dp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth().background(CardDark).padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(SearchBg).padding(14.dp, 10.dp)) {
-                if (inputText.isEmpty()) Text("AI se pucho...", color = TextSec, fontSize = 14.sp)
-                BasicTextField(value = inputText, onValueChange = { inputText = it },
-                    textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = {
-                        if (inputText.isNotBlank() && !isLoading) { viewModel.sendAiMessage(inputText.trim()); inputText = "" }
-                    }),
-                    maxLines = 4, modifier = Modifier.fillMaxWidth())
-            }
-            Box(Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))),
-                contentAlignment = Alignment.Center) {
-                IconButton(onClick = { if (inputText.isNotBlank() && !isLoading) { viewModel.sendAiMessage(inputText.trim()); inputText = "" } }) {
-                    Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                }
-            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Hamara AI assistant jald aa raha hai.\nYT-Booster ke saath connected rahein!",
+                color = TextSec,
+                fontSize = 14.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }
