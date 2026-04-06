@@ -852,6 +852,50 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun updateGroupName(roomId: String, name: String) {
+        viewModelScope.launch {
+            try {
+                val roomIdBody = roomId.toRequestBody("text/plain".toMediaTypeOrNull())
+                val nameBody = name.toRequestBody("text/plain".toMediaTypeOrNull())
+                RetrofitClient.api.updateGroupSettings(token, roomIdBody, nameBody)
+                _toastMsg.value = "Group name update ho gaya ✅"
+                loadGroupInfo(roomId)
+                loadRooms()
+            } catch (e: Exception) { _toastMsg.value = "Name update nahi hua" }
+        }
+    }
+
+    fun updateGroupPic(roomId: String, uri: android.net.Uri, ctx: android.content.Context) {
+        viewModelScope.launch {
+            try {
+                val bytes = ctx.contentResolver.openInputStream(uri)?.readBytes() ?: return@launch
+                val reqBody = bytes.toRequestBody("image/*".toMediaTypeOrNull())
+                val part = okhttp3.MultipartBody.Part.createFormData("pic", "group_pic.jpg", reqBody)
+                val roomIdBody = roomId.toRequestBody("text/plain".toMediaTypeOrNull())
+                RetrofitClient.api.updateGroupSettings(token, roomIdBody, pic = part)
+                _toastMsg.value = "Group photo update ho gaya ✅"
+                loadGroupInfo(roomId)
+                loadRooms()
+            } catch (e: Exception) { _toastMsg.value = "Photo update nahi hua" }
+        }
+    }
+
+    // Wallpaper — local SharedPreferences mein save karo (per room)
+    private val _chatWallpapers = MutableStateFlow<Map<String, String>>(emptyMap())
+    val chatWallpapers: StateFlow<Map<String, String>> = _chatWallpapers
+
+    fun setChatWallpaper(roomId: String, wallpaper: String) {
+        prefs.edit().putString("wallpaper_$roomId", wallpaper).apply()
+        _chatWallpapers.value = _chatWallpapers.value + (roomId to wallpaper)
+        _toastMsg.value = "Wallpaper set ho gaya ✅"
+    }
+
+    fun getChatWallpaper(roomId: String): String {
+        return prefs.getString("wallpaper_$roomId", "default") ?: "default"
+    }
+
+
+
     fun leaveGroup(onDone: () -> Unit) {
         val roomId = _openRoom.value?._id ?: return
         viewModelScope.launch {

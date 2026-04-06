@@ -1116,9 +1116,16 @@ fun ChatWindowScreen(
         }
     }
 
-    // Group info panel
+    // Group profile — full screen (Telegram style)
     if (showGroupInfo && groupInfo != null) {
-        GroupInfoPanel(groupInfo = groupInfo!!, viewModel = viewModel, roomId = room._id, myId = myId)
+        GroupProfileScreen(
+            groupInfo = groupInfo!!,
+            viewModel = viewModel,
+            roomId = room._id,
+            myId = myId,
+            onBack = { viewModel.hideGroupInfo() }
+        )
+        return
     }
 
     // Delete Chats (Disappearing Messages) Dialog — Snapchat style
