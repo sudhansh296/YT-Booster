@@ -569,7 +569,29 @@ fun ChatWindowScreen(
     val displayMessages = if (showSearchBar && searchQuery.isNotBlank())
         messages.filter { it.text.contains(searchQuery, ignoreCase = true) } else messages
 
-    Column(Modifier.fillMaxSize().background(BgDark).imePadding()) {
+    // Wallpaper background
+    val chatWallpapers by viewModel.chatWallpapers.collectAsState()
+    val wallpaperName = chatWallpapers[room._id] ?: viewModel.getChatWallpaper(room._id)
+    val wallpaperBrush: Brush = when (wallpaperName) {
+        "midnight_blue" -> Brush.linearGradient(listOf(Color(0xFF0A0A2E), Color(0xFF1A1A4E), Color(0xFF0D0D1A)))
+        "deep_purple"   -> Brush.linearGradient(listOf(Color(0xFF1A0A2E), Color(0xFF3D1A6E), Color(0xFF1A0A2E)))
+        "ocean"         -> Brush.linearGradient(listOf(Color(0xFF001A2E), Color(0xFF003D5C), Color(0xFF001A2E)))
+        "forest"        -> Brush.linearGradient(listOf(Color(0xFF0A1A0A), Color(0xFF1A3A1A), Color(0xFF0A1A0A)))
+        "sunset"        -> Brush.linearGradient(listOf(Color(0xFF2E0A0A), Color(0xFF5C1A00), Color(0xFF2E0A0A)))
+        "rose_gold"     -> Brush.linearGradient(listOf(Color(0xFF2E1A1A), Color(0xFF5C2A2A), Color(0xFF2E1A1A)))
+        "galaxy"        -> Brush.linearGradient(listOf(Color(0xFF0A0A1A), Color(0xFF1A0A3E), Color(0xFF2E0A2E)))
+        "aurora"        -> Brush.linearGradient(listOf(Color(0xFF001A1A), Color(0xFF003D2E), Color(0xFF001A3D)))
+        "lava"          -> Brush.linearGradient(listOf(Color(0xFF1A0000), Color(0xFF3D0A00), Color(0xFF1A0000)))
+        "teal_dark"     -> Brush.linearGradient(listOf(Color(0xFF001A1A), Color(0xFF004D4D), Color(0xFF001A1A)))
+        "indigo_night"  -> Brush.linearGradient(listOf(Color(0xFF0A0A2E), Color(0xFF1A1A5E), Color(0xFF0A0A2E)))
+        "emerald"       -> Brush.linearGradient(listOf(Color(0xFF001A0A), Color(0xFF004D1A), Color(0xFF001A0A)))
+        "crimson"       -> Brush.linearGradient(listOf(Color(0xFF1A0000), Color(0xFF4D0000), Color(0xFF1A0000)))
+        "cosmic"        -> Brush.linearGradient(listOf(Color(0xFF0A001A), Color(0xFF1A003D), Color(0xFF2E001A)))
+        "slate"         -> Brush.linearGradient(listOf(Color(0xFF0A0F14), Color(0xFF1A2A3A), Color(0xFF0A0F14)))
+        else            -> Brush.linearGradient(listOf(BgDark, BgDark))
+    }
+
+    Column(Modifier.fillMaxSize().background(wallpaperBrush).imePadding()) {
         // Top accent bar
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
 
