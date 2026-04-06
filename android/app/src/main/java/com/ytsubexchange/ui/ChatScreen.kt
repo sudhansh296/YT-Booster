@@ -765,7 +765,19 @@ fun ChatWindowScreen(
             Column {
                 // Emoji panel — hide during recording
                 if (showEmojiPanel && !isVoiceRecording) {
-                    EmojiPickerPanel(onEmojiSelected = { emoji -> inputText += emoji })
+                    EmojiPickerPanel(
+                        onEmojiSelected = { emoji -> inputText += emoji },
+                        onBackspace = {
+                            if (inputText.isNotEmpty()) {
+                                val breakIter = java.text.BreakIterator.getCharacterInstance()
+                                breakIter.setText(inputText)
+                                val end = breakIter.last()
+                                val start = breakIter.previous()
+                                if (start != java.text.BreakIterator.DONE) inputText = inputText.substring(0, start)
+                            }
+                        },
+                        onDismiss = { showEmojiPanel = false }
+                    )
                 }
                 // Attachment popup — floats above 📎 button in one column
                 if (showAttachMenu && !isVoiceRecording) {
@@ -2208,7 +2220,12 @@ fun AttachOption(emoji: String, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun EmojiPickerPanel(onEmojiSelected: (String) -> Unit) {
+fun EmojiPickerPanel(
+    onEmojiSelected: (String) -> Unit,
+    onBackspace: () -> Unit = {},
+    onDismiss: () -> Unit = {}
+) {
+    val categoryEmojis = listOf("😊","👋","❤️","🎉","🔥","🍕","🐶")
     val categories = listOf(
         "😊 Smileys" to listOf("😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙","🥲","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","🤐","🤨","😐","😑","😶","😏","😒","🙄","😬","🤥","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢","🤮","🤧","🥵","🥶","🥴","😵","🤯","🤠","🥳","🥸","😎","🤓","🧐","😕","😟","🙁","☹️","😮","😯","😲","😳","🥺","😦","😧","😨","😰","😥","😢","😭","😱","😖","😣","😞","😓","😩","😫","🥱","😤","😡","😠","🤬","😈","👿","💀","☠️","💩","🤡","👹","👺","👻","👽","👾","🤖"),
         "👋 Gestures" to listOf("👋","🤚","🖐","✋","🖖","👌","🤌","🤏","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","🖕","👇","☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦾","🦿","🦵","🦶","👂","🦻","👃","🫀","🫁","🧠","🦷","🦴","👀","👁","👅","👄","💋","🩸"),
@@ -2220,46 +2237,54 @@ fun EmojiPickerPanel(onEmojiSelected: (String) -> Unit) {
     )
     var selectedCat by remember { mutableStateOf(0) }
 
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .height(260.dp)
-            .background(CardDark)
-    ) {
-        // Category tabs - scrollable row
+    Column(Modifier.fillMaxWidth().height(280.dp).background(CardDark)) {
         Row(
-            Modifier.fillMaxWidth().background(CardAlt).padding(4.dp).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            Modifier.fillMaxWidth().background(CardAlt).padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            categories.forEachIndexed { i, (label, _) ->
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selectedCat == i) AccentRed else Color.Transparent)
-                        .clickable { selectedCat = i }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(label.take(2), fontSize = 18.sp)
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                categoryEmojis.forEachIndexed { i, emoji ->
+                    Box(
+                        Modifier.clip(RoundedCornerShape(8.dp))
+                            .background(if (selectedCat == i) AccentRed else Color.Transparent)
+                            .clickable { selectedCat = i }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) { Text(text = emoji, fontSize = 18.sp) }
                 }
             }
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF2A1A1A)).clickable { onBackspace() },
+                contentAlignment = Alignment.Center
+            ) { Text(text = "⌫", fontSize = 18.sp, color = Color(0xFFFF6B6B)) }
+            Spacer(Modifier.width(4.dp))
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1A1A2E)).clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) { Text(text = "✕", fontSize = 16.sp, color = TextSec) }
         }
-        // Emoji grid
-        val emojis = categories[selectedCat].second
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(8),
-            modifier = Modifier.fillMaxSize().padding(4.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        val emojis: List<String> = categories[selectedCat].second
+        Box(
+            Modifier.fillMaxSize().pointerInput(selectedCat) {
+                detectHorizontalDragGestures { _, dragAmount ->
+                    if (dragAmount < -40f && selectedCat < categories.size - 1) selectedCat++
+                    else if (dragAmount > 40f && selectedCat > 0) selectedCat--
+                }
+            }
         ) {
-            gridItems(emojis) { emoji ->
-                Box(
-                    Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onEmojiSelected(emoji) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = emoji, fontSize = 22.sp)
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(8),
+                modifier = Modifier.fillMaxSize().padding(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                items(emojis.size) { idx ->
+                    Box(
+                        Modifier.size(38.dp).clip(RoundedCornerShape(6.dp))
+                            .clickable { onEmojiSelected(emojis[idx]) },
+                        contentAlignment = Alignment.Center
+                    ) { Text(text = emojis[idx], fontSize = 22.sp) }
                 }
             }
         }
