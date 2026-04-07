@@ -335,7 +335,9 @@ io.on('connection', (socket) => {
         })
       );
 
-      // Always add owner channel (2 coins) - sirf tab dikhao jab 24h mein claim nahi kiya
+      // ── Build exactly 3 cards: 1) Owner, 2) P2P queue match, 3) Random online user ──
+
+      // Card 1: Owner (Coder Lobby) — sirf tab agar 24h mein claim nahi kiya
       const ownerAlreadyClaimed = await Transaction.findOne({
         userId: user._id,
         type: 'earn_owner',
@@ -348,15 +350,60 @@ io.on('connection', (socket) => {
         channelUrl: OWNER_CHANNEL.channelUrl,
         profilePic: OWNER_CHANNEL.profilePic,
         matchId: 'owner_promoted',
-        coinsReward: 5
+        coinsReward: 5,
+        cardType: 'owner'
       };
 
-      // Shuffle + mix owner channel randomly in list
-      const allEntries = [...(ownerEntry ? [ownerEntry] : []), ...channelList.filter(Boolean)];
-      for (let i = allEntries.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allEntries[i], allEntries[j]] = [allEntries[j], allEntries[i]];
+      // Card 2: P2P — queue mein jo search kar raha hai (already subscribed exclude)
+      const p2pEntry = channelList.filter(Boolean).find(c => c) || null;
+      if (p2pEntry) p2pEntry.cardType = 'p2p';
+
+      // Card 3: Random online user (app pe online, queue mein nahi)
+      let onlineEntry = null;
+      try {
+        // Get all online user rooms
+        const onlineRooms = [...io.sockets.adapter.rooms.keys()]
+          .filter(r => r.startsWith('user_'))
+          .map(r => r.replace('user_', ''));
+
+        // Exclude current user, already subscribed, and queue members
+        const queueUserIds = new Set(getQueue().map(q => q.userId));
+        const candidateIds = onlineRooms.filter(uid =>
+          uid !== user._id.toString() &&
+          !subscribedIds.has(uid) &&
+          !queueUserIds.has(uid)
+        );
+
+        if (candidateIds.length > 0) {
+          const randomId = candidateIds[Math.floor(Math.random() * candidateIds.length)];
+          const onlineUser = await User.findById(randomId, 'channelName channelUrl profilePic youtubeId');
+          if (onlineUser) {
+            onlineEntry = {
+              channelId: onlineUser.youtubeId,
+              channelName: onlineUser.channelName,
+              channelUrl: onlineUser.channelUrl,
+              profilePic: onlineUser.profilePic,
+              matchId: randomId,
+              coinsReward: 1,
+              cardType: 'online'
+            };
+          }
+        }
+      } catch (e) { /* silent */ }
+
+      // Combine — always show 3 (fill with more P2P if needed)
+      const finalList = [];
+      if (ownerEntry) finalList.push(ownerEntry);
+      if (p2pEntry) finalList.push(p2pEntry);
+      if (onlineEntry) finalList.push(onlineEntry);
+
+      // Fill remaining slots with more P2P if less than 3
+      if (finalList.length < 3) {
+        const extra = channelList.filter(Boolean).filter(c => c !== p2pEntry).slice(0, 3 - finalList.length);
+        finalList.push(...extra);
       }
+
+      const allEntries = finalList.slice(0, 3);
 
       socket.emit('queue_list', { channels: allEntries, queueSize: getQueueSize() });
 

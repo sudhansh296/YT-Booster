@@ -17,7 +17,8 @@ data class MatchData(
     val channelUrl: String,
     val profilePic: String,
     val matchId: String,
-    val coinsReward: Int = 1
+    val coinsReward: Int = 1,
+    val cardType: String = "" // "owner", "p2p", "online"
 )
 
 data class BuySubsRequest(val coins: Int)

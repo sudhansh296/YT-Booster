@@ -432,6 +432,16 @@ fun QueueChannelCard(channel: MatchData, viewModel: MainViewModel, dark: Boolean
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AsyncImage(model = channel.profilePic, contentDescription = null, modifier = Modifier.size(48.dp).clip(CircleShape))
             Column(modifier = Modifier.weight(1f)) {
+                // Card type badge
+                val (badgeText, badgeColor) = when (channel.cardType) {
+                    "owner" -> "⭐ Featured" to Color(0xFFFFD700)
+                    "p2p" -> "🔄 P2P Match" to Color(0xFF29B6F6)
+                    "online" -> "🟢 Online Now" to Color(0xFF4CAF50)
+                    else -> "" to Color.Transparent
+                }
+                if (badgeText.isNotEmpty()) {
+                    Text(badgeText, color = badgeColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
                 Text(channel.channelName, color = if (isDone) Color(0xFF4CAF50) else AppColors.text(dark), fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
                 Text("+${channel.coinsReward} coin${if (channel.coinsReward > 1) "s" else ""}", color = Color(0xFFFFD700), fontSize = 12.sp)
             }
