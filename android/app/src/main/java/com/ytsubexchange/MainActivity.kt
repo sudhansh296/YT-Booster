@@ -826,28 +826,30 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun FloatingChatbotButton() {
     var showChat by remember { mutableStateOf(false) }
-    var messages by remember { mutableStateOf(listOf("Namaste! Main YT-Booster ka assistant hoon. Kaise help kar sakta hoon? 🤖")) }
-    var input by remember { mutableStateOf("") }
 
-    // Drag position state
+    data class ChatMsg(val text: String, val isUser: Boolean)
+    var messages by remember { mutableStateOf(listOf(ChatMsg("Namaste! Main YT Buddy hoon 🤖\nKoi bhi sawaal pucho — YouTube tips, coins, ya kuch bhi!", false))) }
+    var input by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Drag position
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }
     var initialized by remember { mutableStateOf(false) }
     var parentWidth by remember { mutableStateOf(0) }
     var parentHeight by remember { mutableStateOf(0) }
-    val btnSizePx = with(LocalDensity.current) { 52.dp.toPx() }
-    val bottomNavPx = with(LocalDensity.current) { 80.dp.toPx() }
+    val btnSizePx = with(LocalDensity.current) { 58.dp.toPx() }
+    val bottomNavPx = with(LocalDensity.current) { 90.dp.toPx() }
     val marginPx = with(LocalDensity.current) { 16.dp.toPx() }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .navigationBarsPadding()
+        modifier = Modifier.fillMaxSize().navigationBarsPadding()
             .onGloballyPositioned { coords ->
                 if (!initialized) {
                     parentWidth = coords.size.width
                     parentHeight = coords.size.height
-                    // Default: bottom-right corner
                     offsetX = parentWidth - btnSizePx - marginPx
                     offsetY = parentHeight - btnSizePx - bottomNavPx - marginPx
                     initialized = true
@@ -855,141 +857,184 @@ fun FloatingChatbotButton() {
             }
     ) {
         if (initialized) {
+            // Floating button — gradient + pulse ring
             Box(
                 modifier = Modifier
                     .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                    .size(52.dp)
+                    .size(58.dp)
+                    .shadow(12.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Color(0xFFE53935), Color(0xFFFF6B6B))))
-                    .shadow(8.dp, CircleShape)
+                    .background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935))))
                     .pointerInput(Unit) {
                         detectDragGestures { change, dragAmount ->
                             change.consume()
-                            val newX = (offsetX + dragAmount.x).coerceIn(0f, parentWidth - btnSizePx)
-                            val newY = (offsetY + dragAmount.y).coerceIn(0f, parentHeight - btnSizePx)
-                            offsetX = newX
-                            offsetY = newY
+                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, parentWidth - btnSizePx)
+                            offsetY = (offsetY + dragAmount.y).coerceIn(0f, parentHeight - btnSizePx)
                         }
                     }
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { showChat = !showChat },
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                        showChat = !showChat
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Text("🤖", fontSize = 22.sp)
+                Text("🤖", fontSize = 26.sp)
             }
         }
     }
 
     if (showChat) {
         androidx.compose.ui.window.Dialog(onDismissRequest = { showChat = false }) {
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF1A1A2E))
+            Box(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp, max = 560.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF0D0D1A))
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize()) {
                     // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .background(Brush.horizontalGradient(listOf(Color(0xFFE53935), Color(0xFFFF6B6B))))
-                            .padding(16.dp, 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935))))
+                            .padding(16.dp, 14.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("🤖", fontSize = 20.sp)
-                            Column {
-                                Text("YT Assistant", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("Online", color = Color.White.copy(0.8f), fontSize = 11.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier.size(40.dp).clip(CircleShape)
+                                    .background(Color.White.copy(0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) { Text("🤖", fontSize = 20.sp) }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("YT Buddy", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("AI Assistant • Online", color = Color.White.copy(0.75f), fontSize = 11.sp)
                             }
-                        }
-                        IconButton(onClick = { showChat = false }, modifier = Modifier.size(24.dp)) {
-                            Text("✕", color = Color.White, fontSize = 16.sp)
+                            Box(
+                                Modifier.size(28.dp).clip(CircleShape)
+                                    .background(Color.White.copy(0.15f))
+                                    .clickable { showChat = false },
+                                contentAlignment = Alignment.Center
+                            ) { Text("✕", color = Color.White, fontSize = 13.sp) }
                         }
                     }
 
                     // Messages
                     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-                    LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1) }
-
+                    LaunchedEffect(messages.size) {
+                        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+                    }
                     androidx.compose.foundation.lazy.LazyColumn(
                         state = listState,
                         modifier = Modifier.weight(1f).padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(messages.size) { i ->
-                            val isMine = i % 2 == 1
+                            val msg = messages[i]
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start,
+                                verticalAlignment = Alignment.Bottom
                             ) {
+                                if (!msg.isUser) {
+                                    Box(
+                                        Modifier.size(28.dp).clip(CircleShape)
+                                            .background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935)))),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text("🤖", fontSize = 14.sp) }
+                                    Spacer(Modifier.width(6.dp))
+                                }
                                 Box(
-                                    modifier = Modifier
-                                        .widthIn(max = 240.dp)
-                                        .clip(RoundedCornerShape(12.dp))
+                                    Modifier.widthIn(max = 240.dp)
+                                        .clip(RoundedCornerShape(
+                                            topStart = 16.dp, topEnd = 16.dp,
+                                            bottomStart = if (msg.isUser) 16.dp else 4.dp,
+                                            bottomEnd = if (msg.isUser) 4.dp else 16.dp
+                                        ))
                                         .background(
-                                            if (isMine) Brush.linearGradient(listOf(Color(0xFFE53935), Color(0xFFFF6B6B)))
-                                            else Brush.linearGradient(listOf(Color(0xFF16213E), Color(0xFF0F3460)))
+                                            if (msg.isUser)
+                                                Brush.linearGradient(listOf(Color(0xFFE53935), Color(0xFFFF6B6B)))
+                                            else
+                                                Brush.linearGradient(listOf(Color(0xFF1A1A3E), Color(0xFF16213E)))
                                         )
-                                        .padding(10.dp, 8.dp)
+                                        .padding(12.dp, 8.dp)
                                 ) {
-                                    Text(messages[i], color = Color.White, fontSize = 13.sp)
+                                    Text(msg.text, color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
+                                }
+                            }
+                        }
+                        if (isLoading) {
+                            item {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier.size(28.dp).clip(CircleShape)
+                                            .background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935)))),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text("🤖", fontSize = 14.sp) }
+                                    Spacer(Modifier.width(6.dp))
+                                    Box(
+                                        Modifier.clip(RoundedCornerShape(16.dp))
+                                            .background(Color(0xFF1A1A3E))
+                                            .padding(14.dp, 10.dp)
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color(0xFF7B2FF7), strokeWidth = 2.dp)
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // Input
+                    // Input row
                     Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .background(Color(0xFF0D0D0D))
-                            .padding(8.dp),
+                        Modifier.fillMaxWidth().background(Color(0xFF0A0A14)).padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
-                            modifier = Modifier.weight(1f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0xFF1A1A2E))
-                                .padding(14.dp, 10.dp)
+                            Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
+                                .background(Color(0xFF1A1A2E)).padding(14.dp, 10.dp)
                         ) {
-                            if (input.isEmpty()) Text("Message...", color = Color(0xFF9E9E9E), fontSize = 13.sp)
+                            if (input.isEmpty()) Text("Kuch bhi pucho...", color = Color(0xFF666666), fontSize = 13.sp)
                             androidx.compose.foundation.text.BasicTextField(
-                                value = input,
-                                onValueChange = { input = it },
+                                value = input, onValueChange = { input = it },
                                 textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp),
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
+                                maxLines = 3, modifier = Modifier.fillMaxWidth()
                             )
                         }
                         Box(
-                            modifier = Modifier.size(38.dp).clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(Color(0xFFE53935), Color(0xFFFF6B6B)))),
+                            Modifier.size(42.dp).clip(CircleShape)
+                                .background(
+                                    if (input.isNotBlank() && !isLoading)
+                                        Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935)))
+                                    else
+                                        Brush.linearGradient(listOf(Color(0xFF333333), Color(0xFF333333)))
+                                )
+                                .clickable {
+                                    if (input.isNotBlank() && !isLoading) {
+                                        val userText = input.trim()
+                                        input = ""
+                                        messages = messages + ChatMsg(userText, true)
+                                        isLoading = true
+                                        scope.launch {
+                                            try {
+                                                val prefs = context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE)
+                                                val token = "Bearer ${prefs.getString("token", "")}"
+                                                // Build history for context
+                                                val history = messages.dropLast(1).takeLast(10).map {
+                                                    mapOf("role" to if (it.isUser) "user" else "ai", "text" to it.text)
+                                                }
+                                                val resp = com.ytsubexchange.network.RetrofitClient.api.aiChat(
+                                                    token, mapOf("message" to userText, "history" to history)
+                                                )
+                                                messages = messages + ChatMsg(resp.reply, false)
+                                            } catch (e: Exception) {
+                                                messages = messages + ChatMsg("Oops! Kuch problem aayi. Dobara try karo 😅", false)
+                                            } finally {
+                                                isLoading = false
+                                            }
+                                        }
+                                    }
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            IconButton(onClick = {
-                                if (input.isNotBlank()) {
-                                    val userMsg = input.trim()
-                                    input = ""
-                                    messages = messages + userMsg
-                                    // Simple auto-reply
-                                    val reply = when {
-                                        userMsg.contains("coin", true) -> "Coins earn karne ke liye Exchange tab mein jao aur doosron ko subscribe karo! Har subscribe pe coins milte hain. 💰"
-                                        userMsg.contains("subscriber", true) -> "Subscribers kharidne ke liye Home screen pe 'Buy Subscribers' button use karo. Coins se subscribers milte hain! 📈"
-                                        userMsg.contains("referral", true) || userMsg.contains("refer", true) -> "Refer tab mein jao, apna referral code share karo. Dost join kare to 20 coins milenge! 🎁"
-                                        userMsg.contains("streak", true) -> "Roz app open karo aur daily bonus claim karo. Streak se extra coins milte hain! 🔥"
-                                        userMsg.contains("help", true) || userMsg.contains("kaise", true) -> "Main aapki help ke liye hoon! Coins, subscribers, referral ya kisi bhi cheez ke baare mein pucho. 😊"
-                                        else -> "Samajh gaya! Koi aur sawaal ho to zaroor pucho. Main hamesha yahan hoon. 🤖"
-                                    }
-                                    messages = messages + reply
-                                }
-                            }) {
-                                Text("➤", color = Color.White, fontSize = 16.sp)
-                            }
+                            Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -997,6 +1042,8 @@ fun FloatingChatbotButton() {
         }
     }
 }
+
+
 
 @Composable
 fun BottomNavBar(
