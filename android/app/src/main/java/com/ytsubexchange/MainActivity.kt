@@ -825,6 +825,42 @@ class MainActivity : ComponentActivity() {
 
 private data class BotMsg(val text: String, val isUser: Boolean)
 
+private fun ytBuddyReply(msg: String): String {
+    val m = msg.lowercase().trim()
+    return when {
+        m.matches(Regex("(hi|hello|hey|namaste|hii|helo|hlo|sup|yo|kya haal|kaise ho|gm|good morning|good evening).*")) ->
+            listOf(
+                "Namaste! 😊 Kaise ho? Main YT Buddy hoon — kuch bhi pucho!",
+                "Hey! 👋 Kya haal hai? Coins, subscribers, ya kuch aur?",
+                "Hello! 🤖 Kya help chahiye aaj?"
+            ).random()
+        m.contains("coin") || m.contains("paise") || m.contains("earn") || m.contains("kamao") ->
+            "Coins earn karne ke 3 tarike:\n1️⃣ Exchange tab mein subscribe karo\n2️⃣ Roz daily bonus claim karo\n3️⃣ Friends refer karo — 20 coins each! 💰"
+        m.contains("subscriber") || m.contains("subscribe") || m.contains("sub ") ->
+            "Subscribers kharidne ke liye:\n📱 Home screen → 'Buy Subscribers'\n💰 Coins se subscribers milenge!\n\nPehle coins earn karo, phir subscribers lo. 📈"
+        m.contains("refer") || m.contains("referral") || m.contains("code") || m.contains("invite") ->
+            "Referral system:\n🎁 Refer tab mein apna code milega\n💰 Dost join kare to 20 coins milenge\n📊 Stats bhi dekh sakte ho!"
+        m.contains("streak") || m.contains("daily") || m.contains("bonus") || m.contains("roz") ->
+            "Daily streak ke liye roz app open karo aur bonus claim karo! 🔥\nLonger streak = more bonus coins. Miss mat karna!"
+        m.contains("youtube") || m.contains("yt ") || m.contains("video") || m.contains("channel") || m.contains("thumbnail") ->
+            "YouTube tips:\n📌 Consistent upload schedule rakho\n🎯 Catchy thumbnail + title banao\n💬 Comments ka reply karo\n📊 Analytics dekho aur improve karo 🎬"
+        m.contains("help") || m.contains("kya kar") || m.contains("kaise") || m.contains("batao") ->
+            "Main in topics pe help kar sakta hoon:\n💰 Coins earn karna\n📈 Subscribers lena\n🎁 Referral system\n🔥 Daily streak\n🎬 YouTube tips\n\nKya jaanna chahte ho?"
+        m.contains("thank") || m.contains("shukriya") || m.contains("thx") || m.contains("ty") ->
+            listOf("Koi baat nahi! 😊", "Welcome! 🙌", "Khushi hui help karke! 🤖✨").random()
+        m.contains("app") || m.contains("feature") || m.contains("kya hai") ->
+            "YT Booster ek YouTube subscriber exchange platform hai!\n✅ Doosron ko subscribe karo → coins milenge\n✅ Coins se apne channel ke subscribers lo\n✅ Community chat, groups, aur bahut kuch! 🚀"
+        m.contains("problem") || m.contains("issue") || m.contains("error") || m.contains("nahi") ->
+            "Koi problem hai? 🤔 Thoda detail mein batao — main help karne ki koshish karunga!\n\nYa phir app restart karke try karo. 😊"
+        else ->
+            listOf(
+                "Interesting! 🤔 Coins, subscribers, referral ya YouTube tips ke baare mein kuch specific pucho!",
+                "Samajh gaya! App se related kuch bhi pucho — main bataunga. 😊",
+                "Acha sawaal! Main YT Booster ka assistant hoon. App ke baare mein kuch bhi pucho! 🤖"
+            ).random()
+    }
+}
+
 @Composable
 fun FloatingChatbotButton() {
     var showChat by remember { mutableStateOf(false) }
@@ -832,30 +868,15 @@ fun FloatingChatbotButton() {
     var messages by remember { mutableStateOf(listOf(BotMsg("Namaste! Main YT Buddy hoon 🤖\nKoi bhi sawaal pucho — YouTube tips, coins, ya kuch bhi!", false))) }
     var input by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val context = androidx.compose.ui.platform.LocalContext.current
     var pendingQuery by remember { mutableStateOf<String?>(null) }
 
-    // AI call — LaunchedEffect se karo taaki coroutine scope sahi rahe
     LaunchedEffect(pendingQuery) {
         val query = pendingQuery ?: return@LaunchedEffect
         pendingQuery = null
         isLoading = true
-        try {
-            val prefs = context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE)
-            val token = "Bearer ${prefs.getString("token", "")}"
-            val history = messages.dropLast(1).takeLast(10).map {
-                mapOf("role" to if (it.isUser) "user" else "ai", "text" to it.text)
-            }
-            val resp = com.ytsubexchange.network.RetrofitClient.api.aiChat(
-                token, mapOf("message" to query, "history" to history)
-            )
-            messages = messages + BotMsg(resp.reply, false)
-        } catch (e: Exception) {
-            messages = messages + BotMsg("Oops! Kuch problem aayi. Dobara try karo 😅", false)
-        } finally {
-            isLoading = false
-        }
+        kotlinx.coroutines.delay(350)
+        messages = messages + BotMsg(ytBuddyReply(query), false)
+        isLoading = false
     }
 
     // Drag position
