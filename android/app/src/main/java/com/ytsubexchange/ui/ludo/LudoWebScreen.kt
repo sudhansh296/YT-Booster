@@ -56,8 +56,13 @@ fun LudoWebScreen(
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.allowFileAccess = true
+                    settings.allowFileAccessFromFileURLs = true
+                    settings.allowUniversalAccessFromFileURLs = true
                     settings.builtInZoomControls = false
                     settings.displayZoomControls = false
+                    // Hardware acceleration for WebGL/Three.js
+                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     webViewClient = WebViewClient()
                     addJavascriptInterface(object {
                         @JavascriptInterface
