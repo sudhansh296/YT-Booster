@@ -614,7 +614,7 @@ fun ChatWindowScreen(
         "crimson"       -> Brush.linearGradient(listOf(Color(0xFF1A0000), Color(0xFF4D0000), Color(0xFF1A0000)))
         "cosmic"        -> Brush.linearGradient(listOf(Color(0xFF0A001A), Color(0xFF1A003D), Color(0xFF2E001A)))
         "slate"         -> Brush.linearGradient(listOf(Color(0xFF0A0F14), Color(0xFF1A2A3A), Color(0xFF0A0F14)))
-        else            -> Brush.linearGradient(listOf(BgDark, BgDark))
+        else            -> Brush.linearGradient(listOf(chatBg(), chatBg()))
     }
 
     Column(Modifier.fillMaxSize().background(wallpaperBrush).imePadding()) {
