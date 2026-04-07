@@ -836,15 +836,25 @@ router.post('/react', authMiddleware, async (req, res) => {
     if (!msg) return res.status(404).json({ error: 'Message not found' });
 
     const userId = req.user._id.toString();
-    const current = msg.reactions.get(emoji) || [];
-    if (current.includes(userId)) {
-      // Toggle off
-      const updated = current.filter(id => id !== userId);
-      if (updated.length === 0) msg.reactions.delete(emoji);
-      else msg.reactions.set(emoji, updated);
-    } else {
-      msg.reactions.set(emoji, [...current, userId]);
+
+    // Pehle user ka purana reaction dhundo aur hatao (ek user = ek reaction)
+    for (const [key, users] of msg.reactions.entries()) {
+      if (users.includes(userId)) {
+        const updated = users.filter(id => id !== userId);
+        if (updated.length === 0) msg.reactions.delete(key);
+        else msg.reactions.set(key, updated);
+        break;
+      }
     }
+
+    // Agar same emoji tha toh toggle off (already removed above), warna naya add karo
+    const currentForEmoji = msg.reactions.get(emoji) || [];
+    if (!currentForEmoji.includes(userId)) {
+      // Same emoji nahi tha, naya add karo
+      msg.reactions.set(emoji, [...currentForEmoji, userId]);
+    }
+    // Agar same emoji tha toh already remove ho gaya — toggle off
+
     await msg.save();
 
     const reactionsObj = {};
