@@ -191,6 +191,8 @@ class MainActivity : ComponentActivity() {
         checkForUpdate()
         // Register FCM token
         registerFcmToken()
+        // Network reconnect — net wapas aane pe auto-reload
+        setupNetworkCallback()
 
         setContent {
             val authPrefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
@@ -534,6 +536,36 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
+    }
+
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
+    private fun setupNetworkCallback() {
+        val cm = getSystemService(android.net.ConnectivityManager::class.java)
+        networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                // Net wapas aaya — data reload + socket reconnect
+                val savedToken = getSharedPreferences("prefs", Context.MODE_PRIVATE).getString("token", null) ?: return
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    viewModel.init(savedToken)
+                    chatViewModel.loadRooms()
+                    // Socket reconnect
+                    com.ytsubexchange.network.SocketManager.reconnect()
+                    android.util.Log.d("Network", "Net wapas aaya — auto reload + socket reconnect")
+                }, 500) // thoda wait karo net stable hone ke liye
+            }
+        }
+        val request = android.net.NetworkRequest.Builder()
+            .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        cm.registerNetworkCallback(request, networkCallback!!)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        networkCallback?.let {
+            getSystemService(android.net.ConnectivityManager::class.java).unregisterNetworkCallback(it)
+        }
     }
 
     // PiP - enter when home button pressed during call/voice chat
