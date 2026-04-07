@@ -696,10 +696,38 @@ class MainActivity : ComponentActivity() {
             if (host == "ref") {
                 val refToken = uri.pathSegments.firstOrNull() ?: uri.lastPathSegment
                 if (refToken != null) {
-                    // Store ref token - login ke baad use hoga
-                    getSharedPreferences("prefs", Context.MODE_PRIVATE).edit()
-                        .putString("pending_ref_token", refToken)
-                        .apply()
+                    val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                    val isLoggedIn = prefs.getString("token", null) != null
+                    if (isLoggedIn) {
+                        // Already logged in — resolve token to code and show popup
+                        Thread {
+                            try {
+                                val resp = okhttp3.OkHttpClient().newCall(
+                                    okhttp3.Request.Builder()
+                                        .url("https://api.picrypto.in/auth/ref-info/$refToken")
+                                        .build()
+                                ).execute()
+                                val body = resp.body?.string() ?: ""
+                                val code = org.json.JSONObject(body).optString("code", "")
+                                if (code.isNotEmpty()) {
+                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                        prefs.edit()
+                                            .putString("pending_ref", code)
+                                            .putString("pending_ref_coins", "20")
+                                            .putBoolean("pending_ref_earned", false)
+                                            .apply()
+                                        // Trigger recompose
+                                        tokenState?.value = prefs.getString("token", null)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("Referral", "ref-info error: ${e.message}")
+                            }
+                        }.start()
+                    } else {
+                        // Not logged in — store for after login
+                        prefs.edit().putString("pending_ref_token", refToken).apply()
+                    }
                 }
                 return
             }

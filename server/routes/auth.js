@@ -172,6 +172,12 @@ router.get('/youtube/callback', async (req, res) => {
       user.referralCode = newCode;
     }
 
+    // Generate refToken (unique short token for referral links) if missing
+    if (!user.refToken) {
+      const crypto = require('crypto');
+      user.refToken = crypto.randomBytes(6).toString('hex'); // 12 char hex
+    }
+
     // Set referralParent only for new users
     if (isNewUser) {
       if (refCode) {
