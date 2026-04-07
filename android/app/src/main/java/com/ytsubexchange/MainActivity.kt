@@ -1378,9 +1378,10 @@ fun FloatingGamesButton() {
                         // All games — Coming Soon
                         val comingSoonGames = listOf(
                             Triple("🎲", "Ludo", "2-4 players • P2P • 50🪙 per player"),
-                            Triple("♟️", "Chess", "1v1 • Strategy • 50🪙 bet"),
-                            Triple("🃏", "Andar Bahar", "Card game • Instant win • 10🪙+"),
-                            Triple("🎰", "Satta Matka", "Rolling dice • Number bet • 5x reward")
+                            Triple("🃏", "Teen Patti", "3 cards • P2P • 50🪙 entry"),
+                            Triple("♟️", "Chess", "1v1 • Strategy • 50🪙 entry"),
+                            Triple("🎴", "Andar Bahar", "Card game • Choose side • 10🪙+"),
+                            Triple("🎰", "Satta Matka", "Rolling dice • Pick number • 5x coins")
                         )
                         comingSoonGames.forEach { (emoji, name, desc) ->
                             Box(
