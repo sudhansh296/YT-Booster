@@ -28,4 +28,9 @@ const chatRoomSchema = new mongoose.Schema({
   disappearingSeconds: { type: Number, default: 0 }
 }, { timestamps: true });
 
+// Index for fast room lookup by member
+chatRoomSchema.index({ members: 1, lastTime: -1 });
+// Index for group invite link
+chatRoomSchema.index({ inviteToken: 1 }, { sparse: true });
+
 module.exports = mongoose.model('ChatRoom', chatRoomSchema);

@@ -12,7 +12,14 @@ const mongoSanitize = require('express-mongo-sanitize');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+  cors: { origin: '*' },
+  pingInterval: 10000,      // 10s ping (default 25s) — faster disconnect detection
+  pingTimeout: 5000,        // 5s timeout (default 20s)
+  transports: ['websocket', 'polling'],  // websocket first
+  upgradeTimeout: 10000,
+  maxHttpBufferSize: 1e7    // 10MB for file messages
+});
 
 // ── Security Headers ──────────────────────────────────────────
 app.use(helmet({
@@ -597,14 +604,14 @@ io.on('connection', (socket) => {
       const ChatMessage = require('./models/ChatMessage');
 
       const [room, user] = await Promise.all([
-        ChatRoom.findById(roomId).select('members isGroup').lean(),
+        ChatRoom.findById(roomId).select('members isGroup disappearingSeconds slowMode').lean(),
         User.findById(userId).select('channelName profilePic').lean()
       ]);
       if (!room || !user) return;
       if (!room.members.some(m => m.toString() === userId)) return;
 
       // Block check — DM room mein message block karo
-      if (room.members.length === 2) {
+      if (!room.isGroup && room.members.length === 2) {
         const otherId = room.members.find(m => m.toString() !== userId)?.toString();
         if (otherId) {
           const [me, other] = await Promise.all([
@@ -656,88 +663,70 @@ io.on('connection', (socket) => {
         } catch (e) { /* skip if not found */ }
       }
 
-      // 1. ALWAYS save to database first (for offline users)
-      const disappearsAt = room.disappearingSeconds > 0 ? new Date(Date.now() + room.disappearingSeconds * 1000) : null;
-      await ChatMessage.create({ 
-        _id: msgId, roomId, senderId: userId, senderName: user.channelName, 
-        senderPic: user.profilePic, text, replyTo: msgPayload.replyTo, 
-        createdAt: now, disappearsAt 
-      });
-      if (disappearsAt) msgPayload.disappearsAt = disappearsAt;
-      await ChatRoom.findByIdAndUpdate(roomId, { lastMessage: text, lastTime: now });
-
-      // 2. Broadcast to chat room (jo log room join kiye hain)
+      // 1. Broadcast IMMEDIATELY — don't wait for DB (optimistic, feels instant)
       io.to(`chat_${roomId}`).emit('chat_message', msgPayload);
 
-      // 3. Har member ke personal user room pe bhejo — SIRF unhe jo chat_room mein nahi hain
-      const chatRoomSockets = io.sockets.adapter.rooms.get(`chat_${roomId}`) || new Set();
-      const onlineMembers = new Set();
-      const offlineMembers = [];
+      // 2. Save to DB + update room in parallel (background)
+      const disappearsAt = room.disappearingSeconds > 0 ? new Date(Date.now() + room.disappearingSeconds * 1000) : null;
+      if (disappearsAt) msgPayload.disappearsAt = disappearsAt;
 
-      for (const memberId of room.members) {
-        const mId = memberId.toString();
-        if (mId === userId) continue; // sender ko mat bhejo
-        
-        // Check if member is online
-        const memberUserRoom = io.sockets.adapter.rooms.get(`user_${mId}`);
-        if (memberUserRoom && memberUserRoom.size > 0) {
-          onlineMembers.add(mId);
-          // Check if member is in chat room
-          let isInChatRoom = false;
-          for (const sid of memberUserRoom) {
-            if (chatRoomSockets.has(sid)) { isInChatRoom = true; break; }
-          }
-          if (!isInChatRoom) {
-            io.to(`user_${mId}`).emit('chat_message_notify', msgPayload);
-          }
-        } else {
-          offlineMembers.push(mId);
-        }
-      }
+      const [savedMsg] = await Promise.all([
+        ChatMessage.create({ 
+          _id: msgId, roomId, senderId: userId, senderName: user.channelName, 
+          senderPic: user.profilePic, text, replyTo: msgPayload.replyTo, 
+          createdAt: now, disappearsAt 
+        }),
+        ChatRoom.findByIdAndUpdate(roomId, { lastMessage: text, lastTime: now })
+      ]);
 
-      // 4. FCM push for ALL offline users (guaranteed delivery)
-      if (offlineMembers.length > 0) {
+      // 3. Notify + FCM in background (non-blocking)
+      setImmediate(async () => {
         try {
-          const admin = require('./firebase-admin');
-          if (admin) {
-            const offlineUsers = await User.find({
-              _id: { $in: offlineMembers },
-              fcmToken: { $exists: true, $ne: null, $ne: '' }
-            }).select('fcmToken _id').lean();
+          const chatRoomSockets = io.sockets.adapter.rooms.get(`chat_${roomId}`) || new Set();
+          const offlineMembers = [];
 
-            for (const member of offlineUsers) {
-              await admin.messaging().send({
-                token: member.fcmToken,
-                notification: { 
-                  title: user.channelName, 
-                  body: text.length > 100 ? text.substring(0, 100) + '...' : text 
-                },
-                data: { 
-                  roomId, senderId: userId, type: 'chat_message',
-                  messageId: msgId.toString(), timestamp: now.toISOString()
-                },
-                android: { 
-                  priority: 'high', 
-                  notification: { 
-                    channelId: 'ytbooster_channel', 
-                    sound: 'default',
-                    tag: `chat_${roomId}` // Group notifications by room
-                  } 
-                }
-              }).catch(async e => {
-                console.log('[FCM] send error:', e.message);
-                // Invalid/expired token — DB se clean karo
-                if (e.message && (e.message.includes('not found') || e.message.includes('invalid') || e.message.includes('Unregistered'))) {
-                  await User.findByIdAndUpdate(member._id, { $unset: { fcmToken: 1 } });
-                  console.log('[FCM] Cleaned invalid token for user:', member._id);
-                }
-              });
+          for (const memberId of room.members) {
+            const mId = memberId.toString();
+            if (mId === userId) continue;
+            const memberUserRoom = io.sockets.adapter.rooms.get(`user_${mId}`);
+            if (memberUserRoom && memberUserRoom.size > 0) {
+              let isInChatRoom = false;
+              for (const sid of memberUserRoom) {
+                if (chatRoomSockets.has(sid)) { isInChatRoom = true; break; }
+              }
+              if (!isInChatRoom) {
+                io.to(`user_${mId}`).emit('chat_message_notify', msgPayload);
+              }
+            } else {
+              offlineMembers.push(mId);
             }
           }
-        } catch (fcmErr) {
-          console.error('[FCM] Error sending notifications:', fcmErr.message);
-        }
-      }
+
+          // FCM push for offline users
+          if (offlineMembers.length > 0) {
+            const admin = require('./firebase-admin');
+            if (admin) {
+              const offlineUsers = await User.find({
+                _id: { $in: offlineMembers },
+                fcmToken: { $exists: true, $ne: null, $ne: '' }
+              }).select('fcmToken _id').lean();
+
+              for (const member of offlineUsers) {
+                admin.messaging().send({
+                  token: member.fcmToken,
+                  notification: { title: user.channelName, body: text.length > 100 ? text.substring(0, 100) + '...' : text },
+                  data: { roomId, senderId: userId, type: 'chat_message', messageId: msgId.toString(), timestamp: now.toISOString() },
+                  android: { priority: 'high', notification: { channelId: 'ytbooster_channel', sound: 'default', tag: `chat_${roomId}` } }
+                }).catch(async e => {
+                  if (e.message && (e.message.includes('not found') || e.message.includes('invalid') || e.message.includes('Unregistered'))) {
+                    await User.findByIdAndUpdate(member._id, { $unset: { fcmToken: 1 } });
+                  }
+                });
+              }
+            }
+          }
+        } catch (e) { /* silent */ }
+      });
 
     } catch (e) {
       console.error('chat_message error:', e.message);
@@ -1088,14 +1077,16 @@ io.on('connection', (socket) => {
   // ── Community Chat Socket ─────────────────────────────────
   socket.on('join_community', async () => {
     socket.join('community_global');
-    // Send current status to joiner
     try {
       const Settings = require('./models/Settings');
-      const isOpen = (await Settings.findOne({ key: 'COMMUNITY_OPEN' }))?.value !== 'false';
-      const pinned = (await Settings.findOne({ key: 'COMMUNITY_PINNED' }))?.value || '';
+      const [openDoc, pinnedDoc] = await Promise.all([
+        Settings.findOne({ key: 'COMMUNITY_OPEN' }).lean(),
+        Settings.findOne({ key: 'COMMUNITY_PINNED' }).lean()
+      ]);
+      const isOpen = openDoc?.value !== 'false';
+      const pinned = pinnedDoc?.value || '';
       const onlineCount = io.sockets.adapter.rooms.get('community_global')?.size || 0;
       socket.emit('community_status', { isOpen, pinned, onlineCount });
-      // Broadcast updated online count to all
       io.to('community_global').emit('community_online_count', { count: onlineCount });
     } catch (e) { /* silent */ }
   });
@@ -1107,29 +1098,39 @@ io.on('connection', (socket) => {
       const ChatMessage = require('./models/ChatMessage');
       const Settings = require('./models/Settings');
 
-      // Check if community is open
-      const isOpen = (await Settings.findOne({ key: 'COMMUNITY_OPEN' }))?.value !== 'false';
-      if (!isOpen) { socket.emit('community_error', { message: 'Community chat abhi band hai' }); return; }
+      // Parallel: check open status + fetch user
+      const [settingDoc, user] = await Promise.all([
+        Settings.findOne({ key: 'COMMUNITY_OPEN' }).lean(),
+        User.findById(socket.userId).select('channelName profilePic').lean()
+      ]);
 
-      const user = await User.findById(socket.userId).select('channelName profilePic');
+      const isOpen = settingDoc?.value !== 'false';
+      if (!isOpen) { socket.emit('community_error', { message: 'Community chat abhi band hai' }); return; }
       if (!user) return;
 
-      const msg = await ChatMessage.create({
+      const now = new Date();
+      const msgId = new (require('mongoose').Types.ObjectId)();
+      const msgPayload = {
+        _id: msgId,
+        senderId: socket.userId,
+        senderName: user.channelName,
+        senderPic: user.profilePic,
+        text,
+        createdAt: now
+      };
+
+      // Broadcast FIRST (instant), save in background
+      io.to('community_global').emit('community_message', msgPayload);
+
+      ChatMessage.create({
+        _id: msgId,
         roomId: 'community_global',
         senderId: socket.userId,
         senderName: user.channelName,
         senderPic: user.profilePic,
-        text
-      });
-
-      io.to('community_global').emit('community_message', {
-        _id: msg._id,
-        senderId: msg.senderId,
-        senderName: msg.senderName,
-        senderPic: msg.senderPic,
-        text: msg.text,
-        createdAt: msg.createdAt
-      });
+        text,
+        createdAt: now
+      }).catch(() => {});
     } catch (e) { /* silent */ }
   });
 

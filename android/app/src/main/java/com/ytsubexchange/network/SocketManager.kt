@@ -54,10 +54,10 @@ object SocketManager {
                 val opts = IO.Options().apply {
                     reconnection = true
                     reconnectionAttempts = Int.MAX_VALUE
-                    reconnectionDelay = 1000
-                    reconnectionDelayMax = 5000
-                    timeout = 20000
-                    transports = arrayOf("websocket", "polling")
+                    reconnectionDelay = 500          // 500ms (was 1000ms)
+                    reconnectionDelayMax = 3000      // 3s max (was 5s)
+                    timeout = 10000                  // 10s (was 20s)
+                    transports = arrayOf("websocket") // websocket only — no polling fallback (faster)
                     callFactory = okHttpClient
                     webSocketFactory = okHttpClient
                 }

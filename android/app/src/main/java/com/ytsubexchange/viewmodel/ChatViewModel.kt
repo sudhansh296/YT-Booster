@@ -1536,10 +1536,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 val reactionsJson = data.optJSONObject("reactions")
                 if (msgId.isNotEmpty() && reactionsJson != null && _openRoom.value?._id == roomId) {
                     val reactionsMap = mutableMapOf<String, List<String>>()
-                    reactionsJson.keys().forEach { key ->
+                    val keysIter = reactionsJson.keys()
+                    while (keysIter.hasNext()) {
+                        val key = keysIter.next().toString()
                         val arr = reactionsJson.optJSONArray(key)
                         if (arr != null) {
-                            val list = (0 until arr.length()).map { arr.optString(it) }
+                            val list = mutableListOf<String>()
+                            for (i in 0 until arr.length()) {
+                                list.add(arr.optString(i))
+                            }
                             reactionsMap[key] = list
                         }
                     }
