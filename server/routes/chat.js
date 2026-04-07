@@ -772,9 +772,15 @@ router.post('/group/leave', authMiddleware, async (req, res) => {
     await ChatRoom.findByIdAndUpdate(roomId, { lastMessage: sysMsg.text, lastTime: new Date() });
     const io = req.app.get('io');
     if (io) {
+      // Notify remaining members about the system message
       io.to(`chat_${roomId}`).emit('chat_message', {
         _id: sysMsg._id, roomId, senderId: req.user._id, senderName: 'System',
         senderPic: '', text: sysMsg.text, createdAt: sysMsg.createdAt, replyTo: null
+      });
+      // Tell the leaving user's socket to remove this room from their list
+      io.to(`user_${req.user._id.toString()}`).emit('group_removed', {
+        roomId,
+        roomName: room.name
       });
     }
     res.json({ success: true });
