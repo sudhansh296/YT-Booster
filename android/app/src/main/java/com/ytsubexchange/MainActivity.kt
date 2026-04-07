@@ -526,6 +526,9 @@ class MainActivity : ComponentActivity() {
 
                     // Floating Chatbot Button
                     FloatingChatbotButton()
+
+                    // Floating Games Button
+                    FloatingGamesButton()
                 }
             } else {
                 LoginScreen()
@@ -1211,6 +1214,327 @@ fun BottomNavBar(
                             .clip(CircleShape)
                             .background(Color(0xFFFF0000))
                     )
+                }
+            }
+        }
+    }
+}
+
+// ── Floating Games Button ─────────────────────────────────────
+data class GameItem(val emoji: String, val name: String, val desc: String, val color: Long)
+
+@Composable
+fun FloatingGamesButton() {
+    var showPanel by remember { mutableStateOf(false) }
+    var selectedGame by remember { mutableStateOf<GameItem?>(null) }
+
+    val games = listOf(
+        GameItem("🎯", "Coin Flip", "Heads ya Tails?", 0xFFFF6B35),
+        GameItem("🎲", "Lucky Dice", "Roll karo, luck dekho!", 0xFF7B2FF7),
+        GameItem("🃏", "Number Guess", "1-10 mein guess karo", 0xFF00BCD4),
+        GameItem("⚡", "Reaction Test", "Kitni fast hai reaction?", 0xFFFFD700),
+        GameItem("🧠", "Quiz", "YT Booster quiz!", 0xFF4CAF50),
+        GameItem("🎰", "Spin Wheel", "Spin karo, prize pao!", 0xFFE91E63),
+    )
+
+    // Drag position
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+    var initialized by remember { mutableStateOf(false) }
+    var parentWidth by remember { mutableStateOf(0) }
+    var parentHeight by remember { mutableStateOf(0) }
+    val btnSizePx = with(LocalDensity.current) { 58.dp.toPx() }
+    val bottomNavPx = with(LocalDensity.current) { 160.dp.toPx() } // above chatbot
+    val marginPx = with(LocalDensity.current) { 16.dp.toPx() }
+
+    // Pulse animation
+    val infiniteTransition = rememberInfiniteTransition(label = "games_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "pulse"
+    )
+
+    Box(
+        modifier = Modifier.fillMaxSize().navigationBarsPadding()
+            .onGloballyPositioned { coords ->
+                if (!initialized) {
+                    parentWidth = coords.size.width
+                    parentHeight = coords.size.height
+                    offsetX = parentWidth - btnSizePx - marginPx
+                    offsetY = parentHeight - btnSizePx - bottomNavPx - marginPx
+                    initialized = true
+                }
+            }
+    ) {
+        if (initialized) {
+            // Pulse ring
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                    .size(58.dp)
+                    .graphicsLayer { scaleX = pulseScale; scaleY = pulseScale; alpha = 0.3f }
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Color(0xFFFFD700), Color(0xFFFF6B35))))
+            )
+            // Main button
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                    .size(58.dp)
+                    .shadow(12.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Color(0xFFFFD700), Color(0xFFFF6B35))))
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, parentWidth - btnSizePx)
+                            offsetY = (offsetY + dragAmount.y).coerceIn(0f, parentHeight - btnSizePx)
+                        }
+                    }
+                    .clickable { showPanel = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🎮", fontSize = 26.sp)
+            }
+        }
+
+        // Games Panel
+        if (showPanel) {
+            Dialog(
+                onDismissRequest = { showPanel = false; selectedGame = null },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { showPanel = false; selectedGame = null },
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                            .background(Color(0xFF0D0D1A))
+                            .padding(20.dp)
+                            .clickable(enabled = false) {}
+                            .navigationBarsPadding()
+                    ) {
+                        // Header
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("🎮", fontSize = 24.sp)
+                                Column {
+                                    Text("Mini Games", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                    Text("Fun karo, relax karo!", color = Color(0xFF888888), fontSize = 12.sp)
+                                }
+                            }
+                            Box(
+                                Modifier.size(32.dp).clip(CircleShape).background(Color(0xFF1A1A2E)).clickable { showPanel = false; selectedGame = null },
+                                contentAlignment = Alignment.Center
+                            ) { Text("✕", color = Color(0xFF888888), fontSize = 14.sp) }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        if (selectedGame == null) {
+                            // Game grid
+                            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                                columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.heightIn(max = 300.dp)
+                            ) {
+                                androidx.compose.foundation.lazy.grid.items(games) { game ->
+                                    Box(
+                                        Modifier.aspectRatio(1f)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(Brush.linearGradient(listOf(Color(game.color).copy(alpha = 0.3f), Color(game.color).copy(alpha = 0.1f))))
+                                            .border(1.dp, Color(game.color).copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                            .clickable { selectedGame = game },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(game.emoji, fontSize = 28.sp)
+                                            Text(game.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Game screen
+                            GameScreen(game = selectedGame!!, onBack = { selectedGame = null })
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GameScreen(game: GameItem, onBack: () -> Unit) {
+    var result by remember { mutableStateOf("") }
+    var score by remember { mutableStateOf(0) }
+    var attempts by remember { mutableStateOf(0) }
+    var guess by remember { mutableStateOf("") }
+    var target by remember { mutableStateOf((1..10).random()) }
+    var reactionStart by remember { mutableStateOf(0L) }
+    var reactionState by remember { mutableStateOf(0) } // 0=wait, 1=ready, 2=done
+    var quizIdx by remember { mutableStateOf(0) }
+    var quizScore by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    val quizQuestions = listOf(
+        Triple("YT Booster se kya milta hai?", listOf("Subscribers", "Views", "Likes", "Comments"), 0),
+        Triple("Ek subscriber subscribe karne pe kitne coins milte hain?", listOf("1", "2", "5", "10"), 0),
+        Triple("Owner channel subscribe karne pe kitne coins milte hain?", listOf("1", "2", "5", "10"), 2),
+        Triple("Community chat kitne ghante baad delete hoti hai?", listOf("12", "24", "48", "72"), 1),
+        Triple("YT Booster ka support handle kya hai?", listOf("@YTBOOSTER", "@GODCHEATOFFICIAL", "@YTHELP", "@SUPPORT"), 1),
+    )
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF1A1A2E)).clickable { onBack() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Text("← Back", color = Color(0xFF888888), fontSize = 12.sp)
+            }
+            Text(game.emoji + " " + game.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+
+        when (game.name) {
+            "Coin Flip" -> {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1A2E)).padding(20.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(if (result.isEmpty()) "🪙" else if (result == "Heads") "👑" else "🦅", fontSize = 56.sp)
+                        if (result.isNotEmpty()) Text(result + "!", color = Color(0xFFFFD700), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("Score: $score", color = Color(0xFF888888), fontSize = 13.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            listOf("Heads", "Tails").forEach { choice ->
+                                Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Color(game.color)).clickable {
+                                    val flip = if ((0..1).random() == 0) "Heads" else "Tails"
+                                    result = flip
+                                    if (flip == choice) score++
+                                    attempts++
+                                }.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                                    Text(choice, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        if (attempts > 0) Text("$attempts tries • $score wins", color = Color(0xFF555555), fontSize = 11.sp)
+                    }
+                }
+            }
+            "Lucky Dice" -> {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1A2E)).padding(20.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val diceEmojis = listOf("⚀","⚁","⚂","⚃","⚄","⚅")
+                        Text(if (result.isEmpty()) "🎲" else diceEmojis.getOrElse(result.toIntOrNull()?.minus(1) ?: 0) { "🎲" }, fontSize = 64.sp)
+                        if (result.isNotEmpty()) Text("You rolled: $result", color = Color(0xFF7B2FF7), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))).clickable {
+                            result = ((1..6).random()).toString()
+                            attempts++
+                        }.padding(horizontal = 32.dp, vertical = 12.dp)) {
+                            Text("🎲 Roll!", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                        if (attempts > 0) Text("$attempts rolls", color = Color(0xFF555555), fontSize = 11.sp)
+                    }
+                }
+            }
+            "Number Guess" -> {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1A2E)).padding(20.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text("1 se 10 ke beech number guess karo!", color = Color(0xFF888888), fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        if (result.isNotEmpty()) Text(result, color = if (result.contains("Sahi")) Color(0xFF4CAF50) else Color(0xFFFF6B6B), fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                            columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(5),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(max = 120.dp)
+                        ) {
+                            androidx.compose.foundation.lazy.grid.items((1..10).toList()) { n ->
+                                Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(10.dp)).background(Color(0xFF00BCD4).copy(alpha = 0.2f)).clickable {
+                                    if (n == target) { result = "🎉 Sahi! $n tha!"; score++; target = (1..10).random() }
+                                    else result = if (n < target) "⬆️ Zyada hai" else "⬇️ Kam hai"
+                                    attempts++
+                                }, contentAlignment = Alignment.Center) {
+                                    Text("$n", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                        Text("Score: $score | Tries: $attempts", color = Color(0xFF555555), fontSize = 11.sp)
+                    }
+                }
+            }
+            "Reaction Test" -> {
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1A2E)).padding(20.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val bgColor = when (reactionState) { 1 -> Color(0xFF4CAF50); 2 -> Color(0xFF1A1A2E); else -> Color(0xFFFF6B6B) }
+                        Box(Modifier.size(120.dp).clip(CircleShape).background(bgColor).clickable {
+                            when (reactionState) {
+                                0 -> {
+                                    reactionState = 1
+                                    reactionStart = System.currentTimeMillis()
+                                    scope.launch {
+                                        kotlinx.coroutines.delay((1000..3000).random().toLong())
+                                        if (reactionState == 1) { reactionState = 0; result = "Too slow! Wait for GREEN" }
+                                    }
+                                }
+                                1 -> { val ms = System.currentTimeMillis() - reactionStart; reactionState = 2; result = "${ms}ms reaction time!"; if (ms < 300) score++ }
+                                2 -> { reactionState = 0; result = "" }
+                            }
+                        }, contentAlignment = Alignment.Center) {
+                            Text(when (reactionState) { 0 -> "TAP\nTO\nSTART"; 1 -> "WAIT\n🔴"; else -> "TAP!" }, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                        if (result.isNotEmpty()) Text(result, color = Color(0xFFFFD700), fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Text("Sub-300ms wins: $score", color = Color(0xFF555555), fontSize = 11.sp)
+                    }
+                }
+            }
+            "Quiz" -> {
+                if (quizIdx < quizQuestions.size) {
+                    val q = quizQuestions[quizIdx]
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1A2E)).padding(16.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Q${quizIdx + 1}/${quizQuestions.size}", color = Color(0xFF4CAF50), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(q.first, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            if (result.isNotEmpty()) Text(result, color = if (result.contains("✅")) Color(0xFF4CAF50) else Color(0xFFFF6B6B), fontSize = 13.sp)
+                            q.second.forEachIndexed { i, ans ->
+                                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF0D0D2E)).clickable {
+                                    if (i == q.third) { result = "✅ Sahi!"; quizScore++ } else result = "❌ Galat! Sahi: ${q.second[q.third]}"
+                                    scope.launch { kotlinx.coroutines.delay(1000); quizIdx++; result = "" }
+                                }.padding(12.dp)) {
+                                    Text(ans, color = Color.White, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1A2E)).padding(20.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("🏆", fontSize = 48.sp)
+                            Text("Quiz Complete!", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Score: $quizScore/${quizQuestions.size}", color = Color(0xFFFFD700), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFF4CAF50)).clickable { quizIdx = 0; quizScore = 0 }.padding(horizontal = 24.dp, vertical = 10.dp)) {
+                                Text("Play Again", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+            "Spin Wheel" -> {
+                var spinning by remember { mutableStateOf(false) }
+                val prizes = listOf("🎁 Bonus Tip!", "⭐ Lucky!", "🔥 Hot!", "💎 Rare!", "🎯 Bullseye!", "🌟 Star!")
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1A2E)).padding(20.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(if (result.isEmpty()) "🎰" else prizes.getOrElse(result.toIntOrNull() ?: 0) { "🎰" }, fontSize = 56.sp)
+                        if (result.isNotEmpty()) Text("You got: ${prizes.getOrElse(result.toIntOrNull() ?: 0) { "" }}", color = Color(0xFFE91E63), fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(Color(0xFFE91E63), Color(0xFF9C27B0)))).clickable {
+                            if (!spinning) { spinning = true; scope.launch { kotlinx.coroutines.delay(800); result = (0..5).random().toString(); spinning = false; attempts++ } }
+                        }.padding(horizontal = 32.dp, vertical = 12.dp)) {
+                            Text(if (spinning) "Spinning... 🌀" else "🎰 Spin!", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                        if (attempts > 0) Text("$attempts spins", color = Color(0xFF555555), fontSize = 11.sp)
+                    }
                 }
             }
         }
