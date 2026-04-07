@@ -13,6 +13,7 @@ import Notifications from './pages/Notifications';
 import Groups from './pages/Groups';
 import CommunityLive from './pages/CommunityLive';
 import PromoVideos from './pages/PromoVideos';
+import Reviews from './pages/Reviews';
 import { adminLogin } from './api';
 import './styles.css';
 
@@ -55,12 +56,13 @@ function App() {
     );
   }
 
-  const tabs = ['dashboard', 'users', 'orders', 'promoted', 'coin-requests', 'notices', 'sub-admins', 'referral-codes', 'notifications', 'groups', 'community', 'promo-videos', 'settings'];
+  const tabs = ['dashboard', 'users', 'orders', 'promoted', 'coin-requests', 'notices', 'sub-admins', 'referral-codes', 'notifications', 'groups', 'community', 'promo-videos', 'reviews', 'settings'];
   const tabLabels = {
     'dashboard': 'Dashboard', 'users': 'Users', 'orders': 'Orders',
     'promoted': 'Promoted', 'coin-requests': 'Coins', 'notices': 'Notices',
     'sub-admins': '👥 Sub-Admins', 'referral-codes': '🔗 Referrals', 'notifications': '🔔 Notify',
-    'groups': '💬 Groups', 'community': '🔴 Community', 'promo-videos': '🎬 Promo Videos', 'settings': 'Settings'
+    'groups': '💬 Groups', 'community': '🔴 Community', 'promo-videos': '🎬 Promo Videos',
+    'reviews': '⭐ Reviews', 'settings': 'Settings'
   };
 
   return (
@@ -87,6 +89,7 @@ function App() {
         {tab === 'groups' && <Groups />}
         {tab === 'community' && <CommunityLive />}
         {tab === 'promo-videos' && <PromoVideos />}
+        {tab === 'reviews' && <Reviews />}
         {tab === 'settings' && <Settings />}
       </div>
     </div>

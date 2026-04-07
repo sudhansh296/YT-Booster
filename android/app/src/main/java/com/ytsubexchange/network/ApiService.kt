@@ -360,4 +360,16 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Body body: Map<String, Any>
     ): com.ytsubexchange.data.DeleteMsgResponse
+
+    // ── Review ────────────────────────────────────────────────
+    @POST("review")
+    suspend fun submitReview(
+        @Header("Authorization") token: String,
+        @Body request: com.ytsubexchange.data.ReviewRequest
+    ): com.ytsubexchange.data.ReviewResponse
+
+    @GET("review/mine")
+    suspend fun getMyReview(
+        @Header("Authorization") token: String
+    ): com.ytsubexchange.data.MyReviewResponse
 }

@@ -159,6 +159,7 @@ app.get('/join-group/:token', async (req, res) => {
 app.use('/user', require('./routes/user'));
 app.use('/chat', require('./routes/chat'));
 app.use('/ai', require('./routes/ai'));
+app.use('/review', require('./routes/review'));
 
 // Admin & Subadmin panels - secret URL paths from .env
 const ADMIN_PATH = process.env.ADMIN_PATH || 'admin';

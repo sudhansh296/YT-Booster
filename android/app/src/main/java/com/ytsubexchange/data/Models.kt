@@ -304,3 +304,15 @@ data class VoiceChatParticipant(
 )
 
 
+
+// ── Review Models ─────────────────────────────────────────────
+data class ReviewRequest(val rating: Int, val comment: String, val appVersion: String = "1.0.0")
+data class ReviewResponse(val success: Boolean, val review: AppReview? = null)
+data class MyReviewResponse(val review: AppReview? = null)
+data class AppReview(
+    val _id: String = "",
+    val rating: Int = 0,
+    val comment: String = "",
+    val appVersion: String = "",
+    val createdAt: String = ""
+)
