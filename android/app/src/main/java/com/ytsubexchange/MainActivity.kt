@@ -1232,14 +1232,16 @@ fun BottomNavBar(
 }
 
 
-// ── Floating Games Button (Ludo Launcher) ────────────────────
+
+// ── Floating Games Button ─────────────────────────────────────
 @Composable
 fun FloatingGamesButton() {
+    var showPanel by remember { mutableStateOf(false) }
     var showLudo by remember { mutableStateOf(false) }
+    var inLudoGame by remember { mutableStateOf(false) }
     var ludoMode by remember { mutableStateOf(com.ytsubexchange.ui.ludo.LudoMode.VS_COMPUTER) }
     var ludoPlayers by remember { mutableStateOf(4) }
     var ludoRoomCode by remember { mutableStateOf<String?>(null) }
-    var inGame by remember { mutableStateOf(false) }
 
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }
@@ -1257,40 +1259,33 @@ fun FloatingGamesButton() {
         label = "pulse"
     )
 
-    if (inGame) {
+    // Ludo game full screen
+    if (inLudoGame) {
         Dialog(
-            onDismissRequest = { inGame = false },
+            onDismissRequest = { inLudoGame = false },
             properties = androidx.compose.ui.window.DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnBackPress = true,
-                dismissOnClickOutside = false
+                usePlatformDefaultWidth = false, dismissOnBackPress = true, dismissOnClickOutside = false
             )
         ) {
             com.ytsubexchange.ui.ludo.LudoScreen(
-                mode = ludoMode,
-                playerCount = ludoPlayers,
-                roomCode = ludoRoomCode,
-                onBack = { inGame = false },
-                onGameEnd = { inGame = false }
+                mode = ludoMode, playerCount = ludoPlayers, roomCode = ludoRoomCode,
+                onBack = { inLudoGame = false }, onGameEnd = { inLudoGame = false }
             )
         }
         return
     }
 
+    // Ludo lobby
     if (showLudo) {
         Dialog(
             onDismissRequest = { showLudo = false },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
         ) {
             com.ytsubexchange.ui.ludo.LudoLobbyScreen(
-                myCoins = 0,
-                onBack = { showLudo = false },
+                myCoins = 0, onBack = { showLudo = false },
                 onStartGame = { mode, players, code ->
-                    ludoMode = mode
-                    ludoPlayers = players
-                    ludoRoomCode = code
-                    showLudo = false
-                    inGame = true
+                    ludoMode = mode; ludoPlayers = players; ludoRoomCode = code
+                    showLudo = false; inLudoGame = true
                 }
             )
         }
@@ -1301,8 +1296,7 @@ fun FloatingGamesButton() {
         modifier = Modifier.fillMaxSize().navigationBarsPadding()
             .onGloballyPositioned { coords ->
                 if (!initialized) {
-                    parentWidth = coords.size.width
-                    parentHeight = coords.size.height
+                    parentWidth = coords.size.width; parentHeight = coords.size.height
                     offsetX = parentWidth - btnSizePx - marginPx
                     offsetY = parentHeight - btnSizePx - bottomNavPx - marginPx
                     initialized = true
@@ -1319,7 +1313,7 @@ fun FloatingGamesButton() {
                     .clip(CircleShape)
                     .background(Brush.linearGradient(listOf(Color(0xFFFFD700), Color(0xFFFF6B35))))
             )
-            // Button
+            // Main button
             Box(
                 modifier = Modifier
                     .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
@@ -1334,10 +1328,107 @@ fun FloatingGamesButton() {
                             offsetY = (offsetY + dragAmount.y).coerceIn(0f, parentHeight - btnSizePx)
                         }
                     }
-                    .clickable { showLudo = true },
+                    .clickable { showPanel = true },
                 contentAlignment = Alignment.Center
             ) {
-                Text("🎲", fontSize = 26.sp)
+                Text("🎮", fontSize = 26.sp)
+            }
+        }
+
+        // Games panel — bottom sheet style
+        if (showPanel) {
+            Dialog(
+                onDismissRequest = { showPanel = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { showPanel = false },
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                            .background(Color(0xFF0D0D1A))
+                            .padding(20.dp)
+                            .clickable(enabled = false) {}
+                            .navigationBarsPadding()
+                    ) {
+                        // Header
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("🎮", fontSize = 22.sp)
+                                Column {
+                                    Text("Games", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                    Text("Coins jeeto, dosto ko harao!", color = Color(0xFF888888), fontSize = 12.sp)
+                                }
+                            }
+                            Box(
+                                Modifier.size(32.dp).clip(CircleShape).background(Color(0xFF1A1A2E))
+                                    .clickable { showPanel = false },
+                                contentAlignment = Alignment.Center
+                            ) { Text("✕", color = Color(0xFF888888), fontSize = 14.sp) }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Ludo card
+                        Box(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.linearGradient(listOf(Color(0xFF7B2FF7).copy(0.3f), Color(0xFFE53935).copy(0.2f)))
+                                )
+                                .border(1.dp, Color(0xFF7B2FF7).copy(0.5f), RoundedCornerShape(16.dp))
+                                .clickable { showPanel = false; showLudo = true }
+                                .padding(16.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Text("🎲", fontSize = 40.sp)
+                                Column(Modifier.weight(1f)) {
+                                    Text("Ludo", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text("2-4 players • vs Computer • Online P2P", color = Color(0xFF888888), fontSize = 12.sp)
+                                    Text("50🪙 per player • 1st = 75🪙", color = Color(0xFFFFD700), fontSize = 11.sp)
+                                }
+                                Box(
+                                    Modifier.clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF7B2FF7).copy(0.3f))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text("PLAY", color = Color(0xFF7B2FF7), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        // Coming soon placeholder
+                        Box(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF1A1A2E))
+                                .padding(16.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Text("🃏", fontSize = 40.sp)
+                                Column(Modifier.weight(1f)) {
+                                    Text("Teen Patti", color = Color(0xFF555555), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text("Coming Soon...", color = Color(0xFF444444), fontSize = 12.sp)
+                                }
+                                Box(
+                                    Modifier.clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF222222))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text("SOON", color = Color(0xFF555555), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
             }
         }
     }
