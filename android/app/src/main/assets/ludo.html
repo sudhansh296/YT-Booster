@@ -51,22 +51,51 @@ const COLORS = {
 };
 
 // Standard Ludo path (52 squares, [col, row])
+// Standard Ludo path — 52 squares
+// RED home = top-left, starts entering at [1,6] (left side going right)
+// GREEN home = top-right, starts entering at [8,1] (top going down)  
+// YELLOW home = bottom-right, starts entering at [13,8] (right going left)
+// BLUE home = bottom-left, starts entering at [6,13] (bottom going up)
 const PATH = [
+  // 0: RED start — left side
+  [1,6],[2,6],[3,6],[4,6],[5,6],
+  // 5: turn up
+  [6,5],[6,4],[6,3],[6,2],[6,1],[6,0],
+  // 11: top row going right
+  [7,0],
+  // 12: turn
+  [8,0],
+  // 13: GREEN start — top area
+  [8,1],[8,2],[8,3],[8,4],[8,5],
+  // 18: turn right
+  [9,6],[10,6],[11,6],[12,6],[13,6],[14,6],
+  // 24: right side going down
+  [14,7],
+  // 25: turn
+  [14,8],
+  // 26: YELLOW start — right side
+  [13,8],[12,8],[11,8],[10,8],[9,8],
+  // 31: turn down
+  [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],
+  // 37: bottom row going left
+  [7,14],
+  // 38: turn
+  [6,14],
+  // 39: BLUE start — bottom area
   [6,13],[6,12],[6,11],[6,10],[6,9],
-  [5,8],[4,8],[3,8],[2,8],[1,8],[0,8],[0,7],
-  [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],
-  [6,5],[6,4],[6,3],[6,2],[6,1],[6,0],[7,0],
-  [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],
-  [9,6],[10,6],[11,6],[12,6],[13,6],[14,6],[14,7],
-  [14,8],[13,8],[12,8],[11,8],[10,8],[9,8],
-  [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],[7,14]
+  // 44: turn left
+  [5,8],[4,8],[3,8],[2,8],[1,8],[0,8],
+  // 50: left side going up
+  [0,7],
+  // 51: back to near RED
+  [0,6]
 ];
 
 const HOME_COLS = {
-  RED:    [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
-  GREEN:  [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
-  YELLOW: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
-  BLUE:   [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
+  RED:    [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+  GREEN:  [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+  YELLOW: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
+  BLUE:   [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]]
 };
 
 const START_OFFSET = { RED:0, GREEN:13, YELLOW:26, BLUE:39 };
@@ -115,10 +144,10 @@ function tokenGridPos(color, token) {
 function basePos(color, id) {
   const lp = [[1.3,1.3],[3.2,1.3],[1.3,3.2],[3.2,3.2]];
   const [lc,lr] = lp[id];
-  if (color==='RED')    return [lc, lr];
-  if (color==='GREEN')  return [9+lc, lr];
-  if (color==='YELLOW') return [9+lc, 9+lr];
-  return [lc, 9+lr]; // BLUE
+  if (color==='RED')    return [lc, lr];        // top-left
+  if (color==='GREEN')  return [9+lc, lr];      // top-right
+  if (color==='YELLOW') return [9+lc, 9+lr];    // bottom-right
+  return [lc, 9+lr];                            // BLUE bottom-left
 }
 
 // ── Canvas Drawing ───────────────────────────────────────────
@@ -140,7 +169,7 @@ function drawBoard() {
   ctx.fillStyle = '#F5E6C8';
   ctx.fillRect(0,0,w,w);
 
-  // Home areas
+  // Home areas — correct corners
   drawHomeArea(ctx, 0, 0, c*6, '#E53935', '#B71C1C');       // RED top-left
   drawHomeArea(ctx, c*9, 0, c*6, '#43A047', '#1B5E20');     // GREEN top-right
   drawHomeArea(ctx, c*9, c*9, c*6, '#FDD835', '#F9A825');   // YELLOW bottom-right
@@ -149,17 +178,22 @@ function drawBoard() {
   // Path cells
   PATH.forEach(([col,row], idx) => {
     let bg = '#FFFDE7';
-    if (idx===0)  bg = '#E53935';
-    else if (idx===13) bg = '#43A047';
-    else if (idx===26) bg = '#FDD835';
-    else if (idx===39) bg = '#1E88E5';
+    if (idx===0)  bg = '#E53935';   // RED start
+    else if (idx===13) bg = '#43A047'; // GREEN start
+    else if (idx===26) bg = '#FDD835'; // YELLOW start
+    else if (idx===39) bg = '#1E88E5'; // BLUE start
     else if (SAFE_IDX.has(idx)) bg = '#FFF9C4';
     ctx.fillStyle = bg;
     ctx.fillRect(col*c, row*c, c, c);
   });
 
-  // Home column lanes
-  const laneColors = { RED:'#E5393580', GREEN:'#43A04780', YELLOW:'#FDD83580', BLUE:'#1E88E580' };
+  // Home column lanes — each color's lane leads to their home
+  const laneColors = {
+    RED:    '#E5393580',  // RED lane (row 7, cols 1-6) — leads to RED home top-left
+    GREEN:  '#43A04780',  // GREEN lane (col 7, rows 1-6) — leads to GREEN home top-right
+    YELLOW: '#FDD83580',  // YELLOW lane (row 7, cols 8-13) — leads to YELLOW home bottom-right
+    BLUE:   '#1E88E580'   // BLUE lane (col 7, rows 8-13) — leads to BLUE home bottom-left
+  };
   Object.entries(HOME_COLS).forEach(([color, cells]) => {
     ctx.fillStyle = laneColors[color];
     cells.forEach(([col,row]) => ctx.fillRect(col*c, row*c, c, c));
