@@ -889,11 +889,12 @@ fun ChatWindowScreen(
         Dialog(onDismissRequest = { viewModel.dismissContext() }) {
             Box(
                 Modifier.fillMaxSize().clickable { viewModel.dismissContext() },
-                contentAlignment = Alignment.BottomCenter
+                contentAlignment = Alignment.Center
             ) {
                 Column(
                     Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(20.dp))
                         .background(CardDark)
                         .padding(bottom = 16.dp)
                         .clickable(enabled = false) { } // prevent dismiss when tapping menu itself
