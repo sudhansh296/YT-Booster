@@ -26,23 +26,16 @@ fun LudoWebScreen(
     onBack: () -> Unit,
     onGameEnd: (List<String>) -> Unit = {}
 ) {
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
-
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFF1A0A00))
-    ) {
+    Column(Modifier.fillMaxSize().background(Color(0xFF0a0a1a))) {
         // Top bar
         Row(
-            Modifier.fillMaxWidth().background(Color(0xFF2D1500)).padding(4.dp, 4.dp),
+            Modifier.fillMaxWidth().background(Color(0xFF1a0a2e)).padding(4.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, null, tint = Color.White)
             }
-            Text(
-                "🎲 Ludo",
-                color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, fontSize = 18.sp
-            )
+            Text("🎲 Ludo", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(Modifier.weight(1f))
             if (mode != LudoMode.VS_COMPUTER) {
                 Text("50🪙 × $playerCount", color = Color(0xFFFFD700), fontSize = 13.sp,
@@ -50,37 +43,39 @@ fun LudoWebScreen(
             }
         }
 
-        // WebView board
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.allowFileAccess = true
+                    @Suppress("DEPRECATION")
                     settings.allowFileAccessFromFileURLs = true
+                    @Suppress("DEPRECATION")
                     settings.allowUniversalAccessFromFileURLs = true
                     settings.builtInZoomControls = false
                     settings.displayZoomControls = false
-                    // Hardware acceleration for WebGL/Three.js
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    webViewClient = WebViewClient()
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+
                     addJavascriptInterface(object {
                         @JavascriptInterface
                         fun onGameEnd(result: String) {
-                            // result = JSON array of color strings in finish order
                             val colors = result.trim('[', ']').split(",").map { it.trim('"', ' ') }
                             onGameEnd(colors)
                         }
                     }, "Android")
+
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            // Call startGame AFTER page fully loads
+                            view?.evaluateJavascript("startGame($playerCount);", null)
+                        }
+                    }
                     loadUrl("file:///android_asset/ludo.html")
-                    webViewRef = this
                 }
             },
-            modifier = Modifier.fillMaxSize(),
-            update = { wv ->
-                // Start game with correct player count after page loads
-                wv.evaluateJavascript("if(window.startGame) startGame($playerCount);", null)
-            }
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
