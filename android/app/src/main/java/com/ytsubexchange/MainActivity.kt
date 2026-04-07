@@ -868,14 +868,14 @@ fun FloatingChatbotButton() {
     var messages by remember { mutableStateOf(listOf(BotMsg("Namaste! Main YT Buddy hoon 🤖\nKoi bhi sawaal pucho — YouTube tips, coins, ya kuch bhi!", false))) }
     var input by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var pendingQuery by remember { mutableStateOf<String?>(null) }
+    var queryCounter by remember { mutableStateOf(0) }
+    var lastQuery by remember { mutableStateOf("") }
 
-    LaunchedEffect(pendingQuery) {
-        val query = pendingQuery ?: return@LaunchedEffect
-        pendingQuery = null
+    LaunchedEffect(queryCounter) {
+        if (queryCounter == 0 || lastQuery.isBlank()) return@LaunchedEffect
         isLoading = true
-        kotlinx.coroutines.delay(350)
-        messages = messages + BotMsg(ytBuddyReply(query), false)
+        kotlinx.coroutines.delay(300)
+        messages = messages + BotMsg(ytBuddyReply(lastQuery), false)
         isLoading = false
     }
 
@@ -1067,7 +1067,8 @@ fun FloatingChatbotButton() {
                                         val userText = input.trim()
                                         input = ""
                                         messages = messages + BotMsg(userText, true)
-                                        pendingQuery = userText
+                                        lastQuery = userText
+                                        queryCounter++
                                     }
                                 },
                             contentAlignment = Alignment.Center
