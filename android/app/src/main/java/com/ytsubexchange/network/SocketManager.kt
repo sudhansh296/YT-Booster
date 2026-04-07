@@ -295,20 +295,18 @@ object SocketManager {
     fun disconnect() {
         socket?.disconnect()
         socket = null
+        pendingEmits.clear()
+        isConnecting = false
+        hasConnectedOnce = false
+        synchronized(joinedChatRooms) { joinedChatRooms.clear() }
+    }
 
     fun reconnect() {
-        // Socket already connected hai toh kuch mat karo
         if (socket?.connected() == true) return
-        // Disconnect karo pehle agar connected nahi hai
         socket?.disconnect()
         socket = null
         isConnecting = false
         connect()
         Log.d("Socket", "reconnect() called")
-    }
-        pendingEmits.clear()
-        isConnecting = false
-        hasConnectedOnce = false
-        synchronized(joinedChatRooms) { joinedChatRooms.clear() }
     }
 }
