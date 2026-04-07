@@ -1034,7 +1034,7 @@ fun FloatingChatbotButton() {
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Text("➤", color = Color.White, fontSize = 18.sp)
                         }
                     }
                 }
