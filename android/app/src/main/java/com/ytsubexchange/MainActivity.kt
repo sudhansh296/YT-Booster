@@ -22,16 +22,25 @@ import androidx.core.view.WindowCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -42,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -50,6 +60,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import kotlin.math.roundToInt
 import com.ytsubexchange.ui.*
 import com.ytsubexchange.ui.theme.AppColors
@@ -1344,7 +1355,7 @@ fun FloatingGamesButton() {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.heightIn(max = 300.dp)
                             ) {
-                                androidx.compose.foundation.lazy.grid.items(games) { game ->
+                                gridItems(games) { game ->
                                     Box(
                                         Modifier.aspectRatio(1f)
                                             .clip(RoundedCornerShape(16.dp))
@@ -1451,7 +1462,7 @@ fun GameScreen(game: GameItem, onBack: () -> Unit) {
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.heightIn(max = 120.dp)
                         ) {
-                            androidx.compose.foundation.lazy.grid.items((1..10).toList()) { n ->
+                            gridItems((1..10).toList()) { n ->
                                 Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(10.dp)).background(Color(0xFF00BCD4).copy(alpha = 0.2f)).clickable {
                                     if (n == target) { result = "🎉 Sahi! $n tha!"; score++; target = (1..10).random() }
                                     else result = if (n < target) "⬆️ Zyada hai" else "⬇️ Kam hai"
