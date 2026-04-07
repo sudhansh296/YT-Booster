@@ -44,6 +44,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val _rooms = MutableStateFlow<List<ChatRoom>>(emptyList())
     val rooms: StateFlow<List<ChatRoom>> = _rooms
 
+    // Rooms that user has left/deleted — persist across loadRooms calls
+    private val _hiddenRoomIds = mutableSetOf<String>()
+
     private val _openRoom = MutableStateFlow<ChatRoom?>(null)
     val openRoom: StateFlow<ChatRoom?> = _openRoom
 
@@ -228,9 +231,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             _isLoading.value = true
             try {
                 val resp = RetrofitClient.api.getChatRooms(token)
-                _rooms.value = resp.rooms.sortedByDescending { it.lastTime ?: "" }
-                // Rooms load hone ke baad DM partners ka online status fetch karo
-                fetchOnlineStatus(resp.rooms)
+                // Filter out rooms user has left/deleted
+                val filtered = resp.rooms.filter { it._id !in _hiddenRoomIds }
+                _rooms.value = filtered.sortedByDescending { it.lastTime ?: "" }
+                fetchOnlineStatus(filtered)
             } catch (e: Exception) { } finally {
                 _isLoading.value = false
             }
@@ -740,7 +744,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 clearGroupInvite()
                 // Reload rooms then open the group
                 val resp = RetrofitClient.api.getChatRooms(token)
-                _rooms.value = resp.rooms.sortedByDescending { it.lastTime ?: "" }
+                _rooms.value = resp.rooms.filter { it._id !in _hiddenRoomIds }.sortedByDescending { it.lastTime ?: "" }
                 val room = resp.rooms.firstOrNull { it._id == roomId }
                 _toastMsg.value = "Group join kar liya! 🎉"
                 if (room != null) openRoom(room)
@@ -967,25 +971,24 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     // Leave group from list (without opening room)
     fun leaveGroupById(roomId: String) {
+        // Add to hidden set FIRST — so even if loadRooms fires, it stays hidden
+        _hiddenRoomIds.add(roomId)
+        // Remove from list immediately
+        _rooms.value = _rooms.value.filter { it._id != roomId }
+        _messageCache.remove(roomId)
+        msgPrefs.edit().remove("room_$roomId").apply()
+        _toastMsg.value = "Group delete ho gaya ✓"
+        // Then call server in background
         viewModelScope.launch {
             try {
                 RetrofitClient.api.groupLeave(token, com.ytsubexchange.data.GroupLeaveRequest(roomId))
-                _rooms.value = _rooms.value.filter { it._id != roomId }
-                _messageCache.remove(roomId)
-                msgPrefs.edit().remove("room_$roomId").apply()
-                _toastMsg.value = "Group delete ho gaya ✓"
-            } catch (e: Exception) {
-                // Even if server fails, remove locally
-                _rooms.value = _rooms.value.filter { it._id != roomId }
-                _messageCache.remove(roomId)
-                msgPrefs.edit().remove("room_$roomId").apply()
-                _toastMsg.value = "Group delete ho gaya ✓"
-            }
+            } catch (e: Exception) { /* already removed locally */ }
         }
     }
 
     // Delete DM room locally (just hide from list — no server delete needed)
     fun deleteRoomLocally(roomId: String) {
+        _hiddenRoomIds.add(roomId)
         _rooms.value = _rooms.value.filter { it._id != roomId }
         _messageCache.remove(roomId)
         msgPrefs.edit().remove("room_$roomId").apply()
