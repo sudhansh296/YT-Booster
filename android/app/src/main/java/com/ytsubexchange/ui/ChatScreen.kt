@@ -356,8 +356,8 @@ fun ChatListScreen(
                     // Open
                     Row(Modifier.fillMaxWidth().clickable { showRoomMenu = false; menuRoom = null; onRoomClick(room) }.padding(16.dp, 14.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Icon(Icons.Default.Chat, null, tint = chatTextPrimary(), modifier = Modifier.size(20.dp))
-                        Text("Open Chat", color = chatTextPrimary(), fontSize = 14.sp)
+                        Icon(if (room.isGroup) Icons.Default.Group else Icons.Default.Chat, null, tint = chatTextPrimary(), modifier = Modifier.size(20.dp))
+                        Text(if (room.isGroup) "Open Group" else "Open Chat", color = chatTextPrimary(), fontSize = 14.sp)
                     }
                     Divider(color = chatDivider(), thickness = 0.5.dp)
                     // Leave group / Delete chat
