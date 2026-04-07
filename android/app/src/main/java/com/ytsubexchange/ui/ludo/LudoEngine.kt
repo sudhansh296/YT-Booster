@@ -107,7 +107,6 @@ class LudoEngine(
         },
         gamePhase = GamePhase.PLAYING
     )
-        private set
 
     fun rollDice(): Int {
         if (state.diceRolled) return state.diceValue

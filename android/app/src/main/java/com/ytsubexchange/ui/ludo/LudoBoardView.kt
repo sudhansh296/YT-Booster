@@ -285,12 +285,9 @@ private fun DrawScope.drawHomeColumns(cellPx: Float) {
         LudoColor.BLUE to Color(LudoColor.BLUE.hex).copy(alpha = 0.4f)
     )
     homeColumns.forEach { (color, cells) ->
+        val cellColor = colors[color] ?: Color.Gray
         cells.forEach { (col, row) ->
-            drawRect(
-                colors[color] ?: Color.Gray,
-                Offset(col * cellPx, row * cellPx),
-                Size(cellPx, cellPx)
-            )
+            drawRect(cellColor, Offset(col * cellPx, row * cellPx), Size(cellPx, cellPx))
         }
     }
 }
@@ -301,21 +298,22 @@ private fun DrawScope.drawCenterTriangles(cellPx: Float) {
     val s = 1.5f * cellPx
 
     // 4 triangles pointing to center
+    data class Triangle(val color: LudoColor, val pts: List<Offset>)
     val triangles = listOf(
-        Triple(LudoColor.RED, listOf(Offset(cx - s, cy + s), Offset(cx + s, cy + s), Offset(cx, cy))),
-        Triple(LudoColor.GREEN, listOf(Offset(cx - s, cy - s), Offset(cx - s, cy + s), Offset(cx, cy))),
-        Triple(LudoColor.YELLOW, listOf(Offset(cx - s, cy - s), Offset(cx + s, cy - s), Offset(cx, cy))),
-        Triple(LudoColor.BLUE, listOf(Offset(cx + s, cy - s), Offset(cx + s, cy + s), Offset(cx, cy)))
+        Triangle(LudoColor.RED, listOf(Offset(cx - s, cy + s), Offset(cx + s, cy + s), Offset(cx, cy))),
+        Triangle(LudoColor.GREEN, listOf(Offset(cx - s, cy - s), Offset(cx - s, cy + s), Offset(cx, cy))),
+        Triangle(LudoColor.YELLOW, listOf(Offset(cx - s, cy - s), Offset(cx + s, cy - s), Offset(cx, cy))),
+        Triangle(LudoColor.BLUE, listOf(Offset(cx + s, cy - s), Offset(cx + s, cy + s), Offset(cx, cy)))
     )
 
-    triangles.forEach { (color, pts) ->
+    triangles.forEach { tri ->
         val path = Path().apply {
-            moveTo(pts[0].x, pts[0].y)
-            lineTo(pts[1].x, pts[1].y)
-            lineTo(pts[2].x, pts[2].y)
+            moveTo(tri.pts[0].x, tri.pts[0].y)
+            lineTo(tri.pts[1].x, tri.pts[1].y)
+            lineTo(tri.pts[2].x, tri.pts[2].y)
             close()
         }
-        drawPath(path, Color(color.hex).copy(alpha = 0.8f))
+        drawPath(path, Color(tri.color.hex).copy(alpha = 0.8f))
     }
 
     // Center star
