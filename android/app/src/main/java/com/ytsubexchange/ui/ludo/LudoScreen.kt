@@ -87,7 +87,7 @@ fun LudoScreen(
 
     Box(
         Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF0A0A1A), Color(0xFF1A0A2E))))
+            .background(Brush.verticalGradient(listOf(Color(0xFF1A0A00), Color(0xFF2D1500), Color(0xFF1A0A00))))
     ) {
         Column(Modifier.fillMaxSize()) {
             // Top bar
@@ -142,9 +142,11 @@ fun LudoScreen(
 
             // Bottom controls
             Column(
-                Modifier.fillMaxWidth().background(Color(0xFF0D0D1A)).padding(16.dp),
+                Modifier.fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color(0xFF2D1500), Color(0xFF1A0A00))))
+                    .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Status message
                 Text(
@@ -158,22 +160,21 @@ fun LudoScreen(
 
                 // Dice + Roll button
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Dice display
+                    // Dice display — Ludo King style
                     Box(
-                        Modifier.size(56.dp)
-                            .shadow(8.dp, RoundedCornerShape(12.dp))
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White)
+                        Modifier.size(64.dp)
+                            .shadow(12.dp, RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                Brush.linearGradient(listOf(Color(0xFFFFF9C4), Color(0xFFFFEE58)))
+                            )
                             .rotate(if (diceRolling) diceAngle else 0f),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            diceEmoji(gameState.diceValue),
-                            fontSize = 32.sp
-                        )
+                        Text(diceEmoji(gameState.diceValue), fontSize = 38.sp)
                     }
 
                     // Roll button
@@ -182,15 +183,15 @@ fun LudoScreen(
                         !gameState.isGameOver
 
                     Box(
-                        Modifier
-                            .height(48.dp)
-                            .clip(RoundedCornerShape(24.dp))
+                        Modifier.height(56.dp)
+                            .clip(RoundedCornerShape(28.dp))
                             .background(
                                 if (canRoll)
-                                    Brush.horizontalGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935)))
+                                    Brush.horizontalGradient(listOf(Color(0xFFFF6F00), Color(0xFFFFD600)))
                                 else
-                                    Brush.horizontalGradient(listOf(Color(0xFF333333), Color(0xFF444444)))
+                                    Brush.horizontalGradient(listOf(Color(0xFF3A3A3A), Color(0xFF555555)))
                             )
+                            .shadow(if (canRoll) 8.dp else 0.dp, RoundedCornerShape(28.dp))
                             .clickable(enabled = canRoll) {
                                 scope.launch {
                                     diceRolling = true
@@ -200,12 +201,13 @@ fun LudoScreen(
                                     diceRolling = false
                                 }
                             }
-                            .padding(horizontal = 32.dp),
+                            .padding(horizontal = 36.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            if (diceRolling) "Rolling..." else "🎲 Roll Dice",
-                            color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp
+                            if (diceRolling) "Rolling... 🎲" else "🎲 ROLL",
+                            color = if (canRoll) Color(0xFF1A0A00) else Color.Gray,
+                            fontWeight = FontWeight.ExtraBold, fontSize = 16.sp
                         )
                     }
                 }
@@ -234,43 +236,60 @@ fun LudoScreen(
 @Composable
 private fun PlayerIndicatorRow(state: LudoGameState) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth()
+            .background(Color(0xFF2D1500))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         state.players.forEach { player ->
             val isCurrent = player.color == state.currentPlayer.color
             val finishedTokens = player.tokens.count { it.isFinished }
+            val borderColor = if (isCurrent) Color(0xFFFFD700) else Color.Transparent
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(
-                        if (isCurrent) Color(player.color.hex).copy(alpha = 0.3f)
+                        if (isCurrent) Color(player.color.hex).copy(alpha = 0.25f)
                         else Color.White.copy(alpha = 0.05f)
+                    )
+                    .then(
+                        if (isCurrent) Modifier.shadow(6.dp, RoundedCornerShape(12.dp)) else Modifier
                     )
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
-                Box(
-                    Modifier.size(20.dp).clip(CircleShape)
-                        .background(Color(player.color.hex))
-                        .then(if (isCurrent) Modifier.shadow(4.dp, CircleShape) else Modifier)
-                )
-                Spacer(Modifier.height(2.dp))
+                // Color circle with crown if winning
+                Box(contentAlignment = Alignment.TopEnd) {
+                    Box(
+                        Modifier.size(22.dp).shadow(4.dp, CircleShape).clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(Color(player.color.hex), Color(player.color.darkHex))
+                                )
+                            )
+                    )
+                    if (player.finishOrder == 1) {
+                        Text("👑", fontSize = 10.sp, modifier = Modifier.offset(x = 4.dp, y = (-4).dp))
+                    }
+                }
+                Spacer(Modifier.height(3.dp))
                 Text(
                     player.name.take(5),
-                    color = if (isCurrent) Color.White else Color.Gray,
+                    color = if (isCurrent) Color.White else Color(0xFF888888),
                     fontSize = 10.sp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
                 )
-                Text(
-                    "🏠 $finishedTokens/4",
-                    color = Color(0xFFFFD700), fontSize = 9.sp
-                )
-                if (player.finishOrder > 0) {
-                    Text(
-                        "#${player.finishOrder}",
-                        color = Color(0xFF4CAF50), fontSize = 9.sp, fontWeight = FontWeight.Bold
-                    )
+                // Token progress dots
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    repeat(4) { i ->
+                        Box(
+                            Modifier.size(6.dp).clip(CircleShape)
+                                .background(
+                                    if (i < finishedTokens) Color(player.color.hex)
+                                    else Color(0xFF444444)
+                                )
+                        )
+                    }
                 }
             }
         }
