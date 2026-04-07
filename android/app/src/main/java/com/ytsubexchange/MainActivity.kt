@@ -868,15 +868,29 @@ fun FloatingChatbotButton() {
     var messages by remember { mutableStateOf(listOf(BotMsg("Namaste! Main YT Buddy hoon 🤖\nKoi bhi sawaal pucho — YouTube tips, coins, ya kuch bhi!", false))) }
     var input by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var queryCounter by remember { mutableStateOf(0) }
     var lastQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(queryCounter) {
         if (queryCounter == 0 || lastQuery.isBlank()) return@LaunchedEffect
         isLoading = true
-        kotlinx.coroutines.delay(300)
-        messages = messages + BotMsg(ytBuddyReply(lastQuery), false)
-        isLoading = false
+        try {
+            val prefs = context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE)
+            val token = "Bearer ${prefs.getString("token", "")}"
+            val history = messages.dropLast(1).takeLast(8).map {
+                mapOf("role" to if (it.isUser) "user" else "ai", "text" to it.text)
+            }
+            val resp = com.ytsubexchange.network.RetrofitClient.api.aiChat(
+                token, mapOf("message" to lastQuery, "history" to history)
+            )
+            messages = messages + BotMsg(resp.reply, false)
+        } catch (e: Exception) {
+            // Fallback to local AI if server fails
+            messages = messages + BotMsg(ytBuddyReply(lastQuery), false)
+        } finally {
+            isLoading = false
+        }
     }
 
     // Drag position
