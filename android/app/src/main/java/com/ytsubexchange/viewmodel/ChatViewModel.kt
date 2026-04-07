@@ -1465,6 +1465,48 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) { }
         }
+
+        // ── Real-time edit/delete/pin — receiver side instant update ──
+        SocketManager.on("message_deleted") { args ->
+            try {
+                val data = args[0] as JSONObject
+                val msgId = data.optString("msgId")
+                val roomId = data.optString("roomId")
+                if (msgId.isNotEmpty()) {
+                    _messages.value = _messages.value.filter { it._id != msgId }
+                    _messageCache[roomId] = _messageCache[roomId]?.filter { it._id != msgId } ?: emptyList()
+                    if (_pinnedMsg.value?._id == msgId) _pinnedMsg.value = null
+                }
+            } catch (e: Exception) { }
+        }
+
+        SocketManager.on("message_edited") { args ->
+            try {
+                val data = args[0] as JSONObject
+                val msgId = data.optString("msgId")
+                val newText = data.optString("text")
+                val roomId = _openRoom.value?._id ?: ""
+                if (msgId.isNotEmpty() && newText.isNotEmpty()) {
+                    _messages.value = _messages.value.map {
+                        if (it._id == msgId) it.copy(text = newText, edited = true) else it
+                    }
+                    _messageCache[roomId] = _messages.value
+                }
+            } catch (e: Exception) { }
+        }
+
+        SocketManager.on("message_pinned") { args ->
+            try {
+                val data = args[0] as JSONObject
+                val msgId = data.optString("msgId")
+                val roomId = data.optString("roomId")
+                if (_openRoom.value?._id == roomId) {
+                    // Unpin all, then pin the new one
+                    _messages.value = _messages.value.map { it.copy(pinned = it._id == msgId) }
+                    _pinnedMsg.value = if (msgId.isNotEmpty()) _messages.value.firstOrNull { it._id == msgId } else null
+                }
+            } catch (e: Exception) { }
+        }
     }
 
     override fun onCleared() {

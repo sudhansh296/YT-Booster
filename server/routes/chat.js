@@ -916,6 +916,13 @@ router.post('/pin', authMiddleware, async (req, res) => {
     if (msgId) {
       await ChatMessage.findByIdAndUpdate(msgId, { pinned: true });
     }
+
+    // Socket broadcast
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat_${roomId}`).emit('message_pinned', { msgId: msgId || null, roomId });
+    }
+
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -942,6 +949,13 @@ router.delete('/message/:msgId', authMiddleware, async (req, res) => {
     }
 
     await msg.deleteOne();
+
+    // Socket broadcast — receiver ko turant pata chale
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat_${msg.roomId}`).emit('message_deleted', { msgId: req.params.msgId, roomId: msg.roomId.toString() });
+    }
+
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
