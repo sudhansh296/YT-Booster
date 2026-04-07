@@ -1085,8 +1085,21 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         inCommunity = true
         SocketManager.emit("join_community", JSONObject())
         viewModelScope.launch {
-            try { val resp = RetrofitClient.api.getCommunityMessages(token); _communityMessages.value = resp.messages } catch (e: Exception) { }
+            try {
+                val resp = RetrofitClient.api.getCommunityMessages(token)
+                _communityMessages.value = resp.messages.filter { isCommunityMsgFresh(it.createdAt) }
+            } catch (e: Exception) { }
         }
+    }
+
+    // Only show community messages from last 24 hours
+    private fun isCommunityMsgFresh(createdAt: String): Boolean {
+        return try {
+            val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+            fmt.isLenient = true
+            val date = fmt.parse(createdAt.take(19)) ?: return true
+            (System.currentTimeMillis() - date.time) < 24 * 60 * 60 * 1000L
+        } catch (e: Exception) { true }
     }
 
     fun sendCommunityMessage(text: String, replyTo: ReplyRef? = null) {
@@ -1275,7 +1288,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 val msg = ChatMessage(_id = data.optString("_id", "c_${System.currentTimeMillis()}"),
                     senderId = data.optString("senderId"), senderName = data.optString("senderName"),
                     senderPic = data.optString("senderPic"), text = data.optString("text"), createdAt = data.optString("createdAt"))
-                _communityMessages.value = _communityMessages.value.filter { !it._id.startsWith("temp_") || it.text != msg.text } + msg
+                // Add new message and prune any that are now >24h old
+                _communityMessages.value = (_communityMessages.value
+                    .filter { !it._id.startsWith("temp_") || it.text != msg.text } + msg)
+                    .filter { isCommunityMsgFresh(it.createdAt) }
             } catch (e: Exception) { }
         }
 

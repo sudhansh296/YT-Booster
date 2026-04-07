@@ -978,9 +978,13 @@ const COMMUNITY_ROOM_ID = 'community_global';
 
 router.get('/community', authMiddleware, async (req, res) => {
   try {
-    const messages = await ChatMessage.find({ roomId: COMMUNITY_ROOM_ID })
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const messages = await ChatMessage.find({
+      roomId: COMMUNITY_ROOM_ID,
+      createdAt: { $gte: cutoff }
+    })
       .sort({ createdAt: -1 })
-      .limit(100)
+      .limit(200)
       .lean();
     res.json({ messages: messages.reverse() });
   } catch (e) {

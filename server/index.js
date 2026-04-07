@@ -247,7 +247,6 @@ setInterval(async () => {
     if (expired.length > 0) {
       const ids = expired.map(m => m._id);
       await ChatMessage.deleteMany({ _id: { $in: ids } });
-      // Notify rooms
       const roomIds = [...new Set(expired.map(m => m.roomId.toString()))];
       roomIds.forEach(roomId => {
         io.to(`chat_${roomId}`).emit('messages_disappeared', { roomId, msgIds: expired.filter(m => m.roomId.toString() === roomId).map(m => m._id.toString()) });
@@ -255,6 +254,22 @@ setInterval(async () => {
     }
   } catch (e) { /* silent */ }
 }, 60 * 1000);
+
+// Auto-delete community messages older than 24 hours (runs every hour)
+setInterval(async () => {
+  try {
+    const ChatMessage = require('./models/ChatMessage');
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const deleted = await ChatMessage.deleteMany({
+      roomId: 'community_global',
+      createdAt: { $lt: cutoff }
+    });
+    if (deleted.deletedCount > 0) {
+      console.log(`[Community] Auto-deleted ${deleted.deletedCount} messages older than 24h`);
+      io.to('community_global').emit('community_cleared', {});
+    }
+  } catch (e) { /* silent */ }
+}, 60 * 60 * 1000);
 
 // ── Community Settings Cache (no DB hit on every message) ────
 let _communityOpen = true;
