@@ -566,6 +566,26 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun deleteMessageById(msgId: String, forEveryone: Boolean) {
+        val roomId = _openRoom.value?._id ?: return
+        viewModelScope.launch {
+            if (forEveryone) {
+                try {
+                    RetrofitClient.api.deleteMessage(token, msgId)
+                    _messages.value = _messages.value.filter { it._id != msgId }
+                    _messageCache[roomId] = _messages.value
+                    _toastMsg.value = "Message deleted for everyone"
+                } catch (e: Exception) { _toastMsg.value = "Delete failed" }
+            } else {
+                // Delete for me — sirf local se hatao, server pe nahi
+                _messages.value = _messages.value.filter { it._id != msgId }
+                _messageCache[roomId] = _messages.value
+                saveMessagesToDisk(roomId, _messages.value)
+                _toastMsg.value = "Message deleted for you"
+            }
+        }
+    }
+
     fun editMessage(newText: String) {
         val msg = _contextMsg.value ?: return
         val roomId = _openRoom.value?._id ?: return
@@ -1507,6 +1527,29 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) { }
         }
+
+        SocketManager.on("reaction_updated") { args ->
+            try {
+                val data = args[0] as JSONObject
+                val msgId = data.optString("msgId")
+                val roomId = data.optString("roomId")
+                val reactionsJson = data.optJSONObject("reactions")
+                if (msgId.isNotEmpty() && reactionsJson != null && _openRoom.value?._id == roomId) {
+                    val reactionsMap = mutableMapOf<String, List<String>>()
+                    reactionsJson.keys().forEach { key ->
+                        val arr = reactionsJson.optJSONArray(key)
+                        if (arr != null) {
+                            val list = (0 until arr.length()).map { arr.optString(it) }
+                            reactionsMap[key] = list
+                        }
+                    }
+                    _messages.value = _messages.value.map {
+                        if (it._id == msgId) it.copy(reactions = reactionsMap) else it
+                    }
+                    _messageCache[roomId] = _messages.value
+                }
+            } catch (e: Exception) { }
+        }
     }
 
     override fun onCleared() {
@@ -1530,5 +1573,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         SocketManager.off("community_message_deleted")
         SocketManager.off("community_cleared")
         SocketManager.off("community_error")
+        SocketManager.off("message_deleted")
+        SocketManager.off("message_edited")
+        SocketManager.off("message_pinned")
+        SocketManager.off("reaction_updated")
     }
 }

@@ -587,6 +587,9 @@ fun ChatWindowScreen(
     var forwardMsgId by remember { mutableStateOf("") }
     var showEditDialog by remember { mutableStateOf(false) }
     var editText by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var deleteMsgId by remember { mutableStateOf("") }
+    var deleteMsgIsMine by remember { mutableStateOf(false) }
     var showEmojiPanel by remember { mutableStateOf(false) }
     var showAttachMenu by remember { mutableStateOf(false) }
     var showDeleteChatsMenu by remember { mutableStateOf(false) }
@@ -1046,7 +1049,12 @@ fun ChatWindowScreen(
                                             }
                                             context.startActivity(Intent.createChooser(intent, "Share"))
                                             viewModel.dismissContext()
-                                        }                                        "Delete" -> viewModel.deleteMessage()
+                                        }                                        "Delete" -> {
+                                            deleteMsgId = msg._id
+                                            deleteMsgIsMine = msg.senderId == myId
+                                            viewModel.dismissContext()
+                                            showDeleteDialog = true
+                                        }
                                     }
                                 }
                                 .padding(horizontal = 20.dp, vertical = 14.dp),
@@ -1221,8 +1229,7 @@ fun ChatWindowScreen(
     }
 
     // Edit message dialog
-    if (showEditDialog) {
-        Dialog(onDismissRequest = { showEditDialog = false }) {
+    if (showEditDialog) {        Dialog(onDismissRequest = { showEditDialog = false }) {
             Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1250,6 +1257,54 @@ fun ChatWindowScreen(
                                 }
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) { Text("Save", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+                    }
+                }
+            }
+        }
+    }
+
+    // Delete message dialog — Delete for Everyone / Delete for Me
+    if (showDeleteDialog) {
+        Dialog(onDismissRequest = { showDeleteDialog = false }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🗑️ Delete Message", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(4.dp))
+                    // Delete for Everyone — sirf apne messages pe
+                    if (deleteMsgIsMine) {
+                        Box(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF2A1A1A))
+                                .clickable {
+                                    viewModel.deleteMessageById(deleteMsgId, forEveryone = true)
+                                    showDeleteDialog = false
+                                }
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                Text("Delete for Everyone", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Sabke liye delete ho jaayega", color = TextSec, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    // Delete for Me — hamesha available
+                    Box(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(CardAlt)
+                            .clickable {
+                                viewModel.deleteMessageById(deleteMsgId, forEveryone = false)
+                                showDeleteDialog = false
+                            }
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Text("Delete for Me", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Sirf aapke liye delete hoga", color = TextSec, fontSize = 12.sp)
+                        }
+                    }
+                    TextButton(onClick = { showDeleteDialog = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text("Cancel", color = TextSec)
                     }
                 }
             }

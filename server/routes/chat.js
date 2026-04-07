@@ -859,6 +859,17 @@ router.post('/react', authMiddleware, async (req, res) => {
 
     const reactionsObj = {};
     msg.reactions.forEach((users, key) => { reactionsObj[key] = users; });
+
+    // Socket broadcast — dono ko real-time dikhao
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat_${msg.roomId}`).emit('reaction_updated', {
+        msgId: msg._id.toString(),
+        roomId: msg.roomId.toString(),
+        reactions: reactionsObj
+      });
+    }
+
     res.json({ success: true, reactions: reactionsObj });
   } catch (e) {
     res.status(500).json({ error: e.message });
