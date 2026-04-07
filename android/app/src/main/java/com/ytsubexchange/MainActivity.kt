@@ -823,16 +823,40 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private data class BotMsg(val text: String, val isUser: Boolean)
+
 @Composable
 fun FloatingChatbotButton() {
     var showChat by remember { mutableStateOf(false) }
 
-    data class ChatMsg(val text: String, val isUser: Boolean)
-    var messages by remember { mutableStateOf(listOf(ChatMsg("Namaste! Main YT Buddy hoon 🤖\nKoi bhi sawaal pucho — YouTube tips, coins, ya kuch bhi!", false))) }
+    var messages by remember { mutableStateOf(listOf(BotMsg("Namaste! Main YT Buddy hoon 🤖\nKoi bhi sawaal pucho — YouTube tips, coins, ya kuch bhi!", false))) }
     var input by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+    var pendingQuery by remember { mutableStateOf<String?>(null) }
+
+    // AI call — LaunchedEffect se karo taaki coroutine scope sahi rahe
+    LaunchedEffect(pendingQuery) {
+        val query = pendingQuery ?: return@LaunchedEffect
+        pendingQuery = null
+        isLoading = true
+        try {
+            val prefs = context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE)
+            val token = "Bearer ${prefs.getString("token", "")}"
+            val history = messages.dropLast(1).takeLast(10).map {
+                mapOf("role" to if (it.isUser) "user" else "ai", "text" to it.text)
+            }
+            val resp = com.ytsubexchange.network.RetrofitClient.api.aiChat(
+                token, mapOf("message" to query, "history" to history)
+            )
+            messages = messages + BotMsg(resp.reply, false)
+        } catch (e: Exception) {
+            messages = messages + BotMsg("Oops! Kuch problem aayi. Dobara try karo 😅", false)
+        } finally {
+            isLoading = false
+        }
+    }
 
     // Drag position
     var offsetX by remember { mutableStateOf(0f) }
@@ -1010,26 +1034,8 @@ fun FloatingChatbotButton() {
                                     if (input.isNotBlank() && !isLoading) {
                                         val userText = input.trim()
                                         input = ""
-                                        messages = messages + ChatMsg(userText, true)
-                                        isLoading = true
-                                        scope.launch {
-                                            try {
-                                                val prefs = context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE)
-                                                val token = "Bearer ${prefs.getString("token", "")}"
-                                                // Build history for context
-                                                val history = messages.dropLast(1).takeLast(10).map {
-                                                    mapOf("role" to if (it.isUser) "user" else "ai", "text" to it.text)
-                                                }
-                                                val resp = com.ytsubexchange.network.RetrofitClient.api.aiChat(
-                                                    token, mapOf("message" to userText, "history" to history)
-                                                )
-                                                messages = messages + ChatMsg(resp.reply, false)
-                                            } catch (e: Exception) {
-                                                messages = messages + ChatMsg("Oops! Kuch problem aayi. Dobara try karo 😅", false)
-                                            } finally {
-                                                isLoading = false
-                                            }
-                                        }
+                                        messages = messages + BotMsg(userText, true)
+                                        pendingQuery = userText
                                     }
                                 },
                             contentAlignment = Alignment.Center
