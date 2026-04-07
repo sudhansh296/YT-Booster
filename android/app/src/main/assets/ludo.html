@@ -6,37 +6,93 @@
 <title>Ludo</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; touch-action:manipulation; }
-body { background:#1a0a00; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:100vh; font-family:Arial,sans-serif; overflow:hidden; }
-#game-container { width:100vw; max-width:500px; }
-#board-wrap { position:relative; width:100%; padding-bottom:100%; }
-#board { position:absolute; top:0; left:0; width:100%; height:100%; }
-#controls { padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-#dice-area { display:flex; align-items:center; gap:12px; }
-#dice { width:60px; height:60px; background:linear-gradient(135deg,#fff9c4,#ffee58); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:36px; box-shadow:0 4px 12px rgba(0,0,0,0.4); cursor:pointer; transition:transform 0.1s; user-select:none; }
-#dice:active { transform:scale(0.92); }
-#dice.rolling { animation:roll 0.5s ease; }
-@keyframes roll { 0%{transform:rotate(0deg) scale(1)} 25%{transform:rotate(90deg) scale(1.1)} 50%{transform:rotate(180deg) scale(0.9)} 75%{transform:rotate(270deg) scale(1.1)} 100%{transform:rotate(360deg) scale(1)} }
-#roll-btn { flex:1; height:52px; border:none; border-radius:26px; background:linear-gradient(135deg,#ff6f00,#ffd600); color:#1a0a00; font-size:16px; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(255,111,0,0.4); transition:transform 0.1s; }
-#roll-btn:active { transform:scale(0.96); }
-#roll-btn:disabled { background:linear-gradient(135deg,#444,#666); color:#888; box-shadow:none; }
-#status { color:#ffd700; font-size:13px; text-align:center; padding:4px 16px 8px; min-height:24px; }
-#players-bar { display:flex; justify-content:space-around; padding:6px 8px; gap:6px; }
-.player-chip { flex:1; border-radius:10px; padding:6px 4px; text-align:center; background:rgba(255,255,255,0.05); transition:all 0.3s; }
-.player-chip.active { transform:scale(1.05); box-shadow:0 0 10px currentColor; }
-.player-chip .chip-dot { width:18px; height:18px; border-radius:50%; margin:0 auto 3px; }
-.player-chip .chip-name { font-size:10px; color:#ccc; }
-.player-chip .chip-tokens { font-size:9px; color:#ffd700; }
+body {
+  background: linear-gradient(160deg, #0d0d1a 0%, #1a0a2e 50%, #0d0d1a 100%);
+  display:flex; flex-direction:column; align-items:center;
+  min-height:100vh; font-family:'Arial',sans-serif; overflow:hidden;
+}
+#game-container { width:100vw; max-width:480px; display:flex; flex-direction:column; height:100vh; }
+#board-wrap { position:relative; width:100%; flex-shrink:0; }
+#board-wrap::after {
+  content:''; position:absolute; inset:-3px; border-radius:6px;
+  background:linear-gradient(135deg,#ffd700,#ff6f00,#ffd700,#ff6f00);
+  z-index:-1; animation:borderGlow 3s linear infinite;
+}
+@keyframes borderGlow { 0%{opacity:0.6} 50%{opacity:1} 100%{opacity:0.6} }
+#board { display:block; width:100%; height:auto; border-radius:4px; }
+
+#controls {
+  padding:10px 14px 6px;
+  display:flex; align-items:center; gap:10px;
+  background:linear-gradient(180deg,rgba(13,13,26,0) 0%,rgba(13,13,26,0.95) 20%);
+}
+#dice-wrap { position:relative; }
+#dice {
+  width:58px; height:58px;
+  background:linear-gradient(135deg,#fffde7,#fff176,#ffd600);
+  border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:34px;
+  box-shadow:0 0 0 3px #ff6f00, 0 6px 20px rgba(255,111,0,0.5), inset 0 2px 4px rgba(255,255,255,0.8);
+  cursor:pointer; user-select:none; transition:transform 0.1s;
+}
+#dice:active { transform:scale(0.9); }
+#dice.rolling { animation:diceRoll 0.5s cubic-bezier(.36,.07,.19,.97); }
+@keyframes diceRoll {
+  0%{transform:rotate(0) scale(1)}
+  20%{transform:rotate(-15deg) scale(1.15)}
+  40%{transform:rotate(15deg) scale(0.9)}
+  60%{transform:rotate(-10deg) scale(1.1)}
+  80%{transform:rotate(5deg) scale(0.95)}
+  100%{transform:rotate(0) scale(1)}
+}
+#roll-btn {
+  flex:1; height:54px; border:none; border-radius:27px;
+  background:linear-gradient(135deg,#ff6f00,#ffd600,#ff6f00);
+  background-size:200% 100%;
+  color:#1a0a00; font-size:17px; font-weight:900;
+  cursor:pointer; letter-spacing:1px;
+  box-shadow:0 0 0 2px #ff6f00, 0 6px 20px rgba(255,111,0,0.5);
+  animation:btnShine 2s linear infinite;
+  transition:transform 0.1s, box-shadow 0.1s;
+}
+@keyframes btnShine {
+  0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%}
+}
+#roll-btn:active { transform:scale(0.96); box-shadow:0 2px 8px rgba(255,111,0,0.3); }
+#roll-btn:disabled {
+  background:linear-gradient(135deg,#2a2a3a,#3a3a4a);
+  color:#555; box-shadow:none; animation:none;
+}
+#status {
+  color:#ffd700; font-size:13px; font-weight:600;
+  text-align:center; padding:4px 16px 2px; min-height:22px;
+  text-shadow:0 0 10px rgba(255,215,0,0.5);
+}
+#players-bar { display:flex; justify-content:space-around; padding:4px 6px; gap:5px; }
+.player-chip {
+  flex:1; border-radius:12px; padding:5px 3px; text-align:center;
+  background:rgba(255,255,255,0.04);
+  border:1.5px solid transparent; transition:all 0.3s;
+}
+.player-chip.active {
+  background:rgba(255,255,255,0.1);
+  box-shadow:0 0 12px var(--chip-color,#ffd700);
+  border-color:var(--chip-color,#ffd700);
+  transform:scale(1.06);
+}
+.chip-dot { width:16px; height:16px; border-radius:50%; margin:0 auto 2px; box-shadow:0 2px 6px rgba(0,0,0,0.4); }
+.chip-name { font-size:9px; color:#bbb; font-weight:600; }
+.chip-prog { font-size:8px; color:#ffd700; letter-spacing:1px; }
 </style>
 </head>
 <body>
 <div id="game-container">
-  <div id="players-bar" id="players-bar"></div>
+  <div id="players-bar"></div>
   <div id="board-wrap"><canvas id="board"></canvas></div>
   <div id="status">Game shuru karo!</div>
   <div id="controls">
-    <div id="dice-area">
-      <div id="dice">🎲</div>
-    </div>
+    <div id="dice-wrap"><div id="dice">🎲</div></div>
     <button id="roll-btn" onclick="rollDice()">🎲 ROLL</button>
   </div>
 </div>
@@ -44,10 +100,10 @@ body { background:#1a0a00; display:flex; flex-direction:column; align-items:cent
 
 // ── Game Config ──────────────────────────────────────────────
 const COLORS = {
-  RED:    { hex:'#E53935', dark:'#B71C1C', home:[0,0], label:'Red' },
-  GREEN:  { hex:'#43A047', dark:'#1B5E20', home:[9,0], label:'Green' },
-  YELLOW: { hex:'#FDD835', dark:'#F9A825', home:[9,9], label:'Yellow' },
-  BLUE:   { hex:'#1E88E5', dark:'#0D47A1', home:[0,9], label:'Blue' }
+  RED:    { hex:'#E53935', dark:'#B71C1C', light:'#EF9A9A', home:[0,0], label:'Red' },
+  GREEN:  { hex:'#43A047', dark:'#1B5E20', light:'#A5D6A7', home:[9,0], label:'Green' },
+  YELLOW: { hex:'#FDD835', dark:'#F9A825', light:'#FFF59D', home:[9,9], label:'Yellow' },
+  BLUE:   { hex:'#1E88E5', dark:'#0D47A1', light:'#90CAF9', home:[0,9], label:'Blue' }
 };
 
 // Standard Ludo path (52 squares, [col, row])
@@ -165,129 +221,182 @@ function drawBoard() {
   const c = w / 15;
   ctx.clearRect(0,0,w,w);
 
-  // Background
-  ctx.fillStyle = '#F5E6C8';
-  ctx.fillRect(0,0,w,w);
+  // Premium board background
+  const bgGrad = ctx.createLinearGradient(0,0,w,w);
+  bgGrad.addColorStop(0,'#F8EDD0'); bgGrad.addColorStop(0.5,'#FFF8E1'); bgGrad.addColorStop(1,'#F8EDD0');
+  ctx.fillStyle = bgGrad; ctx.fillRect(0,0,w,w);
 
-  // Home areas — correct corners
-  drawHomeArea(ctx, 0, 0, c*6, '#E53935', '#B71C1C');       // RED top-left
-  drawHomeArea(ctx, c*9, 0, c*6, '#43A047', '#1B5E20');     // GREEN top-right
-  drawHomeArea(ctx, c*9, c*9, c*6, '#FDD835', '#F9A825');   // YELLOW bottom-right
-  drawHomeArea(ctx, 0, c*9, c*6, '#1E88E5', '#0D47A1');     // BLUE bottom-left
+  // Home areas — Ludo King style with gradient + gloss
+  drawHomeArea(ctx, 0, 0, c*6, '#E53935', '#B71C1C', '#EF9A9A');       // RED top-left
+  drawHomeArea(ctx, c*9, 0, c*6, '#43A047', '#1B5E20', '#A5D6A7');     // GREEN top-right
+  drawHomeArea(ctx, c*9, c*9, c*6, '#FDD835', '#F9A825', '#FFF59D');   // YELLOW bottom-right
+  drawHomeArea(ctx, 0, c*9, c*6, '#1E88E5', '#0D47A1', '#90CAF9');     // BLUE bottom-left
 
-  // Path cells
+  // Path cells with subtle gradient
   PATH.forEach(([col,row], idx) => {
-    let bg = '#FFFDE7';
-    if (idx===0)  bg = '#E53935';   // RED start
-    else if (idx===13) bg = '#43A047'; // GREEN start
-    else if (idx===26) bg = '#FDD835'; // YELLOW start
-    else if (idx===39) bg = '#1E88E5'; // BLUE start
-    else if (SAFE_IDX.has(idx)) bg = '#FFF9C4';
-    ctx.fillStyle = bg;
-    ctx.fillRect(col*c, row*c, c, c);
+    let bg1, bg2;
+    if (idx===0)  { bg1='#E53935'; bg2='#EF5350'; }
+    else if (idx===13) { bg1='#43A047'; bg2='#66BB6A'; }
+    else if (idx===26) { bg1='#FDD835'; bg2='#FFEE58'; }
+    else if (idx===39) { bg1='#1E88E5'; bg2='#42A5F5'; }
+    else if (SAFE_IDX.has(idx)) { bg1='#FFF9C4'; bg2='#FFFDE7'; }
+    else { bg1='#FFFDE7'; bg2='#FFF8E1'; }
+    const g = ctx.createLinearGradient(col*c,row*c,col*c+c,row*c+c);
+    g.addColorStop(0,bg1); g.addColorStop(1,bg2);
+    ctx.fillStyle=g; ctx.fillRect(col*c,row*c,c,c);
   });
 
-  // Home column lanes — each color's lane leads to their home
-  const laneColors = {
-    RED:    '#E5393580',  // RED lane (row 7, cols 1-6) — leads to RED home top-left
-    GREEN:  '#43A04780',  // GREEN lane (col 7, rows 1-6) — leads to GREEN home top-right
-    YELLOW: '#FDD83580',  // YELLOW lane (row 7, cols 8-13) — leads to YELLOW home bottom-right
-    BLUE:   '#1E88E580'   // BLUE lane (col 7, rows 8-13) — leads to BLUE home bottom-left
+  // Home column lanes — glossy colored
+  const laneGrads = {
+    RED:    ['#EF5350','#E53935'],
+    GREEN:  ['#66BB6A','#43A047'],
+    YELLOW: ['#FFEE58','#FDD835'],
+    BLUE:   ['#42A5F5','#1E88E5']
   };
   Object.entries(HOME_COLS).forEach(([color, cells]) => {
-    ctx.fillStyle = laneColors[color];
-    cells.forEach(([col,row]) => ctx.fillRect(col*c, row*c, c, c));
+    cells.forEach(([col,row]) => {
+      const [c1,c2] = laneGrads[color];
+      const g = ctx.createLinearGradient(col*c,row*c,col*c+c,row*c+c);
+      g.addColorStop(0,c1+'cc'); g.addColorStop(1,c2+'cc');
+      ctx.fillStyle=g; ctx.fillRect(col*c,row*c,c,c);
+      // Gloss overlay
+      ctx.fillStyle='rgba(255,255,255,0.15)';
+      ctx.fillRect(col*c,row*c,c,c*0.4);
+    });
   });
 
-  // Center
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(c*6, c*6, c*3, c*3);
-  const cx = c*7.5, cy = c*7.5, s = c*1.5;
+  // Center area
+  ctx.fillStyle='#fff'; ctx.fillRect(c*6,c*6,c*3,c*3);
+  const cx=c*7.5, cy=c*7.5, s=c*1.5;
   [['#E53935',[cx-s,cy+s,cx+s,cy+s,cx,cy]],
    ['#43A047',[cx-s,cy-s,cx-s,cy+s,cx,cy]],
    ['#FDD835',[cx-s,cy-s,cx+s,cy-s,cx,cy]],
    ['#1E88E5',[cx+s,cy-s,cx+s,cy+s,cx,cy]]
   ].forEach(([col,pts]) => {
-    ctx.fillStyle = col;
+    const g = ctx.createRadialGradient(cx,cy,0,cx,cy,s);
+    g.addColorStop(0,col+'ff'); g.addColorStop(1,col+'99');
+    ctx.fillStyle=g;
     ctx.beginPath(); ctx.moveTo(pts[0],pts[1]);
     ctx.lineTo(pts[2],pts[3]); ctx.lineTo(pts[4],pts[5]);
     ctx.closePath(); ctx.fill();
   });
-  drawStar(ctx, cx, cy, c*0.5, '#FFD700');
+  // Center star
+  drawStar(ctx,cx,cy,c*0.55,'#FFD700');
+  drawStar(ctx,cx,cy,c*0.38,'#FF8F00');
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(139,105,20,0.3)'; ctx.lineWidth = 0.8;
-  for (let i=0; i<=15; i++) {
-    ctx.beginPath(); ctx.moveTo(i*c,0); ctx.lineTo(i*c,w); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,i*c); ctx.lineTo(w,i*c); ctx.stroke();
+  // Grid lines — subtle
+  ctx.strokeStyle='rgba(139,105,20,0.25)'; ctx.lineWidth=0.6;
+  for(let i=0;i<=15;i++){
+    ctx.beginPath();ctx.moveTo(i*c,0);ctx.lineTo(i*c,w);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,i*c);ctx.lineTo(w,i*c);ctx.stroke();
   }
-  // Outer border
-  ctx.strokeStyle = '#8B6914'; ctx.lineWidth = c*0.1;
-  ctx.strokeRect(c*0.05, c*0.05, w-c*0.1, w-c*0.1);
+  // Thick outer border — gold
+  ctx.strokeStyle='#8B6914'; ctx.lineWidth=c*0.12;
+  ctx.strokeRect(c*0.06,c*0.06,w-c*0.12,w-c*0.12);
+  // Inner border
+  ctx.strokeStyle='rgba(139,105,20,0.4)'; ctx.lineWidth=c*0.04;
+  ctx.strokeRect(c*0.15,c*0.15,w-c*0.3,w-c*0.3);
 
-  // Safe stars
+  // Safe star markers
   [8,21,34,47].forEach(idx => {
     const [col,row] = PATH[idx];
-    drawStar(ctx, col*c+c/2, row*c+c/2, c*0.28, '#FFD700');
+    drawStar(ctx,col*c+c/2,row*c+c/2,c*0.3,'#FFD700');
   });
 
   // Tokens
   players.forEach(p => {
     p.tokens.forEach(t => {
-      if (!t.finished) {
-        const [col,row] = tokenGridPos(p.color, t);
-        drawToken(ctx, col*c+c/2, row*c+c/2, c*0.38, p.color, t.id);
+      if(!t.finished){
+        const [col,row] = tokenGridPos(p.color,t);
+        drawToken(ctx,col*c+c/2,row*c+c/2,c*0.38,p.color,t.id);
       }
     });
   });
 
-  // Highlight movable tokens
-  if (diceRolled && !gameOver) {
+  // Highlight movable tokens — pulsing gold ring
+  if(diceRolled && !gameOver){
     const p = players[currentIdx];
-    getMovable(p, diceVal).forEach(t => {
-      const [col,row] = tokenGridPos(p.color, t);
-      ctx.strokeStyle = '#FFD700';
-      ctx.lineWidth = c*0.08;
+    getMovable(p,diceVal).forEach(t => {
+      const [col,row] = tokenGridPos(p.color,t);
+      ctx.save();
+      ctx.strokeStyle='#FFD700';
+      ctx.lineWidth=c*0.1;
+      ctx.shadowColor='#FFD700';
+      ctx.shadowBlur=c*0.3;
       ctx.beginPath();
-      ctx.arc(col*c+c/2, row*c+c/2, c*0.42, 0, Math.PI*2);
+      ctx.arc(col*c+c/2,row*c+c/2,c*0.44,0,Math.PI*2);
       ctx.stroke();
+      ctx.restore();
     });
   }
 }
 
-function drawHomeArea(ctx, x, y, sz, main, dark) {
-  ctx.fillStyle = main; ctx.fillRect(x,y,sz,sz);
-  const p = sz*0.08;
-  ctx.fillStyle = '#FFFDE7'; ctx.fillRect(x+p,y+p,sz-p*2,sz-p*2);
-  ctx.strokeStyle = main; ctx.lineWidth = sz*0.04;
+function drawHomeArea(ctx, x, y, sz, main, dark, light) {
+  // Outer gradient fill
+  const og = ctx.createLinearGradient(x,y,x+sz,y+sz);
+  og.addColorStop(0,main); og.addColorStop(0.5,light||main); og.addColorStop(1,dark);
+  ctx.fillStyle=og; ctx.fillRect(x,y,sz,sz);
+
+  // Gloss overlay top
+  const gloss = ctx.createLinearGradient(x,y,x,y+sz*0.5);
+  gloss.addColorStop(0,'rgba(255,255,255,0.25)'); gloss.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=gloss; ctx.fillRect(x,y,sz,sz*0.5);
+
+  // Inner white area
+  const p = sz*0.1;
+  ctx.fillStyle='#FFFDE7'; ctx.fillRect(x+p,y+p,sz-p*2,sz-p*2);
+
+  // Inner border
+  ctx.strokeStyle=main; ctx.lineWidth=sz*0.04;
   ctx.strokeRect(x+p,y+p,sz-p*2,sz-p*2);
+
+  // 4 token slot circles — 3D style
   const r = sz*0.18;
   [[0.27,0.27],[0.73,0.27],[0.27,0.73],[0.73,0.73]].forEach(([fx,fy]) => {
     const cx=x+sz*fx, cy=y+sz*fy;
-    ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.arc(cx,cy+2,r+2,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=dark; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=main; ctx.beginPath(); ctx.arc(cx,cy,r*0.72,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(cx-r*0.2,cy-r*0.2,r*0.3,0,Math.PI*2); ctx.fill();
+    // Drop shadow
+    ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(cx,cy+r*0.12,r+1,0,Math.PI*2); ctx.fill();
+    // Outer ring
+    const rg = ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,r*0.1,cx,cy,r);
+    rg.addColorStop(0,light||main); rg.addColorStop(1,dark);
+    ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    // Inner circle
+    ctx.fillStyle=main; ctx.beginPath(); ctx.arc(cx,cy,r*0.68,0,Math.PI*2); ctx.fill();
+    // Highlight
+    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(cx-r*0.22,cy-r*0.22,r*0.28,0,Math.PI*2); ctx.fill();
   });
 }
 
 function drawToken(ctx, cx, cy, r, color, id) {
   const c = COLORS[color];
-  // Shadow
-  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(cx,cy+r*0.15,r,0,Math.PI*2); ctx.fill();
-  // Gradient body
-  const g = ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,r*0.1,cx,cy,r);
-  g.addColorStop(0,'rgba(255,255,255,0.9)');
-  g.addColorStop(0.35,c.hex);
+  // Drop shadow
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=r*0.8; ctx.shadowOffsetY=r*0.2;
+  ctx.fillStyle=c.dark; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // Body gradient
+  const g = ctx.createRadialGradient(cx-r*0.35,cy-r*0.35,r*0.05,cx,cy,r);
+  g.addColorStop(0,'rgba(255,255,255,0.95)');
+  g.addColorStop(0.25,c.light||c.hex);
+  g.addColorStop(0.7,c.hex);
   g.addColorStop(1,c.dark);
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-  // Inner circle
-  ctx.fillStyle=c.dark; ctx.beginPath(); ctx.arc(cx,cy,r*0.55,0,Math.PI*2); ctx.fill();
+  // Outer ring
+  ctx.strokeStyle=c.dark; ctx.lineWidth=r*0.08;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  // Inner dark circle
+  ctx.fillStyle=c.dark; ctx.beginPath(); ctx.arc(cx,cy,r*0.52,0,Math.PI*2); ctx.fill();
   // Number
-  ctx.fillStyle='#fff'; ctx.font=`bold ${r*0.65}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(id+1, cx, cy+r*0.05);
-  // Highlight
-  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(cx-r*0.25,cy-r*0.25,r*0.22,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.font=`bold ${r*0.68}px Arial`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=r*0.3;
+  ctx.fillText(id+1,cx,cy+r*0.04);
+  ctx.shadowBlur=0;
+  // Specular highlight
+  const hl = ctx.createRadialGradient(cx-r*0.28,cy-r*0.28,0,cx-r*0.28,cy-r*0.28,r*0.4);
+  hl.addColorStop(0,'rgba(255,255,255,0.7)'); hl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=hl; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
 }
 
 function drawStar(ctx, cx, cy, r, color) {
@@ -487,10 +596,11 @@ function updatePlayersBar() {
   bar.innerHTML = players.map((p,i) => {
     const done = p.tokens.filter(t=>t.finished).length;
     const active = i === currentIdx;
-    return `<div class="player-chip ${active?'active':''}" style="border:2px solid ${active?COLORS[p.color].hex:'transparent'}">
-      <div class="chip-dot" style="background:${COLORS[p.color].hex}"></div>
-      <div class="chip-name">${COLORS[p.color].label}</div>
-      <div class="chip-tokens">${'●'.repeat(done)}${'○'.repeat(4-done)}</div>
+    const c = COLORS[p.color];
+    return `<div class="player-chip ${active?'active':''}" style="--chip-color:${c.hex};border-color:${active?c.hex:'transparent'}">
+      <div class="chip-dot" style="background:radial-gradient(circle at 35% 35%,${c.light||c.hex},${c.dark})"></div>
+      <div class="chip-name" style="color:${active?c.hex:'#aaa'}">${c.label}</div>
+      <div class="chip-prog">${'●'.repeat(done)}${'○'.repeat(4-done)}</div>
     </div>`;
   }).join('');
 }
