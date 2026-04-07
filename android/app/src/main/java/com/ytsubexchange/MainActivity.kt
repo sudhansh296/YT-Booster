@@ -1375,60 +1375,37 @@ fun FloatingGamesButton() {
 
                         Spacer(Modifier.height(16.dp))
 
-                        // Ludo card
-                        Box(
-                            Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    Brush.linearGradient(listOf(Color(0xFF7B2FF7).copy(0.3f), Color(0xFFE53935).copy(0.2f)))
-                                )
-                                .border(1.dp, Color(0xFF7B2FF7).copy(0.5f), RoundedCornerShape(16.dp))
-                                .clickable { showPanel = false; showLudo = true }
-                                .padding(16.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Text("🎲", fontSize = 40.sp)
-                                Column(Modifier.weight(1f)) {
-                                    Text("Ludo", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                    Text("2-4 players • vs Computer • Online P2P", color = Color(0xFF888888), fontSize = 12.sp)
-                                    Text("50🪙 per player • 1st = 75🪙", color = Color(0xFFFFD700), fontSize = 11.sp)
-                                }
-                                Box(
-                                    Modifier.clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFF7B2FF7).copy(0.3f))
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text("PLAY", color = Color(0xFF7B2FF7), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(10.dp))
-
-                        // Coming soon placeholder
-                        Box(
-                            Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF1A1A2E))
-                                .padding(16.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Text("🃏", fontSize = 40.sp)
-                                Column(Modifier.weight(1f)) {
-                                    Text("Teen Patti", color = Color(0xFF555555), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                    Text("Coming Soon...", color = Color(0xFF444444), fontSize = 12.sp)
-                                }
-                                Box(
-                                    Modifier.clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFF222222))
-                                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text("SOON", color = Color(0xFF555555), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        // All games — Coming Soon
+                        val comingSoonGames = listOf(
+                            Triple("🎲", "Ludo", "2-4 players • P2P • 50🪙 per player"),
+                            Triple("♟️", "Chess", "1v1 • Strategy • 50🪙 bet"),
+                            Triple("🃏", "Andar Bahar", "Card game • Instant win • 10🪙+"),
+                            Triple("🎰", "Satta Matka", "Rolling dice • Number bet • 5x reward")
+                        )
+                        comingSoonGames.forEach { (emoji, name, desc) ->
+                            Box(
+                                Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF1A1A2E))
+                                    .padding(14.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(emoji, fontSize = 36.sp)
+                                    Column(Modifier.weight(1f)) {
+                                        Text(name, color = Color(0xFF555555), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Text(desc, color = Color(0xFF3A3A4A), fontSize = 11.sp)
+                                    }
+                                    Box(
+                                        Modifier.clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFF222233))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("SOON", color = Color(0xFF555566), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
+                            Spacer(Modifier.height(8.dp))
                         }
-
-                        Spacer(Modifier.height(8.dp))
                     }
                 }
             }
