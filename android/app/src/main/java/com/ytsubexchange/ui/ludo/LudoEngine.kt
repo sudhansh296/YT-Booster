@@ -42,14 +42,6 @@ object LudoBoard {
         LudoColor.BLUE to 39
     )
 
-    // Home column entry square (last square before home column)
-    val homeEntry = mapOf(
-        LudoColor.RED to 51,
-        LudoColor.GREEN to 12,
-        LudoColor.YELLOW to 25,
-        LudoColor.BLUE to 38
-    )
-
     // Safe squares (star squares + home squares)
     val safeSquares = setOf(0, 8, 13, 21, 26, 34, 39, 47)
 
