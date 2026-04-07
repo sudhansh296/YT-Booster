@@ -112,6 +112,7 @@ data class ChatMessage(
     val readBy: List<String> = emptyList(),
     val pinned: Boolean = false,
     val starred: Boolean = false,
+    val edited: Boolean = false,
     val reactions: Map<String, List<String>> = emptyMap(),
     val replyTo: ReplyRef? = null,
     val forwardedFrom: String? = null,
@@ -220,6 +221,7 @@ data class StarRequest(val msgId: String)
 data class StarResponse(val success: Boolean, val starred: Boolean)
 data class PinRequest(val msgId: String, val roomId: String)
 data class DeleteMsgResponse(val success: Boolean)
+data class EditMsgResponse(val success: Boolean, val text: String = "", val edited: Boolean = true)
 data class MuteResponse(val success: Boolean, val muted: Boolean)
 
 // ── Chat Request Models ───────────────────────────────────────

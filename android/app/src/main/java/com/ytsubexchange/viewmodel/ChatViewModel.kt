@@ -566,6 +566,23 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun editMessage(newText: String) {
+        val msg = _contextMsg.value ?: return
+        val roomId = _openRoom.value?._id ?: return
+        dismissContext()
+        viewModelScope.launch {
+            try {
+                val resp = RetrofitClient.api.editMessage(token, msg._id, mapOf("text" to newText))
+                val updated = _messages.value.map {
+                    if (it._id == msg._id) it.copy(text = resp.text, edited = true) else it
+                }
+                _messages.value = updated
+                _messageCache[roomId] = updated
+                _toastMsg.value = "Message edited ✓"
+            } catch (e: Exception) { _toastMsg.value = "Edit failed" }
+        }
+    }
+
     fun copyMessage(): String { val text = _contextMsg.value?.text ?: ""; dismissContext(); return text }
 
     fun showStarredPanel() {

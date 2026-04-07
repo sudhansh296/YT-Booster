@@ -1457,4 +1457,28 @@ router.post('/mark-read', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Edit message ─────────────────────────────────────────────
+router.put('/message/:msgId', authMiddleware, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'text required' });
+    const msg = await ChatMessage.findById(req.params.msgId);
+    if (!msg) return res.status(404).json({ error: 'Message not found' });
+    if (msg.senderId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Sirf apna message edit kar sakte ho' });
+    }
+    msg.text = text;
+    msg.edited = true;
+    await msg.save();
+    // Socket broadcast
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat_${msg.roomId}`).emit('message_edited', { msgId: msg._id, text, edited: true });
+    }
+    res.json({ success: true, text, edited: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

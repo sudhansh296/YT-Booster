@@ -155,6 +155,13 @@ interface ApiService {
         @Path("msgId") msgId: String
     ): com.ytsubexchange.data.DeleteMsgResponse
 
+    @PUT("chat/message/{msgId}")
+    suspend fun editMessage(
+        @Header("Authorization") token: String,
+        @Path("msgId") msgId: String,
+        @Body body: Map<String, String>
+    ): com.ytsubexchange.data.EditMsgResponse
+
     @GET("chat/community")
     suspend fun getCommunityMessages(@Header("Authorization") token: String): com.ytsubexchange.data.ChatMessagesResponse
 

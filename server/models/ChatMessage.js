@@ -13,6 +13,7 @@ const chatMessageSchema = new mongoose.Schema({
   forwardedFrom: { type: String, default: null },        // original sender name if forwarded
   disappearsAt: { type: Date, default: null },           // auto-delete time
   pinned: { type: Boolean, default: false },
+  edited: { type: Boolean, default: false },
   starred: [{ type: String }],
   fileUrl: { type: String, default: null },
   fileType: { type: String, default: null },

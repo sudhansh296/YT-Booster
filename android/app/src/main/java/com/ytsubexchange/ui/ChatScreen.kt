@@ -561,6 +561,8 @@ fun ChatWindowScreen(
     var showInviteLink by remember { mutableStateOf("") }
     var showForwardDialog by remember { mutableStateOf(false) }
     var forwardMsgId by remember { mutableStateOf("") }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editText by remember { mutableStateOf("") }
     var showEmojiPanel by remember { mutableStateOf(false) }
     var showAttachMenu by remember { mutableStateOf(false) }
     var showDeleteChatsMenu by remember { mutableStateOf(false) }
@@ -957,6 +959,8 @@ fun ChatWindowScreen(
                         add(Triple(if (isStarred) "Unstar ★" else "Star ⭐", Icons.Default.Star, false))
                         add(Triple("Pin 📌", Icons.Default.PushPin, false))
                         if (msg.text.isNotBlank() && !hasFile) add(Triple("Copy", Icons.Default.ContentCopy, false))
+                        // Edit — sirf apne text messages pe
+                        if (msg.senderId == myId && msg.text.isNotBlank() && !hasFile) add(Triple("Edit ✏️", Icons.Default.Edit, false))
                         if (hasFile) {
                             add(Triple("Save / Open", Icons.Default.Download, false))
                             add(Triple("Share", Icons.Default.Share, false))
@@ -970,6 +974,7 @@ fun ChatWindowScreen(
                                     when (label) {
                                         "Reply" -> viewModel.setReplyFromContext()
                                         "Forward" -> { showForwardDialog = true; forwardMsgId = msg._id; viewModel.dismissContext() }
+                                        "Edit ✏️" -> { editText = msg.text; showEditDialog = true }
                                         "Star ⭐" -> viewModel.starMessage()
                                         "Unstar ★" -> viewModel.starMessage()
                                         "Pin 📌" -> viewModel.pinMessage()
@@ -1185,6 +1190,42 @@ fun ChatWindowScreen(
                     }
                     TextButton(onClick = { showForwardDialog = false }, modifier = Modifier.align(Alignment.End)) {
                         Text("Cancel", color = TextSec)
+                    }
+                }
+            }
+        }
+    }
+
+    // Edit message dialog
+    if (showEditDialog) {
+        Dialog(onDismissRequest = { showEditDialog = false }) {
+            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("✏️ Edit Message", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(CardAlt).padding(12.dp)) {
+                        BasicTextField(
+                            value = editText,
+                            onValueChange = { editText = it },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 14.sp),
+                            maxLines = 6,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showEditDialog = false }) { Text("Cancel", color = TextSec) }
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            Modifier.clip(RoundedCornerShape(10.dp))
+                                .background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B))))
+                                .clickable {
+                                    if (editText.isNotBlank()) {
+                                        viewModel.editMessage(editText.trim())
+                                        showEditDialog = false
+                                    }
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) { Text("Save", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
                     }
                 }
             }
@@ -1860,6 +1901,10 @@ fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwi
                         Spacer(Modifier.width(3.dp))
                     }
                     Text(formatChatTime(msg.createdAt), color = Color.White.copy(0.6f), fontSize = 10.sp)
+                    if (msg.edited) {
+                        Spacer(Modifier.width(3.dp))
+                        Text("edited", color = Color.White.copy(0.45f), fontSize = 9.sp)
+                    }
                     if (isMine && msg.read) {
                         Spacer(Modifier.width(4.dp))
                         Text("✓✓", color = Color(0xFF29B6F6), fontSize = 10.sp)
