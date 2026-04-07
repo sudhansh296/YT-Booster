@@ -367,7 +367,7 @@ fun ChatListScreen(
                         }.padding(16.dp, 14.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                             Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(20.dp))
-                            Text("Leave Group", color = Color(0xFFFF6B6B), fontSize = 14.sp)
+                            Text("Leave & Delete Group", color = Color(0xFFFF6B6B), fontSize = 14.sp)
                         }
                     } else {
                         Row(Modifier.fillMaxWidth().clickable {
@@ -385,15 +385,15 @@ fun ChatListScreen(
         }
     }
 
-    // Leave group confirm
+    // Leave & delete group confirm
     if (showLeaveConfirm && menuRoom != null) {
         val room = menuRoom!!
         Dialog(onDismissRequest = { showLeaveConfirm = false; menuRoom = null }) {
             Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Leave Group?", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("\"${room.name}\" group se leave kar doge?", color = chatTextSec(), fontSize = 14.sp)
+                    Text("🗑️ Delete Group?", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("\"${room.name}\" group se leave ho jaoge aur yeh list se delete ho jaayega.", color = chatTextSec(), fontSize = 14.sp)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { showLeaveConfirm = false; menuRoom = null }) {
                             Text("Cancel", color = chatTextSec())
@@ -405,7 +405,7 @@ fun ChatListScreen(
                                 menuRoom = null
                                 viewModel.leaveGroupById(room._id)
                             }.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            Text("Leave", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Delete", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                     }
                 }

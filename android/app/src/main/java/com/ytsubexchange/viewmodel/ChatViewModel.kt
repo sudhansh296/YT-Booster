@@ -972,8 +972,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 RetrofitClient.api.groupLeave(token, com.ytsubexchange.data.GroupLeaveRequest(roomId))
                 _rooms.value = _rooms.value.filter { it._id != roomId }
                 _messageCache.remove(roomId)
-                _toastMsg.value = "Group leave kar diya ✓"
-            } catch (e: Exception) { _toastMsg.value = "Leave nahi ho saka" }
+                msgPrefs.edit().remove("room_$roomId").apply()
+                _toastMsg.value = "Group delete ho gaya ✓"
+            } catch (e: Exception) {
+                // Even if server fails, remove locally
+                _rooms.value = _rooms.value.filter { it._id != roomId }
+                _messageCache.remove(roomId)
+                msgPrefs.edit().remove("room_$roomId").apply()
+                _toastMsg.value = "Group delete ho gaya ✓"
+            }
         }
     }
 
