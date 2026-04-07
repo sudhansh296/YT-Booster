@@ -166,6 +166,10 @@ fun ChatListScreen(
     var showChatMenu by remember { mutableStateOf(false) }
     var chatMenuScreen by remember { mutableStateOf("") } // "sent" | "received" | "blocked"
 
+    var showRoomMenu by remember { mutableStateOf(false) }
+    var menuRoom by remember { mutableStateOf<ChatRoom?>(null) }
+    var showLeaveConfirm by remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxSize().background(chatBg())) {
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
         Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -305,7 +309,12 @@ fun ChatListScreen(
                         } else {
                             itemsIndexed(filtered) { i, room ->
                                 val isOnline = if (!room.isGroup) room.otherUserId?.let { viewModel.isUserOnline(it) } ?: false else false
-                                ChatRoomRow(room = room, avatarIndex = i, onClick = { onRoomClick(room) }, isOnline = isOnline)
+                                ChatRoomRow(
+                                    room = room, avatarIndex = i,
+                                    onClick = { onRoomClick(room) },
+                                    onLongPress = { menuRoom = room; showRoomMenu = true },
+                                    isOnline = isOnline
+                                )
                                 Divider(color = chatDivider(), thickness = 0.5.dp)
                             }
                         }
@@ -314,6 +323,96 @@ fun ChatListScreen(
             }
         }
     }
+    // Long press room menu
+    if (showRoomMenu && menuRoom != null) {
+        val room = menuRoom!!
+        Dialog(onDismissRequest = { showRoomMenu = false; menuRoom = null }) {
+            Box(Modifier.fillMaxSize().clickable { showRoomMenu = false; menuRoom = null }, contentAlignment = Alignment.Center) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(chatCard())
+                        .padding(bottom = 8.dp)
+                        .clickable(enabled = false) {}
+                ) {
+                    // Room preview header
+                    Row(Modifier.fillMaxWidth().background(chatCardAlt()).padding(16.dp, 12.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(avatarGradient(0)), contentAlignment = Alignment.Center) {
+                            if (!room.pic.isNullOrEmpty()) {
+                                AsyncImage(model = room.pic, contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                            } else {
+                                Icon(if (room.isGroup) Icons.Default.Group else Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(24.dp))
+                            }
+                        }
+                        Column {
+                            Text(room.name, color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(if (room.isGroup) "Group" else "Direct Chat", color = chatTextSec(), fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    // Open
+                    Row(Modifier.fillMaxWidth().clickable { showRoomMenu = false; menuRoom = null; onRoomClick(room) }.padding(16.dp, 14.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Icon(Icons.Default.Chat, null, tint = chatTextPrimary(), modifier = Modifier.size(20.dp))
+                        Text("Open Chat", color = chatTextPrimary(), fontSize = 14.sp)
+                    }
+                    Divider(color = chatDivider(), thickness = 0.5.dp)
+                    // Leave group / Delete chat
+                    if (room.isGroup) {
+                        Row(Modifier.fillMaxWidth().clickable {
+                            showRoomMenu = false
+                            menuRoom = null
+                            showLeaveConfirm = true
+                        }.padding(16.dp, 14.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Icon(Icons.Default.ExitToApp, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(20.dp))
+                            Text("Leave Group", color = Color(0xFFFF6B6B), fontSize = 14.sp)
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth().clickable {
+                            showRoomMenu = false
+                            viewModel.deleteRoomLocally(room._id)
+                            menuRoom = null
+                        }.padding(16.dp, 14.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Icon(Icons.Default.Delete, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(20.dp))
+                            Text("Delete Chat", color = Color(0xFFFF6B6B), fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Leave group confirm
+    if (showLeaveConfirm && menuRoom != null) {
+        val room = menuRoom!!
+        Dialog(onDismissRequest = { showLeaveConfirm = false; menuRoom = null }) {
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Leave Group?", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("\"${room.name}\" group se leave kar doge?", color = chatTextSec(), fontSize = 14.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showLeaveConfirm = false; menuRoom = null }) {
+                            Text("Cancel", color = chatTextSec())
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0xFFFF6B6B))
+                            .clickable {
+                                showLeaveConfirm = false
+                                menuRoom = null
+                                viewModel.leaveGroupById(room._id)
+                            }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text("Leave", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (showNewChat) NewChatDialog(
         users = users,
         groupResults = groupSearchResults,
@@ -519,8 +618,10 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
 }
 
 @Composable
-fun ChatRoomRow(room: ChatRoom, avatarIndex: Int, onClick: () -> Unit, isOnline: Boolean = false) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).background(chatBg()).padding(16.dp, 12.dp),
+fun ChatRoomRow(room: ChatRoom, avatarIndex: Int, onClick: () -> Unit, onLongPress: () -> Unit = {}, isOnline: Boolean = false) {
+    Row(Modifier.fillMaxWidth()
+        .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }, onLongPress = { onLongPress() }) }
+        .background(chatBg()).padding(16.dp, 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box {
             if (!room.pic.isNullOrEmpty()) {

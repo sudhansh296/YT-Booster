@@ -965,6 +965,26 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Leave group from list (without opening room)
+    fun leaveGroupById(roomId: String) {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.api.groupLeave(token, com.ytsubexchange.data.GroupLeaveRequest(roomId))
+                _rooms.value = _rooms.value.filter { it._id != roomId }
+                _messageCache.remove(roomId)
+                _toastMsg.value = "Group leave kar diya ✓"
+            } catch (e: Exception) { _toastMsg.value = "Leave nahi ho saka" }
+        }
+    }
+
+    // Delete DM room locally (just hide from list — no server delete needed)
+    fun deleteRoomLocally(roomId: String) {
+        _rooms.value = _rooms.value.filter { it._id != roomId }
+        _messageCache.remove(roomId)
+        msgPrefs.edit().remove("room_$roomId").apply()
+        _toastMsg.value = "Chat delete ho gaya ✓"
+    }
+
     fun clearToast() { _toastMsg.value = null }
 
     fun clearChat() {
