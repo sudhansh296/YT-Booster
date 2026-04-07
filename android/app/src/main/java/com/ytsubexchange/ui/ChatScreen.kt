@@ -561,12 +561,22 @@ fun ChatListScreen(
 fun CommunityChatScreen(viewModel: ChatViewModel) {
     val communityMessages by viewModel.communityMessages.collectAsState()
     val communityOnline by viewModel.communityOnline.collectAsState()
+    val myId by viewModel.myIdFlow.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) { viewModel.joinCommunity() }
-    LaunchedEffect(communityMessages.size) { if (communityMessages.isNotEmpty()) listState.animateScrollToItem(communityMessages.size - 1) }
+    LaunchedEffect(communityMessages.size) {
+        if (communityMessages.isNotEmpty()) listState.animateScrollToItem(communityMessages.size - 1)
+    }
+
+    // Context menu state
+    var contextMsg by remember { mutableStateOf<ChatMessage?>(null) }
+    var replyTo by remember { mutableStateOf<ReplyRef?>(null) }
+    var showEmojiPanel by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(chatBg()).navigationBarsPadding()) {
+        // Header
         Row(Modifier.fillMaxWidth().background(chatCard()).padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Star, null, tint = AccentRed, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
@@ -585,32 +595,147 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
             }
         }
         Divider(color = chatDivider(), thickness = 0.5.dp)
-        if (communityMessages.isEmpty()) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("Koi message nahi abhi", color = chatTextSec(), fontSize = 14.sp)
-            }
-        } else {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
-                items(communityMessages) { msg -> MessageBubble(msg = msg, myId = viewModel.myId, onLongClick = {}) }
+
+        // Messages
+        Box(Modifier.weight(1f).then(
+            if (showEmojiPanel) Modifier.pointerInput(Unit) { detectTapGestures { showEmojiPanel = false } } else Modifier
+        )) {
+            if (communityMessages.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Koi message nahi abhi", color = chatTextSec(), fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                    items(communityMessages, key = { it._id }) { msg ->
+                        MessageBubble(
+                            msg = msg, myId = myId,
+                            onLongClick = { contextMsg = msg },
+                            onSwipeReply = { replyTo = ReplyRef(msgId = it._id, text = it.text, senderName = it.senderName) }
+                        )
+                    }
+                }
             }
         }
-        Row(Modifier.fillMaxWidth().background(chatCard()).padding(8.dp),
+
+        // Reply preview
+        replyTo?.let { reply ->
+            Row(Modifier.fillMaxWidth().background(chatCardAlt()).padding(12.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(3.dp).height(28.dp).background(AccentRed))
+                Spacer(Modifier.width(8.dp))
+                Text(reply.text.take(50), color = chatTextSec(), fontSize = 12.sp, modifier = Modifier.weight(1f))
+                IconButton(onClick = { replyTo = null }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Close, null, tint = chatTextSec(), modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        // Emoji panel
+        if (showEmojiPanel) {
+            EmojiPickerPanel(onEmojiSelected = { inputText += it }, onDismiss = { showEmojiPanel = false })
+        }
+
+        // Input row
+        Row(Modifier.fillMaxWidth().background(chatCard()).padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("😊", fontSize = 20.sp, modifier = Modifier.clickable { showEmojiPanel = !showEmojiPanel }.padding(4.dp))
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(chatSearchBg()).padding(14.dp, 10.dp)) {
                 if (inputText.isEmpty()) Text("Message...", color = chatTextSec(), fontSize = 14.sp)
                 BasicTextField(value = inputText, onValueChange = { inputText = it },
                     textStyle = androidx.compose.ui.text.TextStyle(color = chatTextPrimary(), fontSize = 14.sp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = {
-                        if (inputText.isNotBlank()) { viewModel.sendCommunityMessage(inputText.trim()); inputText = "" }
+                        if (inputText.isNotBlank()) {
+                            viewModel.sendCommunityMessage(inputText.trim(), replyTo)
+                            inputText = ""; replyTo = null; showEmojiPanel = false
+                        }
                     }),
                     maxLines = 4, modifier = Modifier.fillMaxWidth())
             }
+            if (showEmojiPanel) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF2A1A1A))
+                    .clickable {
+                        if (inputText.isNotEmpty()) {
+                            val bi = java.text.BreakIterator.getCharacterInstance()
+                            bi.setText(inputText); bi.last()
+                            val s = bi.previous()
+                            if (s != java.text.BreakIterator.DONE) inputText = inputText.substring(0, s)
+                        }
+                    }, contentAlignment = Alignment.Center) {
+                    Text("⌫", fontSize = 18.sp, color = Color(0xFFFF6B6B))
+                }
+            }
             Box(Modifier.size(40.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))),
                 contentAlignment = Alignment.Center) {
-                IconButton(onClick = { if (inputText.isNotBlank()) { viewModel.sendCommunityMessage(inputText.trim()); inputText = "" } }) {
+                IconButton(onClick = {
+                    if (inputText.isNotBlank()) {
+                        viewModel.sendCommunityMessage(inputText.trim(), replyTo)
+                        inputText = ""; replyTo = null; showEmojiPanel = false
+                    }
+                }) {
                     Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+
+    // Context menu — same as p2p
+    contextMsg?.let { msg ->
+        val isMine = msg.senderId == myId
+        Dialog(onDismissRequest = { contextMsg = null }) {
+            Box(Modifier.fillMaxSize().clickable { contextMsg = null }, contentAlignment = Alignment.Center) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(chatCard())
+                        .padding(bottom = 16.dp)
+                        .clickable(enabled = false) {}
+                ) {
+                    // Message preview
+                    Box(Modifier.fillMaxWidth().background(chatCardAlt()).padding(16.dp, 12.dp)) {
+                        Text(msg.text.take(80) + if (msg.text.length > 80) "..." else "", color = chatTextSec(), fontSize = 13.sp)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    // Quick emoji reactions
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        listOf("❤️","😂","😮","😢","👍","🔥").forEach { emoji ->
+                            Text(emoji, fontSize = 26.sp, modifier = Modifier.clickable {
+                                viewModel.reactToCommunityMessage(msg._id, emoji)
+                                contextMsg = null
+                            }.padding(4.dp))
+                        }
+                    }
+                    Divider(color = chatDivider(), thickness = 0.5.dp)
+                    // Reply
+                    Row(Modifier.fillMaxWidth().clickable {
+                        replyTo = ReplyRef(msgId = msg._id, text = msg.text, senderName = msg.senderName)
+                        contextMsg = null
+                    }.padding(16.dp, 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Icon(Icons.Default.Reply, null, tint = chatTextPrimary(), modifier = Modifier.size(20.dp))
+                        Text("Reply", color = chatTextPrimary(), fontSize = 14.sp)
+                    }
+                    Divider(color = chatDivider(), thickness = 0.5.dp)
+                    // Copy
+                    Row(Modifier.fillMaxWidth().clickable {
+                        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("msg", msg.text))
+                        viewModel.setToast("Copied ✓")
+                        contextMsg = null
+                    }.padding(16.dp, 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Icon(Icons.Default.ContentCopy, null, tint = chatTextPrimary(), modifier = Modifier.size(20.dp))
+                        Text("Copy", color = chatTextPrimary(), fontSize = 14.sp)
+                    }
+                    // Delete (own messages only)
+                    if (isMine) {
+                        Divider(color = chatDivider(), thickness = 0.5.dp)
+                        Row(Modifier.fillMaxWidth().clickable {
+                            viewModel.deleteCommunityMessage(msg._id)
+                            contextMsg = null
+                        }.padding(16.dp, 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Icon(Icons.Default.Delete, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(20.dp))
+                            Text("Delete", color = Color(0xFFFF6B6B), fontSize = 14.sp)
+                        }
+                    }
                 }
             }
         }

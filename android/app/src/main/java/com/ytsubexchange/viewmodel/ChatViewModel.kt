@@ -1089,14 +1089,41 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun sendCommunityMessage(text: String) {
+    fun sendCommunityMessage(text: String, replyTo: ReplyRef? = null) {
         val tempMsg = ChatMessage(
             _id = "temp_${System.currentTimeMillis()}", senderId = myId, senderName = "Me", senderPic = "", text = text,
-            createdAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.getDefault()).format(java.util.Date())
+            createdAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.getDefault()).format(java.util.Date()),
+            replyTo = replyTo
         )
         _communityMessages.value = _communityMessages.value + tempMsg
-        // Sirf socket se bhejo — server socket handler DB mein save karta hai
-        SocketManager.emit("community_message", JSONObject().apply { put("text", text) })
+        val payload = JSONObject().apply {
+            put("text", text)
+            replyTo?.let { r -> put("replyTo", JSONObject().apply { put("msgId", r.msgId); put("text", r.text); put("senderName", r.senderName) }) }
+        }
+        SocketManager.emit("community_message", payload)
+    }
+
+    fun reactToCommunityMessage(msgId: String, emoji: String) {
+        viewModelScope.launch {
+            try {
+                val resp = RetrofitClient.api.reactToMessage(token, ReactRequest(msgId, emoji))
+                _communityMessages.value = _communityMessages.value.map {
+                    if (it._id == msgId) it.copy(reactions = resp.reactions) else it
+                }
+            } catch (e: Exception) { _toastMsg.value = "React failed" }
+        }
+    }
+
+    fun deleteCommunityMessage(msgId: String) {
+        viewModelScope.launch {
+            try {
+                RetrofitClient.api.deleteMessage(token, msgId)
+                _communityMessages.value = _communityMessages.value.filter { it._id != msgId }
+            } catch (e: Exception) {
+                // Remove locally anyway
+                _communityMessages.value = _communityMessages.value.filter { it._id != msgId }
+            }
+        }
     }
 
     private fun handleIncomingMessage(data: JSONObject, isNotify: Boolean) {
