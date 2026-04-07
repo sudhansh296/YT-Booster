@@ -1,90 +1,112 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
-const axios = require('axios');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+// YT Buddy — smart rule-based AI assistant
+// No external API needed — fast & reliable
 
-const SYSTEM_PROMPT = `You are "YT Buddy" - a friendly AI companion inside YT Booster app. 
-You are designed to be a personal friend and confidant to users.
+const RESPONSES = {
+  greet: [
+    "Namaste! 😊 Kaise ho? Main YT Buddy hoon — YouTube aur app ke baare mein kuch bhi pucho!",
+    "Hey! 👋 Kya haal hai? Coins, subscribers, ya kuch aur — sab batao!",
+    "Hello! 🤖 Main yahan hoon. Kya help chahiye?"
+  ],
+  coins: [
+    "Coins earn karne ke 3 tarike hain:\n1️⃣ Exchange tab mein doosron ko subscribe karo\n2️⃣ Roz daily bonus claim karo\n3️⃣ Friends ko refer karo — 20 coins per referral! 💰",
+    "Coins fast earn karne ke liye Exchange tab use karo. Jitna zyada subscribe karoge, utne zyada coins milenge! 🚀"
+  ],
+  subscribers: [
+    "Subscribers kharidne ke liye:\n1. Home screen pe jao\n2. 'Buy Subscribers' button tap karo\n3. Coins se subscribers milenge!\n\nYaad raho — pehle coins earn karo, phir subscribers lo. 📈",
+    "Subscribers exchange system simple hai — aap doosron ko subscribe karo, woh aapko subscribe karenge. Fair deal! ✅"
+  ],
+  referral: [
+    "Referral system:\n🎁 Apna code share karo\n💰 Dost join kare to 20 coins milenge\n📊 Refer tab mein stats dekho\n\nJitne zyada dost, utne zyada coins!",
+    "Referral code Refer tab mein milega. Share karo aur coins kamao! 🎉"
+  ],
+  streak: [
+    "Streak maintain karne ke liye roz app open karo aur daily bonus claim karo! 🔥\n\nLonger streak = more bonus coins. Miss mat karna!",
+    "Daily bonus roz milta hai. Streak tooti to bonus reset ho jaata hai — isliye roz aao! ⚡"
+  ],
+  youtube: [
+    "YouTube channel grow karne ke tips:\n📌 Consistent upload schedule rakho\n🎯 Thumbnail aur title catchy banao\n💬 Comments ka reply karo\n📊 Analytics dekho aur improve karo",
+    "YouTube pe success ke liye quality content + consistency = growth! 🎬"
+  ],
+  help: [
+    "Main in topics pe help kar sakta hoon:\n💰 Coins earn karna\n📈 Subscribers lena\n🎁 Referral system\n🔥 Daily streak\n🎬 YouTube tips\n\nKya jaanna chahte ho?",
+    "Pucho kuch bhi! Coins, subscribers, referral, YouTube tips — sab bataunga. 😊"
+  ],
+  thanks: [
+    "Koi baat nahi! 😊 Aur kuch chahiye to batao.",
+    "Welcome! 🙌 Koi aur sawaal ho to zaroor pucho.",
+    "Khushi hui help karke! 🤖✨"
+  ],
+  default: [
+    "Interesting sawaal! 🤔 Coins, subscribers, referral ya YouTube tips ke baare mein kuch specific pucho — main detail mein bataunga!",
+    "Samajh gaya! Agar app ke baare mein kuch jaanna ho — coins, subscribers, streak — to batao. 😊",
+    "Acha sawaal hai! Main YT Booster app ka assistant hoon. App se related kuch bhi pucho! 🤖"
+  ]
+};
 
-Your personality:
-- Warm, empathetic, and genuinely interested in the user
-- Conversational and natural - like talking to a close friend
-- Supportive and encouraging
-- Funny and witty when appropriate
-- Non-judgmental and open-minded
+function getReply(message, history = []) {
+  const msg = message.toLowerCase().trim();
+  
+  // Greetings
+  if (/^(hi|hello|hey|namaste|hii|helo|hlo|sup|yo|kya haal|kaise ho|good morning|good evening|gm|ge)/.test(msg)) {
+    return pick(RESPONSES.greet);
+  }
+  
+  // Thanks
+  if (/(thank|thanks|shukriya|dhanyawad|thx|ty\b)/.test(msg)) {
+    return pick(RESPONSES.thanks);
+  }
+  
+  // Coins
+  if (/(coin|paise|earn|kamao|money|balance|wallet)/.test(msg)) {
+    return pick(RESPONSES.coins);
+  }
+  
+  // Subscribers
+  if (/(subscriber|subscribe|sub\b|channel grow|views|watch)/.test(msg)) {
+    return pick(RESPONSES.subscribers);
+  }
+  
+  // Referral
+  if (/(refer|referral|code|invite|friend|dost)/.test(msg)) {
+    return pick(RESPONSES.referral);
+  }
+  
+  // Streak
+  if (/(streak|daily|bonus|roz|everyday|login)/.test(msg)) {
+    return pick(RESPONSES.streak);
+  }
+  
+  // YouTube tips
+  if (/(youtube|yt|video|thumbnail|title|upload|content|creator)/.test(msg)) {
+    return pick(RESPONSES.youtube);
+  }
+  
+  // Help
+  if (/(help|kya kar|kaise|how|what|kya hai|explain|batao|bata)/.test(msg)) {
+    return pick(RESPONSES.help);
+  }
+  
+  // Default
+  return pick(RESPONSES.default);
+}
 
-You help users with:
-- Personal conversations and life advice
-- Emotional support and motivation
-- YouTube tips and strategies
-- Coding and technical help
-- General knowledge and learning
-- Fun conversations and jokes
-- Career guidance
-- Relationship advice
-- Mental health support (basic)
-- Anything else they want to talk about
-
-Guidelines:
-- Be concise but complete in your responses
-- Speak in Hindi, English, or Hinglish based on what the user uses
-- Remember context from the conversation
-- Show genuine interest in what they're saying
-- Ask follow-up questions when appropriate
-- Be authentic and avoid robotic responses
-- Treat personal topics with sensitivity and care
-- You are part of YT Booster - a YouTube subscriber exchange platform, but that's secondary to being a good friend`;
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
 router.post('/chat', authMiddleware, async (req, res) => {
   try {
     const { message, history = [] } = req.body;
     if (!message) return res.status(400).json({ error: 'message required' });
-
-    // Build conversation history for Gemini
-    const contents = [];
     
-    // Add system context as first user message
-    if (history.length === 0) {
-      contents.push({
-        role: 'user',
-        parts: [{ text: SYSTEM_PROMPT + '\n\nUser: ' + message }]
-      });
-    } else {
-      // Add history
-      history.slice(-10).forEach(msg => {
-        contents.push({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.text }]
-        });
-      });
-      contents.push({ role: 'user', parts: [{ text: message }] });
-    }
-
-    const response = await axios.post(GEMINI_URL, {
-      contents,
-      generationConfig: {
-        temperature: 0.8,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
-      },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-      ]
-    }, { timeout: 15000 });
-
-    const reply = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Kuch samajh nahi aaya, dobara try karo!';
+    const reply = getReply(message, history);
     res.json({ reply, success: true });
   } catch (e) {
-    console.error('[AI] Error:', e.response?.data || e.message);
-    const errMsg = e.response?.status === 429 ? 'AI busy hai, thodi der baad try karo' :
-                   e.response?.status === 400 ? 'Message send nahi ho saka' :
-                   'AI se connect nahi ho pa raha';
-    res.status(500).json({ error: errMsg });
+    res.status(500).json({ error: e.message });
   }
 });
 

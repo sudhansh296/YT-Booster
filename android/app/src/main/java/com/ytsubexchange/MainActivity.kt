@@ -907,11 +907,17 @@ fun FloatingChatbotButton() {
     }
 
     if (showChat) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = { showChat = false }) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showChat = false },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
+                    .padding(horizontal = 12.dp)
                     .systemBarsPadding()
                     .imePadding()
                     .heightIn(min = 300.dp, max = 520.dp)
