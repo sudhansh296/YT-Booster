@@ -256,6 +256,23 @@ setInterval(async () => {
   } catch (e) { /* silent */ }
 }, 60 * 1000);
 
+// ── Community Settings Cache (no DB hit on every message) ────
+let _communityOpen = true;
+let _communitySettingsCached = false;
+async function getCommunityOpen() {
+  if (_communitySettingsCached) return _communityOpen;
+  try {
+    const Settings = require('./models/Settings');
+    const doc = await Settings.findOne({ key: 'COMMUNITY_OPEN' }).lean();
+    _communityOpen = doc?.value !== 'false';
+    _communitySettingsCached = true;
+    setTimeout(() => { _communitySettingsCached = false; }, 30000);
+  } catch (e) { /* default true */ }
+  return _communityOpen;
+}
+// Per-socket user info cache (avoid User.findById on every message)
+const socketUserCache = new Map();
+
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
@@ -515,6 +532,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', async () => {
+    socketUserCache.delete(socket.id); // cleanup user cache
     if (socket.userId) {
       removeFromQueue(socket.userId);
       await User.findByIdAndUpdate(socket.userId, { inQueue: false });
@@ -1084,6 +1102,8 @@ io.on('connection', (socket) => {
         Settings.findOne({ key: 'COMMUNITY_PINNED' }).lean()
       ]);
       const isOpen = openDoc?.value !== 'false';
+      _communityOpen = isOpen; _communitySettingsCached = true;
+      setTimeout(() => { _communitySettingsCached = false; }, 30000);
       const pinned = pinnedDoc?.value || '';
       const onlineCount = io.sockets.adapter.rooms.get('community_global')?.size || 0;
       socket.emit('community_status', { isOpen, pinned, onlineCount });
@@ -1093,28 +1113,29 @@ io.on('connection', (socket) => {
 
   socket.on('community_message', async ({ text }) => {
     try {
-      if (!socket.userId || !text) return;
-      const User = require('./models/User');
-      const ChatMessage = require('./models/ChatMessage');
-      const Settings = require('./models/Settings');
+      if (!socket.userId || !text || text.length > 500) return;
 
-      // Parallel: check open status + fetch user
-      const [settingDoc, user] = await Promise.all([
-        Settings.findOne({ key: 'COMMUNITY_OPEN' }).lean(),
-        User.findById(socket.userId).select('channelName profilePic').lean()
-      ]);
-
-      const isOpen = settingDoc?.value !== 'false';
+      // Check open status from cache (no DB hit)
+      const isOpen = await getCommunityOpen();
       if (!isOpen) { socket.emit('community_error', { message: 'Community chat abhi band hai' }); return; }
-      if (!user) return;
+
+      // Get user info from cache first
+      let userInfo = socketUserCache.get(socket.id);
+      if (!userInfo) {
+        const User = require('./models/User');
+        const user = await User.findById(socket.userId).select('channelName profilePic').lean();
+        if (!user) return;
+        userInfo = { channelName: user.channelName, profilePic: user.profilePic || '' };
+        socketUserCache.set(socket.id, userInfo);
+      }
 
       const now = new Date();
       const msgId = new (require('mongoose').Types.ObjectId)();
       const msgPayload = {
         _id: msgId,
         senderId: socket.userId,
-        senderName: user.channelName,
-        senderPic: user.profilePic,
+        senderName: userInfo.channelName,
+        senderPic: userInfo.profilePic,
         text,
         createdAt: now
       };
@@ -1122,14 +1143,11 @@ io.on('connection', (socket) => {
       // Broadcast FIRST (instant), save in background
       io.to('community_global').emit('community_message', msgPayload);
 
+      const ChatMessage = require('./models/ChatMessage');
       ChatMessage.create({
-        _id: msgId,
-        roomId: 'community_global',
-        senderId: socket.userId,
-        senderName: user.channelName,
-        senderPic: user.profilePic,
-        text,
-        createdAt: now
+        _id: msgId, roomId: 'community_global',
+        senderId: socket.userId, senderName: userInfo.channelName,
+        senderPic: userInfo.profilePic, text, createdAt: now
       }).catch(() => {});
     } catch (e) { /* silent */ }
   });

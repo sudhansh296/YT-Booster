@@ -567,7 +567,7 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) { viewModel.joinCommunity() }
     LaunchedEffect(communityMessages.size) {
-        if (communityMessages.isNotEmpty()) listState.animateScrollToItem(communityMessages.size - 1)
+        if (communityMessages.isNotEmpty()) listState.scrollToItem(communityMessages.size - 1)
     }
 
     // Context menu state
