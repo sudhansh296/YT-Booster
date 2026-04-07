@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -742,10 +744,11 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatRoomRow(room: ChatRoom, avatarIndex: Int, onClick: () -> Unit, onLongPress: () -> Unit = {}, isOnline: Boolean = false) {
     Row(Modifier.fillMaxWidth()
-        .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }, onLongPress = { onLongPress() }) }
+        .combinedClickable(onClick = onClick, onLongClick = onLongPress)
         .background(chatBg()).padding(16.dp, 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box {
