@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ludo</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; touch-action:manipulation; }
+body { background:#1a0a00; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:100vh; font-family:Arial,sans-serif; overflow:hidden; }
+#game-container { width:100vw; max-width:500px; }
+#board-wrap { position:relative; width:100%; padding-bottom:100%; }
+#board { position:absolute; top:0; left:0; width:100%; height:100%; }
+#controls { padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+#dice-area { display:flex; align-items:center; gap:12px; }
+#dice { width:60px; height:60px; background:linear-gradient(135deg,#fff9c4,#ffee58); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:36px; box-shadow:0 4px 12px rgba(0,0,0,0.4); cursor:pointer; transition:transform 0.1s; user-select:none; }
+#dice:active { transform:scale(0.92); }
+#dice.rolling { animation:roll 0.5s ease; }
+@keyframes roll { 0%{transform:rotate(0deg) scale(1)} 25%{transform:rotate(90deg) scale(1.1)} 50%{transform:rotate(180deg) scale(0.9)} 75%{transform:rotate(270deg) scale(1.1)} 100%{transform:rotate(360deg) scale(1)} }
+#roll-btn { flex:1; height:52px; border:none; border-radius:26px; background:linear-gradient(135deg,#ff6f00,#ffd600); color:#1a0a00; font-size:16px; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(255,111,0,0.4); transition:transform 0.1s; }
+#roll-btn:active { transform:scale(0.96); }
+#roll-btn:disabled { background:linear-gradient(135deg,#444,#666); color:#888; box-shadow:none; }
+#status { color:#ffd700; font-size:13px; text-align:center; padding:4px 16px 8px; min-height:24px; }
+#players-bar { display:flex; justify-content:space-around; padding:6px 8px; gap:6px; }
+.player-chip { flex:1; border-radius:10px; padding:6px 4px; text-align:center; background:rgba(255,255,255,0.05); transition:all 0.3s; }
+.player-chip.active { transform:scale(1.05); box-shadow:0 0 10px currentColor; }
+.player-chip .chip-dot { width:18px; height:18px; border-radius:50%; margin:0 auto 3px; }
+.player-chip .chip-name { font-size:10px; color:#ccc; }
+.player-chip .chip-tokens { font-size:9px; color:#ffd700; }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="players-bar" id="players-bar"></div>
+  <div id="board-wrap"><canvas id="board"></canvas></div>
+  <div id="status">Game shuru karo!</div>
+  <div id="controls">
+    <div id="dice-area">
+      <div id="dice">🎲</div>
+    </div>
+    <button id="roll-btn" onclick="rollDice()">🎲 ROLL</button>
+  </div>
+</div>
+<script>
+
+// ── Game Config ──────────────────────────────────────────────
+const COLORS = {
+  RED:    { hex:'#E53935', dark:'#B71C1C', home:[0,0], label:'Red' },
+  GREEN:  { hex:'#43A047', dark:'#1B5E20', home:[9,0], label:'Green' },
+  YELLOW: { hex:'#FDD835', dark:'#F9A825', home:[9,9], label:'Yellow' },
+  BLUE:   { hex:'#1E88E5', dark:'#0D47A1', home:[0,9], label:'Blue' }
+};
+
+// Standard Ludo path (52 squares, [col, row])
+const PATH = [
+  [6,13],[6,12],[6,11],[6,10],[6,9],
+  [5,8],[4,8],[3,8],[2,8],[1,8],[0,8],[0,7],
+  [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],
+  [6,5],[6,4],[6,3],[6,2],[6,1],[6,0],[7,0],
+  [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],
+  [9,6],[10,6],[11,6],[12,6],[13,6],[14,6],[14,7],
+  [14,8],[13,8],[12,8],[11,8],[10,8],[9,8],
+  [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],[7,14]
+];
+
+const HOME_COLS = {
+  RED:    [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
+  GREEN:  [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+  YELLOW: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+  BLUE:   [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
+};
+
+const START_OFFSET = { RED:0, GREEN:13, YELLOW:26, BLUE:39 };
+const SAFE_IDX = new Set([0,8,13,21,26,34,39,47]);
+
+// ── Game State ───────────────────────────────────────────────
+let playerCount = 4;
+let playerColors = ['RED','GREEN','YELLOW','BLUE'];
+let players = [];
+let currentIdx = 0;
+let diceVal = 0;
+let diceRolled = false;
+let gameOver = false;
+let finishOrder = [];
+let consecutiveSixes = 0;
+
+function initGame(count) {
+  playerCount = count;
+  playerColors = count === 2 ? ['RED','YELLOW'] : count === 3 ? ['RED','GREEN','YELLOW'] : ['RED','GREEN','YELLOW','BLUE'];
+  players = playerColors.map(color => ({
+    color,
+    tokens: [0,1,2,3].map(id => ({ id, pos: -1, finished: false })),
+    finishRank: 0,
+    isComputer: false
+  }));
+  currentIdx = 0; diceVal = 0; diceRolled = false; gameOver = false;
+  finishOrder = []; consecutiveSixes = 0;
+  updatePlayersBar();
+  drawBoard();
+  setStatus(`${COLORS[playerColors[0]].label} ki baari — Roll karo!`);
+  document.getElementById('roll-btn').disabled = false;
+}
+
+// ── Token position helpers ───────────────────────────────────
+function tokenGridPos(color, token) {
+  if (token.pos === -1) return basePos(color, token.id);
+  if (token.finished) return [7,7];
+  if (token.pos >= 52) {
+    const col = HOME_COLS[color];
+    return col[Math.min(token.pos - 52, 5)];
+  }
+  const off = START_OFFSET[color];
+  return PATH[(off + token.pos) % 52];
+}
+
+function basePos(color, id) {
+  const lp = [[1.3,1.3],[3.2,1.3],[1.3,3.2],[3.2,3.2]];
+  const [lc,lr] = lp[id];
+  if (color==='RED')    return [lc, lr];
+  if (color==='GREEN')  return [9+lc, lr];
+  if (color==='YELLOW') return [9+lc, 9+lr];
+  return [lc, 9+lr]; // BLUE
+}
+
+// ── Canvas Drawing ───────────────────────────────────────────
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const w = canvas.parentElement.clientWidth;
+  canvas.width = w; canvas.height = w;
+  drawBoard();
+}
+
+function drawBoard() {
+  const w = canvas.width;
+  const c = w / 15;
+  ctx.clearRect(0,0,w,w);
+
+  // Background
+  ctx.fillStyle = '#F5E6C8';
+  ctx.fillRect(0,0,w,w);
+
+  // Home areas
+  drawHomeArea(ctx, 0, 0, c*6, '#E53935', '#B71C1C');       // RED top-left
+  drawHomeArea(ctx, c*9, 0, c*6, '#43A047', '#1B5E20');     // GREEN top-right
+  drawHomeArea(ctx, c*9, c*9, c*6, '#FDD835', '#F9A825');   // YELLOW bottom-right
+  drawHomeArea(ctx, 0, c*9, c*6, '#1E88E5', '#0D47A1');     // BLUE bottom-left
+
+  // Path cells
+  PATH.forEach(([col,row], idx) => {
+    let bg = '#FFFDE7';
+    if (idx===0)  bg = '#E53935';
+    else if (idx===13) bg = '#43A047';
+    else if (idx===26) bg = '#FDD835';
+    else if (idx===39) bg = '#1E88E5';
+    else if (SAFE_IDX.has(idx)) bg = '#FFF9C4';
+    ctx.fillStyle = bg;
+    ctx.fillRect(col*c, row*c, c, c);
+  });
+
+  // Home column lanes
+  const laneColors = { RED:'#E5393580', GREEN:'#43A04780', YELLOW:'#FDD83580', BLUE:'#1E88E580' };
+  Object.entries(HOME_COLS).forEach(([color, cells]) => {
+    ctx.fillStyle = laneColors[color];
+    cells.forEach(([col,row]) => ctx.fillRect(col*c, row*c, c, c));
+  });
+
+  // Center
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(c*6, c*6, c*3, c*3);
+  const cx = c*7.5, cy = c*7.5, s = c*1.5;
+  [['#E53935',[cx-s,cy+s,cx+s,cy+s,cx,cy]],
+   ['#43A047',[cx-s,cy-s,cx-s,cy+s,cx,cy]],
+   ['#FDD835',[cx-s,cy-s,cx+s,cy-s,cx,cy]],
+   ['#1E88E5',[cx+s,cy-s,cx+s,cy+s,cx,cy]]
+  ].forEach(([col,pts]) => {
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(pts[0],pts[1]);
+    ctx.lineTo(pts[2],pts[3]); ctx.lineTo(pts[4],pts[5]);
+    ctx.closePath(); ctx.fill();
+  });
+  drawStar(ctx, cx, cy, c*0.5, '#FFD700');
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(139,105,20,0.3)'; ctx.lineWidth = 0.8;
+  for (let i=0; i<=15; i++) {
+    ctx.beginPath(); ctx.moveTo(i*c,0); ctx.lineTo(i*c,w); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*c); ctx.lineTo(w,i*c); ctx.stroke();
+  }
+  // Outer border
+  ctx.strokeStyle = '#8B6914'; ctx.lineWidth = c*0.1;
+  ctx.strokeRect(c*0.05, c*0.05, w-c*0.1, w-c*0.1);
+
+  // Safe stars
+  [8,21,34,47].forEach(idx => {
+    const [col,row] = PATH[idx];
+    drawStar(ctx, col*c+c/2, row*c+c/2, c*0.28, '#FFD700');
+  });
+
+  // Tokens
+  players.forEach(p => {
+    p.tokens.forEach(t => {
+      if (!t.finished) {
+        const [col,row] = tokenGridPos(p.color, t);
+        drawToken(ctx, col*c+c/2, row*c+c/2, c*0.38, p.color, t.id);
+      }
+    });
+  });
+
+  // Highlight movable tokens
+  if (diceRolled && !gameOver) {
+    const p = players[currentIdx];
+    getMovable(p, diceVal).forEach(t => {
+      const [col,row] = tokenGridPos(p.color, t);
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = c*0.08;
+      ctx.beginPath();
+      ctx.arc(col*c+c/2, row*c+c/2, c*0.42, 0, Math.PI*2);
+      ctx.stroke();
+    });
+  }
+}
+
+function drawHomeArea(ctx, x, y, sz, main, dark) {
+  ctx.fillStyle = main; ctx.fillRect(x,y,sz,sz);
+  const p = sz*0.08;
+  ctx.fillStyle = '#FFFDE7'; ctx.fillRect(x+p,y+p,sz-p*2,sz-p*2);
+  ctx.strokeStyle = main; ctx.lineWidth = sz*0.04;
+  ctx.strokeRect(x+p,y+p,sz-p*2,sz-p*2);
+  const r = sz*0.18;
+  [[0.27,0.27],[0.73,0.27],[0.27,0.73],[0.73,0.73]].forEach(([fx,fy]) => {
+    const cx=x+sz*fx, cy=y+sz*fy;
+    ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.arc(cx,cy+2,r+2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=dark; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=main; ctx.beginPath(); ctx.arc(cx,cy,r*0.72,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(cx-r*0.2,cy-r*0.2,r*0.3,0,Math.PI*2); ctx.fill();
+  });
+}
+
+function drawToken(ctx, cx, cy, r, color, id) {
+  const c = COLORS[color];
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(cx,cy+r*0.15,r,0,Math.PI*2); ctx.fill();
+  // Gradient body
+  const g = ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,r*0.1,cx,cy,r);
+  g.addColorStop(0,'rgba(255,255,255,0.9)');
+  g.addColorStop(0.35,c.hex);
+  g.addColorStop(1,c.dark);
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  // Inner circle
+  ctx.fillStyle=c.dark; ctx.beginPath(); ctx.arc(cx,cy,r*0.55,0,Math.PI*2); ctx.fill();
+  // Number
+  ctx.fillStyle='#fff'; ctx.font=`bold ${r*0.65}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(id+1, cx, cy+r*0.05);
+  // Highlight
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(cx-r*0.25,cy-r*0.25,r*0.22,0,Math.PI*2); ctx.fill();
+}
+
+function drawStar(ctx, cx, cy, r, color) {
+  ctx.fillStyle=color; ctx.beginPath();
+  for (let i=0;i<10;i++) {
+    const a=(i*36-90)*Math.PI/180, rad=i%2===0?r:r*0.42;
+    i===0?ctx.moveTo(cx+rad*Math.cos(a),cy+rad*Math.sin(a)):ctx.lineTo(cx+rad*Math.cos(a),cy+rad*Math.sin(a));
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+// ── Game Logic ───────────────────────────────────────────────
+function getMovable(player, dice) {
+  return player.tokens.filter(t => {
+    if (t.finished) return false;
+    if (t.pos === -1) return dice === 6;
+    return (t.pos + dice) <= 57;
+  });
+}
+
+function rollDice() {
+  if (diceRolled || gameOver) return;
+  const btn = document.getElementById('roll-btn');
+  btn.disabled = true;
+  const dice = document.getElementById('dice');
+  dice.classList.add('rolling');
+  const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+  let count = 0;
+  const interval = setInterval(() => {
+    diceVal = Math.floor(Math.random()*6)+1;
+    dice.textContent = faces[diceVal-1];
+    if (++count >= 8) {
+      clearInterval(interval);
+      dice.classList.remove('rolling');
+      onDiceRolled();
+    }
+  }, 60);
+}
+
+function onDiceRolled() {
+  diceRolled = true;
+  const p = players[currentIdx];
+  const movable = getMovable(p, diceVal);
+
+  if (diceVal === 6) consecutiveSixes++;
+  else consecutiveSixes = 0;
+
+  if (consecutiveSixes >= 3) {
+    setStatus('3 sixes! Turn skip!');
+    consecutiveSixes = 0;
+    setTimeout(nextTurn, 800);
+    return;
+  }
+
+  if (movable.length === 0) {
+    setStatus(`${COLORS[p.color].label}: Koi move nahi!`);
+    setTimeout(nextTurn, 800);
+    return;
+  }
+
+  if (movable.length === 1) {
+    // Auto move if only one option
+    setTimeout(() => moveToken(p, movable[0]), 300);
+    return;
+  }
+
+  setStatus(`${COLORS[p.color].label}: Token choose karo`);
+  drawBoard();
+}
+
+function onTokenTap(e) {
+  if (!diceRolled || gameOver) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  const px = x * scaleX, py = y * scaleY;
+  const c = canvas.width / 15;
+
+  const p = players[currentIdx];
+  const movable = getMovable(p, diceVal);
+
+  for (const t of movable) {
+    const [col,row] = tokenGridPos(p.color, t);
+    const tx = col*c+c/2, ty = row*c+c/2;
+    if (Math.hypot(px-tx, py-ty) < c*0.5) {
+      moveToken(p, t);
+      return;
+    }
+  }
+}
+
+function moveToken(player, token) {
+  if (token.pos === -1) {
+    token.pos = 0;
+  } else {
+    const newPos = token.pos + diceVal;
+    if (newPos === 57) {
+      token.pos = 57; token.finished = true;
+      checkFinish(player);
+    } else {
+      token.pos = newPos;
+      checkCapture(player, newPos);
+    }
+  }
+
+  diceRolled = false;
+  drawBoard();
+  updatePlayersBar();
+
+  if (gameOver) return;
+
+  if (diceVal === 6 && consecutiveSixes < 3) {
+    setStatus(`${COLORS[player.color].label}: Six! Phir se roll karo`);
+    document.getElementById('roll-btn').disabled = false;
+  } else {
+    nextTurn();
+  }
+}
+
+function checkCapture(attacker, pos) {
+  if (pos >= 52) return;
+  const aOff = START_OFFSET[attacker.color];
+  const aPathIdx = (aOff + pos) % 52;
+  if (SAFE_IDX.has(aPathIdx)) return;
+
+  players.forEach(p => {
+    if (p.color === attacker.color) return;
+    p.tokens.forEach(t => {
+      if (t.pos === -1 || t.finished || t.pos >= 52) return;
+      const pOff = START_OFFSET[p.color];
+      const pPathIdx = (pOff + t.pos) % 52;
+      if (pPathIdx === aPathIdx) {
+        t.pos = -1;
+        setStatus(`${COLORS[attacker.color].label} ne ${COLORS[p.color].label} ko capture kiya! 💥`);
+      }
+    });
+  });
+}
+
+function checkFinish(player) {
+  if (player.tokens.every(t => t.finished) && !finishOrder.includes(player.color)) {
+    finishOrder.push(player.color);
+    player.finishRank = finishOrder.length;
+    if (finishOrder.length >= playerCount - 1) {
+      gameOver = true;
+      showResult();
+    }
+  }
+}
+
+function nextTurn() {
+  let next = (currentIdx + 1) % players.length;
+  let tries = 0;
+  while (players[next].finishRank > 0 && tries < players.length) {
+    next = (next + 1) % players.length; tries++;
+  }
+  currentIdx = next;
+  diceRolled = false;
+  consecutiveSixes = 0;
+  const p = players[currentIdx];
+  setStatus(`${COLORS[p.color].label} ki baari — Roll karo!`);
+  document.getElementById('roll-btn').disabled = false;
+  updatePlayersBar();
+  drawBoard();
+}
+
+function showResult() {
+  // Add remaining players to finish order
+  players.forEach(p => { if (!finishOrder.includes(p.color)) finishOrder.push(p.color); });
+  let msg = '🏆 Game Over!\n';
+  finishOrder.forEach((color, i) => {
+    const medals = ['🥇','🥈','🥉','4️⃣'];
+    const prize = calcPrize(playerCount, i+1);
+    msg += `${medals[i]} ${COLORS[color].label}${prize > 0 ? ` +${prize}🪙` : ''}\n`;
+  });
+  setStatus(msg.replace(/\n/g, ' | '));
+  document.getElementById('roll-btn').disabled = true;
+  // Notify Android
+  if (window.Android) window.Android.onGameEnd(JSON.stringify(finishOrder));
+}
+
+function calcPrize(count, rank) {
+  if (count === 2) return rank === 1 ? 75 : 0;
+  if (count === 4) return [75,50,25,0][rank-1] || 0;
+  if (count === 3) return [75,50,0][rank-1] || 0;
+  return 0;
+}
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+function updatePlayersBar() {
+  const bar = document.getElementById('players-bar');
+  bar.innerHTML = players.map((p,i) => {
+    const done = p.tokens.filter(t=>t.finished).length;
+    const active = i === currentIdx;
+    return `<div class="player-chip ${active?'active':''}" style="border:2px solid ${active?COLORS[p.color].hex:'transparent'}">
+      <div class="chip-dot" style="background:${COLORS[p.color].hex}"></div>
+      <div class="chip-name">${COLORS[p.color].label}</div>
+      <div class="chip-tokens">${'●'.repeat(done)}${'○'.repeat(4-done)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Init ─────────────────────────────────────────────────────
+canvas.addEventListener('click', onTokenTap);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); onTokenTap(e); }, {passive:false});
+window.addEventListener('resize', resize);
+resize();
+
+// Called from Android WebView
+window.startGame = function(count) { initGame(count || 4); };
+initGame(4);
+</script>
+</body>
+</html>

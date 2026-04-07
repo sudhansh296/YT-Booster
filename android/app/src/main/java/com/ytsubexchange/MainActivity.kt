@@ -1267,9 +1267,11 @@ fun FloatingGamesButton() {
                 usePlatformDefaultWidth = false, dismissOnBackPress = true, dismissOnClickOutside = false
             )
         ) {
-            com.ytsubexchange.ui.ludo.LudoScreen(
-                mode = ludoMode, playerCount = ludoPlayers, roomCode = ludoRoomCode,
-                onBack = { inLudoGame = false }, onGameEnd = { inLudoGame = false }
+            com.ytsubexchange.ui.ludo.LudoWebScreen(
+                playerCount = ludoPlayers,
+                mode = ludoMode,
+                onBack = { inLudoGame = false },
+                onGameEnd = { inLudoGame = false }
             )
         }
         return
