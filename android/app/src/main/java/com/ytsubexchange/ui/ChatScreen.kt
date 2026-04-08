@@ -70,11 +70,11 @@ private fun avatarGradient(index: Int): Brush =
     Brush.linearGradient(avatarGradients[index % avatarGradients.size], Offset(0f, 0f), Offset(100f, 100f))
 
 private val BgDark      = Color(0xFF0D0D0D)
-private val chatCard()    = Color(0xFF1A1A2E)
-private val chatCardAlt()     = Color(0xFF16213E)
+private val CardDark    = Color(0xFF1A1A2E)
+private val CardAlt     = Color(0xFF16213E)
 private val AccentRed   = Color(0xFFE53935)
-private val chatTextPrimary() = Color(0xFFFFFFFF)
-private val chatTextSec()     = Color(0xFF9E9E9E)
+private val TextPrimary = Color(0xFFFFFFFF)
+private val TextSec     = Color(0xFF9E9E9E)
 private val Divider2    = Color(0xFF1E1E2E)
 private val SearchBg    = Color(0xFF1A1A2E)
 
@@ -90,13 +90,13 @@ private val SearchBgLight = Color(0xFFEEEEEE)
 @Composable
 private fun chatBg() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) BgDark else BgLight
 @Composable
-private fun chatCard() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatCard() else CardLight
+private fun chatCard() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) CardDark else CardLight
 @Composable
-private fun chatCardAlt() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatCardAlt() else CardAltLight
+private fun chatCardAlt() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) CardAlt else CardAltLight
 @Composable
-private fun chatTextPrimary() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatTextPrimary() else TextPrimaryLight
+private fun chatTextPrimary() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) TextPrimary else TextPrimaryLight
 @Composable
-private fun chatTextSec() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatTextSec() else TextSecLight
+private fun chatTextSec() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) TextSec else TextSecLight
 @Composable
 private fun chatDivider() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) Divider2 else Divider2Light
 @Composable
@@ -1645,7 +1645,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
     fun roleColor(role: String) = when (role) {
         "Owner" -> Color(0xFFFFD700)
         "Sub-Admin" -> Color(0xFF29B6F6)
-        else -> chatTextSec()
+        else -> Color(0xFF9E9E9E)
     }
 
     Dialog(onDismissRequest = { viewModel.hideGroupInfo() }) {
