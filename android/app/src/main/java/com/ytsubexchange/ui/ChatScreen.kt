@@ -70,11 +70,11 @@ private fun avatarGradient(index: Int): Brush =
     Brush.linearGradient(avatarGradients[index % avatarGradients.size], Offset(0f, 0f), Offset(100f, 100f))
 
 private val BgDark      = Color(0xFF0D0D0D)
-private val CardDark    = Color(0xFF1A1A2E)
-private val CardAlt     = Color(0xFF16213E)
+private val chatCard()    = Color(0xFF1A1A2E)
+private val chatCardAlt()     = Color(0xFF16213E)
 private val AccentRed   = Color(0xFFE53935)
-private val TextPrimary = Color(0xFFFFFFFF)
-private val TextSec     = Color(0xFF9E9E9E)
+private val chatTextPrimary() = Color(0xFFFFFFFF)
+private val chatTextSec()     = Color(0xFF9E9E9E)
 private val Divider2    = Color(0xFF1E1E2E)
 private val SearchBg    = Color(0xFF1A1A2E)
 
@@ -90,13 +90,13 @@ private val SearchBgLight = Color(0xFFEEEEEE)
 @Composable
 private fun chatBg() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) BgDark else BgLight
 @Composable
-private fun chatCard() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) CardDark else CardLight
+private fun chatCard() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatCard() else CardLight
 @Composable
-private fun chatCardAlt() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) CardAlt else CardAltLight
+private fun chatCardAlt() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatCardAlt() else CardAltLight
 @Composable
-private fun chatTextPrimary() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) TextPrimary else TextPrimaryLight
+private fun chatTextPrimary() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatTextPrimary() else TextPrimaryLight
 @Composable
-private fun chatTextSec() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) TextSec else TextSecLight
+private fun chatTextSec() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) chatTextSec() else TextSecLight
 @Composable
 private fun chatDivider() = if (com.ytsubexchange.ui.theme.isDarkTheme.value) Divider2 else Divider2Light
 @Composable
@@ -234,7 +234,7 @@ fun ChatListScreen(
             listOf("Direct", "Group", "Community", "AI 🤖").forEachIndexed { i, label ->
                 Column(Modifier.clickable { selectedTab = i }.padding(8.dp, 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(label, color = if (selectedTab == i) AccentRed else TextSec,
+                        Text(label, color = if (selectedTab == i) AccentRed else chatTextSec(),
                             fontWeight = if (selectedTab == i) FontWeight.Bold else FontWeight.Normal, fontSize = 13.sp)
                         if (i == 0 && pendingRequests.isNotEmpty()) {
                             Spacer(Modifier.width(4.dp))
@@ -432,7 +432,7 @@ fun ChatListScreen(
     // Sent Requests Dialog
     if (chatMenuScreen == "sent") {
         Dialog(onDismissRequest = { chatMenuScreen = "" }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -470,7 +470,7 @@ fun ChatListScreen(
     // Received Requests Dialog
     if (chatMenuScreen == "received") {
         Dialog(onDismissRequest = { chatMenuScreen = "" }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -520,7 +520,7 @@ fun ChatListScreen(
     // Blocked Users Dialog
     if (chatMenuScreen == "blocked") {
         Dialog(onDismissRequest = { chatMenuScreen = "" }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -855,7 +855,7 @@ fun ChatWindowScreen(
 
         // Header
         Row(Modifier.fillMaxWidth().background(chatCard()).padding(4.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextPrimary) }
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = chatTextPrimary()) }
             Box(Modifier.size(38.dp).clip(CircleShape).background(avatarGradient(0)).clickable {
                 if (room.isGroup) viewModel.loadGroupInfo(room._id)
             }, contentAlignment = Alignment.Center) {
@@ -937,7 +937,7 @@ fun ChatWindowScreen(
                     add("Clear Chat")
                 }
                 menuItems.forEach { item ->
-                    DropdownMenuItem(text = { Text(item, color = if (item.contains("Block") || item == "Clear Chat") Color(0xFFFF6B6B) else if (item == "Delete Chats ⏱") Color(0xFFFFAA00) else TextPrimary, fontSize = 14.sp) },
+                    DropdownMenuItem(text = { Text(item, color = if (item.contains("Block") || item == "Clear Chat") Color(0xFFFF6B6B) else if (item == "Delete Chats ⏱") Color(0xFFFFAA00) else chatTextPrimary(), fontSize = 14.sp) },
                         onClick = {
                             showMoreMenu = false
                             when (item) {
@@ -1290,8 +1290,8 @@ fun ChatWindowScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            Icon(icon, null, tint = if (isDanger) AccentRed else TextPrimary, modifier = Modifier.size(22.dp))
-                            Text(label, color = if (isDanger) AccentRed else TextPrimary, fontSize = 15.sp)
+                            Icon(icon, null, tint = if (isDanger) AccentRed else chatTextPrimary(), modifier = Modifier.size(22.dp))
+                            Text(label, color = if (isDanger) AccentRed else chatTextPrimary(), fontSize = 15.sp)
                         }
                     }
                 }
@@ -1302,7 +1302,7 @@ fun ChatWindowScreen(
     // Starred messages panel
     if (showStarred) {
         Dialog(onDismissRequest = { viewModel.hideStarredPanel() }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -1377,7 +1377,7 @@ fun ChatWindowScreen(
     // Pinned message panel
     if (showPinned) {
         Dialog(onDismissRequest = { viewModel.hidePinnedPanel() }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
                     Text("📌 Pinned Message", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
@@ -1392,7 +1392,7 @@ fun ChatWindowScreen(
     // Invite link dialog
     if (showInviteLink.isNotEmpty()) {
         Dialog(onDismissRequest = { showInviteLink = "" }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
                     Text("🔗 Group Invite Link", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.height(12.dp))
@@ -1412,7 +1412,7 @@ fun ChatWindowScreen(
                             val shareIntent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, showInviteLink) }
                             context.startActivity(Intent.createChooser(shareIntent, "Share Group Link"))
                             showInviteLink = ""
-                        }, colors = ButtonDefaults.buttonColors(containerColor = CardAlt), modifier = Modifier.weight(1f)) {
+                        }, colors = ButtonDefaults.buttonColors(containerColor = chatCardAlt()), modifier = Modifier.weight(1f)) {
                             Text("Share", color = chatTextPrimary())
                         }
                     }
@@ -1425,7 +1425,7 @@ fun ChatWindowScreen(
     if (showForwardDialog) {
         val allRooms by viewModel.rooms.collectAsState()
         Dialog(onDismissRequest = { showForwardDialog = false }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("↪ Forward to...", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1459,7 +1459,7 @@ fun ChatWindowScreen(
 
     // Edit message dialog
     if (showEditDialog) {        Dialog(onDismissRequest = { showEditDialog = false }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("✏️ Edit Message", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1495,10 +1495,10 @@ fun ChatWindowScreen(
     // Delete message dialog — Delete for Everyone / Delete for Me
     if (showDeleteDialog) {
         Dialog(onDismissRequest = { showDeleteDialog = false }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🗑️ Delete Message", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("🗑️ Delete Message", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.height(4.dp))
                     // Delete for Everyone — sirf apne messages pe
                     if (deleteMsgIsMine) {
@@ -1513,14 +1513,14 @@ fun ChatWindowScreen(
                         ) {
                             Column {
                                 Text("Delete for Everyone", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("Sabke liye delete ho jaayega", color = TextSec, fontSize = 12.sp)
+                                Text("Sabke liye delete ho jaayega", color = chatTextSec(), fontSize = 12.sp)
                             }
                         }
                     }
                     // Delete for Me — hamesha available
                     Box(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                            .background(CardAlt)
+                            .background(chatCardAlt())
                             .clickable {
                                 viewModel.deleteMessageById(deleteMsgId, forEveryone = false)
                                 showDeleteDialog = false
@@ -1528,12 +1528,12 @@ fun ChatWindowScreen(
                             .padding(14.dp)
                     ) {
                         Column {
-                            Text("Delete for Me", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Sirf aapke liye delete hoga", color = TextSec, fontSize = 12.sp)
+                            Text("Delete for Me", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Sirf aapke liye delete hoga", color = chatTextSec(), fontSize = 12.sp)
                         }
                     }
                     TextButton(onClick = { showDeleteDialog = false }, modifier = Modifier.align(Alignment.End)) {
-                        Text("Cancel", color = TextSec)
+                        Text("Cancel", color = chatTextSec())
                     }
                 }
             }
@@ -1569,7 +1569,7 @@ fun ChatWindowScreen(
     // Delete Chats (Disappearing Messages) Dialog — Snapchat style
     if (showDeleteChatsMenu) {
         Dialog(onDismissRequest = { showDeleteChatsMenu = false }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp)) {
                     Text("⏱ Delete Chats", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1602,7 +1602,7 @@ fun ChatWindowScreen(
                                 if (isSelected) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
                             }
                             Column {
-                                Text(label, color = if (isSelected) AccentRed else TextPrimary, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                Text(label, color = if (isSelected) AccentRed else chatTextPrimary(), fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
                                 Text(desc, color = chatTextSec(), fontSize = 11.sp)
                             }
                         }
@@ -1645,12 +1645,12 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
     fun roleColor(role: String) = when (role) {
         "Owner" -> Color(0xFFFFD700)
         "Sub-Admin" -> Color(0xFF29B6F6)
-        else -> TextSec
+        else -> chatTextSec()
     }
 
     Dialog(onDismissRequest = { viewModel.hideGroupInfo() }) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = CardDark),
+            colors = CardDefaults.cardColors(containerColor = chatCard()),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp)
         ) {
@@ -1715,7 +1715,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = { viewModel.getGroupInviteLink(roomId) {} },
-                            colors = ButtonDefaults.buttonColors(containerColor = CardAlt),
+                            colors = ButtonDefaults.buttonColors(containerColor = chatCardAlt()),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Icon(Icons.Default.Link, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(14.dp))
@@ -1737,7 +1737,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
     selectedMember?.let { member ->
         val isSubAdmin = subAdmins.any { it.userId == member._id }
         Dialog(onDismissRequest = { selectedMember = null }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     // Member header
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1746,7 +1746,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                         }
                         Column {
                             Text(member.channelName, color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text(if (isSubAdmin) "Sub-Admin" else "Member", color = if (isSubAdmin) Color(0xFF29B6F6) else TextSec, fontSize = 12.sp)
+                            Text(if (isSubAdmin) "Sub-Admin" else "Member", color = if (isSubAdmin) Color(0xFF29B6F6) else chatTextSec(), fontSize = 12.sp)
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -1829,7 +1829,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
     // SubAdmin permissions dialog (Telegram style)
     if (showSubAdminPerms && subAdminTarget != null) {
         Dialog(onDismissRequest = { showSubAdminPerms = false }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp)) {
                     Text("⭐ Sub-Admin Rights", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(subAdminTarget!!.channelName, color = Color(0xFF29B6F6), fontSize = 13.sp)
@@ -1918,7 +1918,7 @@ fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwi
                     .widthIn(max = 270.dp)
                     .offset { androidx.compose.ui.unit.IntOffset(animatedOffset.toInt(), 0) }
                     .clip(RoundedCornerShape(18.dp, 18.dp, if (isMine) 4.dp else 18.dp, if (isMine) 18.dp else 4.dp))
-                    .background(if (isMine) Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B))) else Brush.linearGradient(listOf(CardDark, CardAlt)))
+                    .background(if (isMine) Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B))) else Brush.linearGradient(listOf(chatCard(), chatCardAlt())))
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onLongPress = { onLongClick() },
@@ -2296,7 +2296,7 @@ fun NewChatDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = CardDark),
+            colors = CardDefaults.cardColors(containerColor = chatCard()),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)
         ) {
@@ -2318,7 +2318,7 @@ fun NewChatDialog(
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(label, color = if (selectedTab == i) Color.White else TextSec, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(label, color = if (selectedTab == i) Color.White else chatTextSec(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -2444,7 +2444,7 @@ fun NewChatDialog(
     // Group action bottom sheet
     selectedGroup?.let { group ->
         Dialog(onDismissRequest = { selectedGroup = null }) {
-            Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.size(44.dp).clip(CircleShape).background(Brush.linearGradient(listOf(AccentRed, Color(0xFFFF6B6B)))), contentAlignment = Alignment.Center) {
@@ -2500,7 +2500,7 @@ fun CreateGroupDialog(users: List<ChatUser>, onSearch: (String) -> Unit, onCreat
     var query by remember { mutableStateOf("") }
     val selected = remember { mutableStateListOf<String>() }
     Dialog(onDismissRequest = onDismiss) {
-        Card(colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp),
+        Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)) {
             Column(Modifier.padding(16.dp)) {
                 Text("Create Group", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -2525,7 +2525,7 @@ fun CreateGroupDialog(users: List<ChatUser>, onSearch: (String) -> Unit, onCreat
                         Row(Modifier.fillMaxWidth().clickable { if (isSel) selected.remove(user._id) else selected.add(user._id) }.padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Checkbox(checked = isSel, onCheckedChange = { if (it) selected.add(user._id) else selected.remove(user._id) },
-                                colors = CheckboxDefaults.colors(checkedColor = AccentRed, uncheckedColor = TextSec))
+                                colors = CheckboxDefaults.colors(checkedColor = AccentRed, uncheckedColor = chatTextSec()))
                             Box(Modifier.size(32.dp).clip(CircleShape).background(avatarGradient(i)), contentAlignment = Alignment.Center) {
                                 Icon(Icons.Default.Person, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(18.dp))
                             }
@@ -2795,7 +2795,7 @@ fun VoiceRecordButton(onVoiceSent: (java.io.File) -> Unit, onRecordingStateChang
                     isPaused = true
                 }
             }, contentAlignment = Alignment.Center) {
-                Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, tint = TextPrimary, modifier = Modifier.size(18.dp))
+                Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, tint = chatTextPrimary(), modifier = Modifier.size(18.dp))
             }
             Box(
                 Modifier.size(36.dp).clip(CircleShape)
