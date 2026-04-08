@@ -31,15 +31,30 @@ export default function Groups() {
     } catch (e) { alert('Error: ' + (e.response?.data?.error || e.message)); }
   };
 
+  const deleteGroup = async (id, name) => {
+    if (!confirm(`"${name}" group permanently delete karo? Saare messages bhi delete ho jaayenge!`)) return;
+    try {
+      await api.delete(`${ADMIN_BASE}/groups/${id}`);
+      setGroups(g => g.filter(x => x._id !== id));
+    } catch (e) { alert('Error: ' + (e.response?.data?.error || e.message)); }
+  };
+
   const viewMessages = async (group) => {
     setViewGroup(group);
     setMsgLoading(true);
     try {
-      // Use subadmin-style endpoint via admin — reuse admin groups messages
       const res = await api.get(`${ADMIN_BASE}/groups/${group._id}/messages`);
       setMessages(res.data);
     } catch (e) { setMessages([]); }
     setMsgLoading(false);
+  };
+
+  const deleteMsg = async (groupId, msgId) => {
+    if (!confirm('Message delete karo?')) return;
+    try {
+      await api.delete(`${ADMIN_BASE}/groups/${groupId}/messages/${msgId}`);
+      setMessages(m => m.filter(x => x._id !== msgId));
+    } catch (e) { alert('Error: ' + (e.response?.data?.error || e.message)); }
   };
 
   const subCodes = [...new Set(groups.map(g => g.adminCode).filter(Boolean))].sort();
@@ -60,11 +75,13 @@ export default function Groups() {
                 <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0, fontWeight: 'bold' }}>
                   {m.senderName?.[0]?.toUpperCase() || '?'}
                 </div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ color: '#FFD700', fontSize: 12, fontWeight: 600, marginBottom: 3 }}>{m.senderName}</div>
                   <div style={{ background: '#1a1a2e', borderRadius: 10, padding: '8px 12px', color: '#fff', fontSize: 13, maxWidth: 500 }}>{m.text}</div>
                   <div style={{ color: '#444', fontSize: 10, marginTop: 3 }}>{new Date(m.createdAt).toLocaleString()}</div>
                 </div>
+                <button onClick={() => deleteMsg(viewGroup._id, m._id)}
+                  style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 16, padding: '0 4px', flexShrink: 0 }} title="Delete">🗑</button>
               </div>
             ))}
           </div>
@@ -75,7 +92,7 @@ export default function Groups() {
 
   return (
     <div className="page">
-      <h2>💬 Groups</h2>
+      <h2>💬 Groups ({groups.length})</h2>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <input
           value={search} onChange={e => setSearch(e.target.value)}
@@ -123,14 +140,18 @@ export default function Groups() {
                     </span>
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button onClick={() => viewMessages(g)}
-                        style={{ padding: '5px 12px', background: '#1a2a3a', border: 'none', borderRadius: 6, color: '#29B6F6', cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '5px 10px', background: '#1a2a3a', border: 'none', borderRadius: 6, color: '#29B6F6', cursor: 'pointer', fontSize: 12 }}>
                         👁 View
                       </button>
                       <button onClick={() => toggleBlock(g._id)}
-                        style={{ padding: '5px 12px', background: g.isBlocked ? '#1a2a1a' : '#2a1a1a', border: 'none', borderRadius: 6, color: g.isBlocked ? '#4CAF50' : '#ff6b6b', cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '5px 10px', background: g.isBlocked ? '#1a2a1a' : '#2a1a1a', border: 'none', borderRadius: 6, color: g.isBlocked ? '#4CAF50' : '#ff6b6b', cursor: 'pointer', fontSize: 12 }}>
                         {g.isBlocked ? '✅ Unblock' : '🚫 Block'}
+                      </button>
+                      <button onClick={() => deleteGroup(g._id, g.name)}
+                        style={{ padding: '5px 10px', background: '#2a0a0a', border: 'none', borderRadius: 6, color: '#ff4444', cursor: 'pointer', fontSize: 12 }}>
+                        🗑 Delete
                       </button>
                     </div>
                   </td>

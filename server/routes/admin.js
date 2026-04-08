@@ -297,6 +297,41 @@ router.get('/groups/:id/messages', adminAuthJwt, async (req, res) => {
   }
 });
 
+// Admin delete a message from group
+router.delete('/groups/:id/messages/:msgId', adminAuthJwt, async (req, res) => {
+  try {
+    const ChatMessage = require('../models/ChatMessage');
+    await ChatMessage.findByIdAndDelete(req.params.msgId);
+    const io = req.app.get('io');
+    if (io) io.to(`chat_${req.params.id}`).emit('message_deleted', { msgId: req.params.msgId, roomId: req.params.id });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Admin delete entire group
+router.delete('/groups/:id', adminAuthJwt, async (req, res) => {
+  try {
+    const ChatRoom = require('../models/ChatRoom');
+    const ChatMessage = require('../models/ChatMessage');
+    const room = await ChatRoom.findById(req.params.id);
+    if (!room) return res.status(404).json({ error: 'Not found' });
+    // Notify all members
+    const io = req.app.get('io');
+    if (io) {
+      room.members.forEach(mId => {
+        io.to(`user_${mId.toString()}`).emit('group_removed', { roomId: req.params.id, roomName: room.name });
+      });
+    }
+    await ChatMessage.deleteMany({ roomId: req.params.id });
+    await ChatRoom.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- ADMIN PROFILE ---
 const Settings = require('../models/Settings');
 const multer = require('multer');
