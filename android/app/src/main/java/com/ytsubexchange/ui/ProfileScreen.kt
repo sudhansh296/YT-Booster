@@ -167,12 +167,69 @@ fun ProfileScreen(
                     }
                 }
 
-                // Transaction History
+                // Channel Boost card
+                val scope = rememberCoroutineScope()
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val authPrefs = remember { context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE) }
+                val token = remember { "Bearer ${authPrefs.getString("token", "")}" }
+                var boostStatus by remember { mutableStateOf<com.ytsubexchange.data.BoostStatusResponse?>(null) }
+                var showBoostDialog by remember { mutableStateOf(false) }
+                var boostMsg by remember { mutableStateOf("") }
+
+                LaunchedEffect(Unit) {
+                    try { boostStatus = com.ytsubexchange.network.RetrofitClient.api.getBoostStatus(token) } catch (e: Exception) { }
+                }
+
                 Card(
                     colors = CardDefaults.cardColors(containerColor = card),
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().clickable { showBoostDialog = true }
                 ) {
+                    Row(Modifier.padding(20.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("🚀 Channel Boost", color = textColor, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(
+                                if (boostStatus?.isBoosted == true) "Boosted ✅ — ${boostStatus?.boostedUntil?.take(16)?.replace("T"," ")}"
+                                else "Coins se channel top pe dikhao",
+                                color = AppColors.textSecondary(dark), fontSize = 12.sp
+                            )
+                        }
+                        Text("›", color = Color.Gray, fontSize = 22.sp)
+                    }
+                }
+
+                if (showBoostDialog) {
+                    androidx.compose.ui.window.Dialog(onDismissRequest = { showBoostDialog = false }) {
+                        Card(colors = CardDefaults.cardColors(containerColor = card), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("🚀 Channel Boost", color = textColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("Apna channel featured section mein dikhao!", color = AppColors.textSecondary(dark), fontSize = 13.sp)
+                                if (boostMsg.isNotEmpty()) Text(boostMsg, color = if (boostMsg.contains("✅")) Color(0xFF4CAF50) else Color(0xFFFF6B6B), fontSize = 13.sp)
+                                listOf("6h" to 20, "12h" to 35, "24h" to 60, "48h" to 100).forEach { (dur, cost) ->
+                                    Box(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF7B2FF7).copy(0.15f))
+                                        .clickable {
+                                            scope.launch {
+                                                try {
+                                                    val resp = com.ytsubexchange.network.RetrofitClient.api.boostChannel(token, mapOf("duration" to dur))
+                                                    boostMsg = "✅ Channel boosted for $dur! Coins: ${resp.coins}"
+                                                    boostStatus = com.ytsubexchange.network.RetrofitClient.api.getBoostStatus(token)
+                                                } catch (e: Exception) { boostMsg = "❌ ${e.message?.take(50)}" }
+                                            }
+                                        }.padding(14.dp)) {
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("$dur boost", color = textColor, fontWeight = FontWeight.Bold)
+                                            Text("$cost 🪙", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                TextButton(onClick = { showBoostDialog = false }, modifier = Modifier.align(Alignment.End)) {
+                                    Text("Close", color = AppColors.textSecondary(dark))
+                                }
+                            }
+                        }
+                    }
+                }
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("📋 Transaction History", color = textColor, fontWeight = FontWeight.Bold, fontSize = 15.sp)

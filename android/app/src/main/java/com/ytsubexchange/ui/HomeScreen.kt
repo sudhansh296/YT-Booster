@@ -226,6 +226,37 @@ fun HomeScreen(viewModel: MainViewModel, onNavigateToCommunity: () -> Unit = {},
                 Text("🎯 Daily Tasks", color = Color(0xFF7B2FF7), modifier = Modifier.padding(6.dp))
             }
 
+            // Live Events banner
+            val scope2 = rememberCoroutineScope()
+            val context2 = androidx.compose.ui.platform.LocalContext.current
+            val authPrefs2 = remember { context2.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE) }
+            val token2 = remember { "Bearer ${authPrefs2.getString("token", "")}" }
+            var activeEvents by remember { mutableStateOf<List<com.ytsubexchange.data.LiveEvent>>(emptyList()) }
+            LaunchedEffect(Unit) {
+                try {
+                    val resp = com.ytsubexchange.network.RetrofitClient.api.getUpcomingEvents(token2)
+                    activeEvents = resp.events
+                } catch (e: Exception) { }
+            }
+            activeEvents.forEach { event ->
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color(0xFFFF6F00).copy(0.3f), Color(0xFFFFD600).copy(0.2f))))
+                    .padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(event.icon, fontSize = 24.sp)
+                        Column(Modifier.weight(1f)) {
+                            Text(event.title, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            if (event.description.isNotEmpty()) Text(event.description, color = Color(0xFFFFAA00), fontSize = 11.sp)
+                        }
+                        if (event.type == "double_coins") {
+                            Box(Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFFFF6F00)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                                Text("${event.multiplier}x 🪙", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
             Button(
                 onClick = { showBuyCoinsDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = if (dark) Color(0xFF1A3A1A) else Color(0xFFE8F5E9)),
