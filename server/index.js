@@ -161,6 +161,9 @@ app.use('/chat', require('./routes/chat'));
 app.use('/ai', require('./routes/ai'));
 app.use('/review', require('./routes/review'));
 app.use('/tasks', require('./routes/tasks'));
+app.use('/events', require('./routes/events'));
+app.use('/boost', require('./routes/boost'));
+app.use('/friends', require('./routes/friends'));
 
 // Admin & Subadmin panels - secret URL paths from .env
 const ADMIN_PATH = process.env.ADMIN_PATH || 'admin';
@@ -506,8 +509,21 @@ io.on('connection', (socket) => {
       }
 
       // Give coin directly - trust user (YouTube API unreliable with OAuth tokens)
-      user.coins += 1;
-      user.totalEarned += 1;
+      // Check for double coins event
+      let coinMultiplier = 1;
+      try {
+        const LiveEvent = require('./models/LiveEvent');
+        const now = new Date();
+        const activeEvent = await LiveEvent.findOne({
+          isActive: true, type: 'double_coins',
+          startTime: { $lte: now }, endTime: { $gte: now }
+        }).lean();
+        if (activeEvent) coinMultiplier = activeEvent.multiplier || 2;
+      } catch (e) { /* silent */ }
+
+      const coinsEarned = 1 * coinMultiplier;
+      user.coins += coinsEarned;
+      user.totalEarned += coinsEarned;
       user.subscribersGiven += 1;
       user.inQueue = false;
       await user.save();
@@ -528,12 +544,12 @@ io.on('connection', (socket) => {
       await Transaction.create({
         userId: user._id,
         type: 'earn',
-        coins: 1,
-        description: `Subscribed ${matchedUser.channelName}`,
+        coins: coinsEarned,
+        description: `Subscribed ${matchedUser.channelName}${coinMultiplier > 1 ? ` (${coinMultiplier}x event!)` : ''}`,
         relatedUserId: matchedUser._id
       });
 
-      socket.emit('coins_earned', { coins: user.coins, earned: 1 });
+      socket.emit('coins_earned', { coins: user.coins, earned: coinsEarned, multiplier: coinMultiplier });
       const matchedSocket = [...io.sockets.sockets.values()].find(s => s.userId === matchId);
       if (matchedSocket) matchedSocket.emit('partner_confirmed', { channelName: user.channelName });
     } catch (e) {

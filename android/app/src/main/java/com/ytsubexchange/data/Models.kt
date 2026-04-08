@@ -333,3 +333,27 @@ data class DailyTask(
 )
 data class DailyTasksResponse(val tasks: List<DailyTask>, val date: String = "")
 data class ClaimTaskResponse(val success: Boolean, val coins: Int = 0, val earned: Int = 0)
+
+// ── Live Events ───────────────────────────────────────────────
+data class LiveEvent(
+    val _id: String, val title: String, val description: String = "",
+    val type: String = "custom", val startTime: String = "", val endTime: String = "",
+    val multiplier: Int = 1, val prizePool: Int = 0, val icon: String = "🔥", val isActive: Boolean = true
+)
+data class LiveEventsResponse(val events: List<LiveEvent>)
+data class MultiplierResponse(val multiplier: Int = 1, val event: LiveEvent? = null)
+
+// ── Channel Boost ─────────────────────────────────────────────
+data class BoostStatusResponse(
+    val isBoosted: Boolean = false, val boostedUntil: String? = null,
+    val coins: Int = 0, val costs: Map<String, Int> = emptyMap()
+)
+data class BoostResponse(val success: Boolean, val coins: Int = 0, val boostedUntil: String? = null)
+
+// ── Friends ───────────────────────────────────────────────────
+data class FriendUser(
+    val _id: String, val channelName: String, val profilePic: String = "",
+    val coins: Int = 0, val totalEarned: Int = 0, val subscribersGiven: Int = 0
+)
+data class FriendsResponse(val friends: List<FriendUser>)
+data class FriendSearchResponse(val users: List<FriendUser>)

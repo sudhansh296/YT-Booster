@@ -37,7 +37,11 @@ const userSchema = new mongoose.Schema({
   suspiciousReason: { type: String, default: null },
   lastIp: { type: String, default: null },
   deviceFingerprint: { type: String, default: null },
-  registrationIp: { type: String, default: null }
+  registrationIp: { type: String, default: null },
+  // Social features
+  friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  // Channel boost
+  boostedUntil: { type: Date, default: null }
 });
 
 // Auto-generate refToken before save if not set

@@ -395,4 +395,31 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Body body: Map<String, Any>
     ): com.ytsubexchange.data.ClaimTaskResponse
+
+    // ── Live Events ───────────────────────────────────────────
+    @GET("events/upcoming")
+    suspend fun getUpcomingEvents(@Header("Authorization") token: String): com.ytsubexchange.data.LiveEventsResponse
+
+    @GET("events/multiplier")
+    suspend fun getCoinMultiplier(@Header("Authorization") token: String): com.ytsubexchange.data.MultiplierResponse
+
+    // ── Channel Boost ─────────────────────────────────────────
+    @GET("boost/status")
+    suspend fun getBoostStatus(@Header("Authorization") token: String): com.ytsubexchange.data.BoostStatusResponse
+
+    @POST("boost/channel")
+    suspend fun boostChannel(@Header("Authorization") token: String, @Body body: Map<String, String>): com.ytsubexchange.data.BoostResponse
+
+    // ── Friends ───────────────────────────────────────────────
+    @GET("friends")
+    suspend fun getFriends(@Header("Authorization") token: String): com.ytsubexchange.data.FriendsResponse
+
+    @GET("friends/search")
+    suspend fun searchFriends(@Header("Authorization") token: String, @Query("q") q: String): com.ytsubexchange.data.FriendSearchResponse
+
+    @POST("friends/add/{userId}")
+    suspend fun addFriend(@Header("Authorization") token: String, @Path("userId") userId: String): com.ytsubexchange.data.ClaimTaskResponse
+
+    @DELETE("friends/remove/{userId}")
+    suspend fun removeFriend(@Header("Authorization") token: String, @Path("userId") userId: String): com.ytsubexchange.data.ClaimTaskResponse
 }
