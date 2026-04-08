@@ -31,7 +31,7 @@ import com.ytsubexchange.viewmodel.MainViewModel
 import com.ytsubexchange.viewmodel.QueueState
 
 @Composable
-fun HomeScreen(viewModel: MainViewModel, onNavigateToCommunity: () -> Unit = {}) {
+fun HomeScreen(viewModel: MainViewModel, onNavigateToCommunity: () -> Unit = {}, onNavigateToDailyTasks: () -> Unit = {}) {
     val profile by viewModel.profile.collectAsState()
     val queueState by viewModel.queueState.collectAsState()
     val notices by viewModel.notices.collectAsState()
@@ -214,6 +214,16 @@ fun HomeScreen(viewModel: MainViewModel, onNavigateToCommunity: () -> Unit = {})
             }
             if (bonusMsg.isNotEmpty()) {
                 Text(bonusMsg, color = if (bonusMsg.contains("+")) Color(0xFF4CAF50) else Color(0xFFFF6B6B), fontSize = 13.sp)
+            }
+
+            // Daily Tasks button
+            Button(
+                onClick = { onNavigateToDailyTasks() },
+                colors = ButtonDefaults.buttonColors(containerColor = if (dark) Color(0xFF1A0A2E) else Color(0xFFF3E5F5)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("🎯 Daily Tasks", color = Color(0xFF7B2FF7), modifier = Modifier.padding(6.dp))
             }
 
             Button(

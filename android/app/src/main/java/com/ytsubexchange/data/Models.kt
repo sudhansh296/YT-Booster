@@ -316,3 +316,20 @@ data class AppReview(
     val appVersion: String = "",
     val createdAt: String = ""
 )
+
+// ── Daily Tasks ───────────────────────────────────────────────
+data class DailyTask(
+    val _id: String,
+    val title: String,
+    val description: String = "",
+    val type: String = "custom",
+    val targetCount: Int = 1,
+    val coinReward: Int = 5,
+    val icon: String = "🎯",
+    val isActive: Boolean = true,
+    val progress: Int = 0,
+    val completed: Boolean = false,
+    val claimed: Boolean = false
+)
+data class DailyTasksResponse(val tasks: List<DailyTask>, val date: String = "")
+data class ClaimTaskResponse(val success: Boolean, val coins: Int = 0, val earned: Int = 0)

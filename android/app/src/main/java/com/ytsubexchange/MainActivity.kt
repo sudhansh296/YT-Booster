@@ -80,6 +80,7 @@ sealed class Screen {
     object Exchange : Screen()
     // Sub-screens (no bottom nav)
     object Streak : Screen()
+    object DailyTasks : Screen()
     object Settings : Screen()
     object Transactions : Screen()
 }
@@ -253,6 +254,11 @@ class MainActivity : ComponentActivity() {
                         StreakScreen(viewModel) { currentScreen = Screen.Profile }
                         return@setContent
                     }
+                    is Screen.DailyTasks -> {
+                        BackHandler { currentScreen = Screen.Home }
+                        com.ytsubexchange.ui.DailyTasksScreen { currentScreen = Screen.Home }
+                        return@setContent
+                    }
                     is Screen.Settings -> {
                         BackHandler { currentScreen = Screen.Profile }
                         SettingsScreen { currentScreen = Screen.Profile }
@@ -300,7 +306,8 @@ class MainActivity : ComponentActivity() {
                         when (currentScreen) {
                             is Screen.Home -> HomeScreen(
                                 viewModel = viewModel,
-                                onNavigateToCommunity = { currentScreen = Screen.ChatWithCommunity(true) }
+                                onNavigateToCommunity = { currentScreen = Screen.ChatWithCommunity(true) },
+                                onNavigateToDailyTasks = { currentScreen = Screen.DailyTasks }
                             )
                             is Screen.Leaderboard -> LeaderboardScreen(viewModel)
                             is Screen.Referral -> ReferralScreen(viewModel)

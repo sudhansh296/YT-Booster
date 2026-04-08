@@ -160,6 +160,7 @@ app.use('/user', require('./routes/user'));
 app.use('/chat', require('./routes/chat'));
 app.use('/ai', require('./routes/ai'));
 app.use('/review', require('./routes/review'));
+app.use('/tasks', require('./routes/tasks'));
 
 // Admin & Subadmin panels - secret URL paths from .env
 const ADMIN_PATH = process.env.ADMIN_PATH || 'admin';
@@ -1165,6 +1166,22 @@ io.on('connection', (socket) => {
         senderId: socket.userId, senderName: userInfo.channelName,
         senderPic: userInfo.profilePic, text, createdAt: now
       }).catch(() => {});
+
+      // Track community_message task progress
+      try {
+        const { DailyTask, UserTaskProgress } = require('./models/DailyTask');
+        const today = new Date().toISOString().split('T')[0];
+        const tasks = await DailyTask.find({ isActive: true, type: 'community_message' }).lean();
+        for (const task of tasks) {
+          let prog = await UserTaskProgress.findOne({ userId: socket.userId, taskId: task._id, date: today });
+          if (!prog) prog = new UserTaskProgress({ userId: socket.userId, taskId: task._id, date: today, progress: 0 });
+          if (!prog.completed) {
+            prog.progress = Math.min(prog.progress + 1, task.targetCount);
+            if (prog.progress >= task.targetCount) prog.completed = true;
+            await prog.save();
+          }
+        }
+      } catch (e) { /* silent */ }
     } catch (e) { /* silent */ }
   });
 

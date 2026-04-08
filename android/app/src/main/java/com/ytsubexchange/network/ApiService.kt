@@ -372,4 +372,27 @@ interface ApiService {
     suspend fun getMyReview(
         @Header("Authorization") token: String
     ): com.ytsubexchange.data.MyReviewResponse
+
+    // ── Daily Tasks ───────────────────────────────────────────
+    @GET("tasks/today")
+    suspend fun getDailyTasks(
+        @Header("Authorization") token: String
+    ): com.ytsubexchange.data.DailyTasksResponse
+
+    @POST("tasks/{taskId}/claim")
+    suspend fun claimTask(
+        @Header("Authorization") token: String,
+        @Path("taskId") taskId: String
+    ): com.ytsubexchange.data.ClaimTaskResponse
+
+    @POST("tasks/login-task")
+    suspend fun completeLoginTask(
+        @Header("Authorization") token: String
+    ): com.ytsubexchange.data.ClaimTaskResponse
+
+    @POST("tasks/progress")
+    suspend fun updateTaskProgress(
+        @Header("Authorization") token: String,
+        @Body body: Map<String, Any>
+    ): com.ytsubexchange.data.ClaimTaskResponse
 }
