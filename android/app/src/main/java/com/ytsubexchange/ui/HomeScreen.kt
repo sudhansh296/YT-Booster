@@ -54,7 +54,15 @@ fun HomeScreen(viewModel: MainViewModel, onNavigateToCommunity: () -> Unit = {})
 
     LaunchedEffect(notices) {
         if (notices.isNotEmpty()) {
-            noticeToShow = notices.firstOrNull { !prefs.getBoolean("seen_${it._id}", false) }
+            noticeToShow = notices.firstOrNull { notice ->
+                if (notice.subAdminCode != null) {
+                    // Subadmin notice — show only once (check seen flag)
+                    !prefs.getBoolean("seen_${notice._id}", false)
+                } else {
+                    // Admin notice — show every time app opens (no seen check)
+                    true
+                }
+            }
         }
     }
 
@@ -318,12 +326,25 @@ fun HomeScreen(viewModel: MainViewModel, onNavigateToCommunity: () -> Unit = {})
         AlertDialog(
             onDismissRequest = {},
             containerColor = if (dark) Color(0xFF1A1A2E) else Color.White,
-            title = { Text(notice.title, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold) },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (notice.subAdminCode != null) "📢" else "🔔", fontSize = 18.sp)
+                    Text(notice.title, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                }
+            },
             text = { Text(notice.message, color = textColor, fontSize = 14.sp) },
             confirmButton = {
                 TextButton(onClick = {
-                    prefs.edit().putBoolean("seen_${notice._id}", true).apply()
-                    noticeToShow = notices.firstOrNull { it._id != notice._id && !prefs.getBoolean("seen_${it._id}", false) }
+                    if (notice.subAdminCode != null) {
+                        // Subadmin notice — mark as seen so it doesn't show again
+                        prefs.edit().putBoolean("seen_${notice._id}", true).apply()
+                        noticeToShow = notices.firstOrNull { n ->
+                            n._id != notice._id && n.subAdminCode != null && !prefs.getBoolean("seen_${n._id}", false)
+                        }
+                    } else {
+                        // Admin notice — just dismiss, will show again next time
+                        noticeToShow = null
+                    }
                 }) { Text("OK", color = Color(0xFFFFD700)) }
             }
         )

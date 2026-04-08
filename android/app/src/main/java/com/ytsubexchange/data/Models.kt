@@ -26,7 +26,7 @@ data class BuySubsResponse(val success: Boolean, val remainingCoins: Int, val me
 data class CoinsEarned(val coins: Int, val earned: Int)
 data class CoinRequestBody(val coins: Int)
 data class CoinRequestResponse(val success: Boolean, val requestId: String)
-data class NoticeData(val _id: String, val title: String, val message: String)
+data class NoticeData(val _id: String, val title: String, val message: String, val subAdminCode: String? = null)
 data class DailyBonusResponse(val success: Boolean, val coins: Int = 0, val message: String = "", val streak: Int = 0)
 
 data class TransactionData(
