@@ -112,9 +112,24 @@ router.get('/messages/:roomId', authMiddleware, async (req, res) => {
     // Reverse to show oldest first
     messages.reverse();
 
+    // Apply user-specific hide/clear settings
+    const UserChatSettings = require('../models/UserChatSettings');
+    const userSettings = await UserChatSettings.findOne({ userId: req.user._id, roomId: req.params.roomId }).lean();
+    
+    let filteredMessages = messages;
+    if (userSettings) {
+      const hiddenIds = new Set((userSettings.hiddenMsgIds || []).map(id => id.toString()));
+      const clearedAt = userSettings.clearedAt ? new Date(userSettings.clearedAt) : null;
+      filteredMessages = messages.filter(msg => {
+        if (hiddenIds.has(msg._id.toString())) return false;
+        if (clearedAt && new Date(msg.createdAt) <= clearedAt) return false;
+        return true;
+      });
+    }
+
     // Convert starred array to boolean for current user
     const userId = req.user._id.toString();
-    const processedMessages = messages.map(msg => ({
+    const processedMessages = filteredMessages.map(msg => ({
       ...msg,
       starred: Array.isArray(msg.starred) ? msg.starred.some(id => id.toString() === userId) : !!msg.starred
     }));

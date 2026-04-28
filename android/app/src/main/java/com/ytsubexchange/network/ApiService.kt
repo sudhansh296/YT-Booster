@@ -226,6 +226,13 @@ interface ApiService {
         @Body body: Map<String, String>
     ): com.ytsubexchange.data.DeleteMsgResponse
 
+    @POST("chat/hide-message")
+    suspend fun hideMessage(
+        @Header("Authorization") token: String,
+        @Body body: Map<String, String>
+    ): com.ytsubexchange.data.DeleteMsgResponse
+    ): com.ytsubexchange.data.DeleteMsgResponse
+
     @POST("chat/mute")
     suspend fun muteChat(
         @Header("Authorization") token: String,
