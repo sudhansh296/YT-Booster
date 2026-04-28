@@ -95,10 +95,12 @@ class MusicViewModel(app: Application) : AndroidViewModel(app) {
                         isLoading.value  = false
                         isPlaying.value  = false
                         statusText.value = "Track ended"
-                        // Use Handler to ensure this runs even when screen is off
-                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        // Use a background-safe coroutine scope instead of viewModelScope
+                        // viewModelScope can be suspended when screen is off
+                        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                            kotlinx.coroutines.delay(300)
                             playNext()
-                        }, 300)
+                        }
                     }
                     Player.STATE_IDLE -> {
                         isLoading.value  = false
@@ -183,14 +185,15 @@ class MusicViewModel(app: Application) : AndroidViewModel(app) {
         lyrics.value         = null
         parsedLyrics.value   = emptyList()
 
-        viewModelScope.launch {
+        // Use GlobalScope so playback continues in background even when screen is off
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
             // Ensure controller is ready
             if (controller == null) {
                 android.util.Log.d("MusicVM", "Controller null, reconnecting...")
                 connectService()
                 var waited = 0
                 while (controller == null && waited < 6000) {
-                    delay(200)
+                    kotlinx.coroutines.delay(200)
                     waited += 200
                 }
             }
@@ -206,7 +209,9 @@ class MusicViewModel(app: Application) : AndroidViewModel(app) {
             // Fetch stream URL
             statusText.value = "Fetching stream..."
             val url = streamCache[song.videoId] ?: run {
-                val fetched = MusiqFlowYouTube.getStreamUrl(song.videoId)
+                val fetched = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    MusiqFlowYouTube.getStreamUrl(song.videoId)
+                }
                 if (fetched != null) streamCache[song.videoId] = fetched
                 fetched
             }

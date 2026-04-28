@@ -151,6 +151,23 @@ class MusicService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
 
+    override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        // START_STICKY = service restart hogi agar system kill kare
+        return android.app.Service.START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: android.content.Intent?) {
+        // App swipe se close hone pe bhi music chalti rahe
+        val player = mediaSession?.player
+        if (player != null && player.playWhenReady) {
+            // Music chal rahi hai - service ko alive rakho
+            return
+        }
+        // Music nahi chal rahi - service band karo
+        stopSelf()
+    }
+
     override fun onDestroy() {
         mediaSession?.run {
             player.release()
