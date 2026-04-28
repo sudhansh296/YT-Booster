@@ -11,7 +11,8 @@ const promoVideoSchema = new mongoose.Schema({
   totalViews: { type: Number, default: 0 },
   totalCoinsGiven: { type: Number, default: 0 },
   addedBy: { type: String, default: 'admin' }, // admin or userId
-  priority: { type: Number, default: 0 } // higher = shown first
+  priority: { type: Number, default: 0 }, // higher = shown first
+  expiresAt: { type: Date, default: null } // null = never expires (admin videos), set for user-submitted videos
 }, { timestamps: true });
 
 module.exports = mongoose.model('PromoVideo', promoVideoSchema);

@@ -1403,6 +1403,24 @@ setInterval(deleteOldMessages, 60 * 60 * 1000);
 deleteOldFiles(); // Run on startup too
 deleteOldMessages();
 
+// ── Auto-delete expired user-submitted promo videos (every 5 min) ──
+async function deleteExpiredPromoVideos() {
+  try {
+    const PromoVideo = require('./models/PromoVideo');
+    const now = new Date();
+    // Only delete user-submitted videos (addedBy != 'admin') that have expired
+    const result = await PromoVideo.deleteMany({
+      expiresAt: { $ne: null, $lte: now },
+      addedBy: { $ne: 'admin' }
+    });
+    if (result.deletedCount > 0) {
+      console.log(`[PromoVideo] Auto-deleted ${result.deletedCount} expired user videos`);
+    }
+  } catch (e) { /* silent */ }
+}
+setInterval(deleteExpiredPromoVideos, 5 * 60 * 1000); // every 5 min
+deleteExpiredPromoVideos(); // run on startup too
+
 // ── Daily Task Reminder — 8 PM every day ─────────────────────
 async function sendDailyTaskReminder() {
   try {

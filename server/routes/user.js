@@ -582,7 +582,8 @@ router.post('/video-order', authMiddleware, async (req, res) => {
       watchSeconds: config.watchSeconds,
       isActive: true,
       addedBy: req.user._id.toString(),
-      priority: 0
+      priority: 0,
+      expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000) // 2 hours se auto-delete
     });
 
     // Transaction record
