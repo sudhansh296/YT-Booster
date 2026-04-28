@@ -328,8 +328,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     if (_messages.value.isEmpty()) {
                         val diskMsgs = loadMessagesFromDisk(roomId)
                         if (diskMsgs.isNotEmpty()) {
-                            _messages.value = diskMsgs
-                            _messageCache[roomId] = diskMsgs
+                            val deletedIds = getDeletedForMe(roomId)
+                            val filtered = diskMsgs.filter { it._id !in deletedIds }
+                            _messages.value = filtered
+                            _messageCache[roomId] = filtered
                         }
                     }
                     return@launch
@@ -340,7 +342,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     serverMessages.none { real -> real.text == temp.text && !real._id.startsWith("temp_") }
                 }
 
-                val finalMessages = serverMessages + unconfirmedTemps
+                val deletedIds = getDeletedForMe(roomId)
+                val clearedTime = getRoomClearedTime(roomId)
+                val finalMessages = (serverMessages + unconfirmedTemps).filter { msg ->
+                    msg._id !in deletedIds &&
+                    (clearedTime == 0L || (msg.createdAt.let { t ->
+                        try { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.getDefault()).parse(t)?.time ?: 0L } catch (e: Exception) { 0L }
+                    }) > clearedTime)
+                }
                 _messages.value = finalMessages
                 _messageCache[roomId] = finalMessages
                 saveMessagesToDisk(roomId, finalMessages)
@@ -623,6 +632,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 } catch (e: Exception) { _toastMsg.value = "Delete failed" }
             } else {
                 // Delete for me — sirf local se hatao, server pe nahi
+                addDeletedForMe(roomId, msgId)
                 _messages.value = _messages.value.filter { it._id != msgId }
                 _messageCache[roomId] = _messages.value
                 saveMessagesToDisk(roomId, _messages.value)
@@ -1126,6 +1136,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun clearChatForMe() {
         val roomId = _openRoom.value?._id ?: return
         // Optimistic — turant local clear karo
+        markRoomCleared(roomId)
         _messages.value = emptyList()
         _pinnedMsg.value = null
         _messageCache.remove(roomId)
