@@ -4,7 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 
-const BOOST_COSTS = { '6h': 20, '12h': 35, '24h': 60, '48h': 100 };
+const BOOST_COSTS = { '2h': 20, '6h': 35, '12h': 60, '24h': 100 };
 
 // Boost my channel
 router.post('/channel', authMiddleware, async (req, res) => {

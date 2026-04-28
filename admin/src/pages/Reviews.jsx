@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
 const BASE = import.meta.env.VITE_API_URL || 'https://api.picrypto.in';
-const headers = () => ({ 'x-admin-secret': localStorage.getItem('admin_token') });
+const headers = () => ({ 'x-admin-token': localStorage.getItem('admin_token') });
 
 const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 const ratingColor = (r) => r >= 4 ? '#4CAF50' : r === 3 ? '#FFB300' : '#FF5252';

@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const ChatRoom = require('../models/ChatRoom');
 const ChatMessage = require('../models/ChatMessage');
 const User = require('../models/User');
+const { sendFCMNotification } = require('../fcm-helper');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -80,7 +81,9 @@ router.get('/rooms', authMiddleware, async (req, res) => {
         unread: unreadMap[room._id.toString()] || 0,
         otherUserId,
         isBlockedByMe: otherUserId ? (myUser?.blockedUsers?.some(id => id.toString() === otherUserId) || false) : false,
-        isBlockedByThem: otherUserId ? (userMap[otherUserId]?.blockedUsers?.some(id => id.toString() === req.user._id.toString()) || false) : false
+        isBlockedByThem: otherUserId ? (userMap[otherUserId]?.blockedUsers?.some(id => id.toString() === req.user._id.toString()) || false) : false,
+        disappearingSeconds: room.disappearingSeconds || 0,
+        subAdmins: room.subAdmins || []
       };
     });
 
@@ -100,10 +103,14 @@ router.get('/messages/:roomId', authMiddleware, async (req, res) => {
     }
     if (room.isBlocked) return res.status(403).json({ error: 'This group has been blocked by admin' });
 
+    // Cache check disabled — messages always fresh load karo
+    // (cache se naye messages miss ho jaate the)
     const messages = await ChatMessage.find({ roomId: req.params.roomId })
-      .sort({ createdAt: 1 })
-      .limit(100)
+      .sort({ createdAt: -1 })
+      .limit(200)
       .lean();
+    // Reverse to show oldest first
+    messages.reverse();
 
     // Convert starred array to boolean for current user
     const userId = req.user._id.toString();
@@ -112,11 +119,11 @@ router.get('/messages/:roomId', authMiddleware, async (req, res) => {
       starred: Array.isArray(msg.starred) ? msg.starred.some(id => id.toString() === userId) : !!msg.starred
     }));
 
-    // Mark as read
-    await ChatMessage.updateMany(
+    // Mark as read (async - don't wait)
+    ChatMessage.updateMany(
       { roomId: req.params.roomId, senderId: { $ne: req.user._id }, read: false },
       { read: true }
-    );
+    ).catch(() => {});
 
     res.json({ messages: processedMessages });
   } catch (e) {
@@ -421,6 +428,22 @@ router.post('/request/accept', authMiddleware, async (req, res) => {
       });
     }
 
+    // FCM to sender if offline
+    try {
+      const admin = require('../firebase-admin');
+      if (admin) {
+        const senderUser = await User.findById(request.fromUserId).select('fcmToken').lean();
+        if (senderUser?.fcmToken) {
+          await admin.messaging().send({
+            token: senderUser.fcmToken,
+            notification: { title: `✅ ${req.user.channelName}`, body: 'Aapki chat request accept ho gayi!' },
+            data: { type: 'chat_request_accepted', roomId: room._id.toString() },
+            android: { priority: 'high', notification: { channelId: 'ytbooster_channel', sound: 'default' } }
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+
     res.json({ success: true, room });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -615,6 +638,26 @@ router.post('/group/invite', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Get pending group invites for current user ───────────────
+router.get('/group/pending-invites', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    const groups = await ChatRoom.find({ 
+      pendingInvites: req.user._id, 
+      isGroup: true 
+    }).select('name pic pendingInvites').lean();
+    
+    const invites = groups.map(g => ({
+      roomId: g._id,
+      roomName: g.name,
+      roomPic: g.pic || ''
+    }));
+    res.json({ invites });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Join group directly by roomId ────────────────────────────
 router.post('/group/join', authMiddleware, async (req, res) => {
   try {
@@ -711,10 +754,13 @@ router.get('/group/info/:roomId', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Not a member' });
     }
     const members = await User.find({ _id: { $in: room.members } }).select('channelName profilePic').lean();
+    const isAdmin = room.admins?.some(a => a.toString() === req.user._id.toString()) || false;
+    const ownerId = room.createdBy?.toString() || room.admins?.[0]?.toString() || '';
     res.json({
-      room: { ...room, adminId: room.admins?.[0]?.toString() },
+      room: { ...room, adminId: room.admins?.[0]?.toString(), ownerId },
       members: members.map(m => ({ _id: m._id, channelName: m.channelName, profilePic: m.profilePic || '' })),
-      isAdmin: room.admins?.some(a => a.toString() === req.user._id.toString()) || false
+      isAdmin,
+      ownerId
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -984,13 +1030,13 @@ const COMMUNITY_ROOM_ID = 'community_global';
 
 router.get('/community', authMiddleware, async (req, res) => {
   try {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48 hours
     const messages = await ChatMessage.find({
       roomId: COMMUNITY_ROOM_ID,
       createdAt: { $gte: cutoff }
     })
       .sort({ createdAt: -1 })
-      .limit(200)
+      .limit(500)
       .lean();
     res.json({ messages: messages.reverse() });
   } catch (e) {
@@ -1024,13 +1070,66 @@ router.post('/community/send', authMiddleware, async (req, res) => {
       });
     }
 
+    // FCM push notification to all users who are NOT currently in community room
+    // This ensures background/offline users get notified
+    try {
+      const admin = require('../firebase-admin');
+      const User = require('../models/User');
+const { sendFCMNotification } = require('../fcm-helper');
+      
+      // Get all users with FCM tokens (except sender)
+      const usersWithTokens = await User.find({
+        _id: { $ne: req.user._id },
+        fcmToken: { $exists: true, $ne: null, $ne: '' }
+      }).select('fcmToken').lean();
+
+      if (usersWithTokens.length > 0) {
+        const tokens = usersWithTokens.map(u => u.fcmToken).filter(Boolean);
+        
+        // Send in batches of 500 (FCM limit)
+        const batchSize = 500;
+        for (let i = 0; i < tokens.length; i += batchSize) {
+          const batch = tokens.slice(i, i + batchSize);
+          try {
+            await admin.messaging().sendEachForMulticast({
+              tokens: batch,
+              notification: {
+                title: `${req.user.channelName} - Community`,
+                body: text.length > 100 ? text.substring(0, 100) + '...' : text,
+              },
+              data: {
+                type: 'community_message',
+                senderId: req.user._id.toString(),
+                senderName: req.user.channelName,
+                senderPic: req.user.profilePic || '',
+                msgId: msg._id.toString(),
+                click_action: 'COMMUNITY_CHAT'
+              },
+              android: {
+                priority: 'high',
+                notification: {
+                  channelId: 'community_chat',
+                  sound: 'default',
+                  icon: 'ic_notification'
+                }
+              }
+            });
+          } catch (fcmErr) {
+            console.log('[Community FCM] Batch error:', fcmErr.message);
+          }
+        }
+      }
+    } catch (fcmErr) {
+      console.log('[Community FCM] Error:', fcmErr.message);
+    }
+
     res.json(msg);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── Clear Chat (sirf apne liye) ──────────────────────────────
+// ── Clear Chat for Everyone (owner/admin only) ───────────────
 router.post('/clear', authMiddleware, async (req, res) => {
   try {
     const { roomId } = req.body;
@@ -1041,6 +1140,48 @@ router.post('/clear', authMiddleware, async (req, res) => {
     }
     await ChatMessage.deleteMany({ roomId });
     await ChatRoom.findByIdAndUpdate(roomId, { lastMessage: '', lastTime: new Date() });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Clear Chat for Me only ────────────────────────────────────
+router.post('/clear-for-me', authMiddleware, async (req, res) => {
+  try {
+    const { roomId } = req.body;
+    if (!roomId) return res.status(400).json({ error: 'roomId required' });
+    const room = await ChatRoom.findById(roomId);
+    if (!room || !room.members.some(m => m.toString() === req.user._id.toString())) {
+      return res.status(403).json({ error: 'Not a member' });
+    }
+    const UserChatSettings = require('../models/UserChatSettings');
+    await UserChatSettings.findOneAndUpdate(
+      { userId: req.user._id, roomId },
+      { clearedAt: new Date(), hiddenMsgIds: [] },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Delete message for Me only ────────────────────────────────
+router.post('/hide-message', authMiddleware, async (req, res) => {
+  try {
+    const { roomId, msgId } = req.body;
+    if (!roomId || !msgId) return res.status(400).json({ error: 'roomId and msgId required' });
+    const room = await ChatRoom.findById(roomId);
+    if (!room || !room.members.some(m => m.toString() === req.user._id.toString())) {
+      return res.status(403).json({ error: 'Not a member' });
+    }
+    const UserChatSettings = require('../models/UserChatSettings');
+    await UserChatSettings.findOneAndUpdate(
+      { userId: req.user._id, roomId },
+      { $addToSet: { hiddenMsgIds: msgId } },
+      { upsert: true, new: true }
+    );
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1087,6 +1228,22 @@ router.post('/block', authMiddleware, async (req, res) => {
       io.to(`user_${otherId.toString()}`).emit('user_blocked', { roomId, blockedBy: req.user._id.toString(), blockedUser: otherId.toString() });
     }
 
+    // FCM to blocked user
+    try {
+      const admin = require('../firebase-admin');
+      if (admin) {
+        const blockedUser = await User.findById(otherId).select('fcmToken channelName').lean();
+        if (blockedUser?.fcmToken) {
+          await admin.messaging().send({
+            token: blockedUser.fcmToken,
+            notification: { title: '🚫 Blocked', body: `${req.user.channelName} ne aapko block kar diya` },
+            data: { type: 'user_blocked', roomId },
+            android: { priority: 'normal', notification: { channelId: 'ytbooster_channel' } }
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1111,6 +1268,22 @@ router.post('/unblock', authMiddleware, async (req, res) => {
       io.to(`user_${req.user._id.toString()}`).emit('user_unblocked', { roomId, unblockedBy: req.user._id.toString() });
       io.to(`user_${otherId.toString()}`).emit('user_unblocked', { roomId, unblockedBy: req.user._id.toString() });
     }
+
+    // FCM to unblocked user
+    try {
+      const admin = require('../firebase-admin');
+      if (admin) {
+        const unblockedUser = await User.findById(otherId).select('fcmToken').lean();
+        if (unblockedUser?.fcmToken) {
+          await admin.messaging().send({
+            token: unblockedUser.fcmToken,
+            notification: { title: '✅ Unblocked', body: `${req.user.channelName} ne aapko unblock kar diya` },
+            data: { type: 'user_unblocked', roomId },
+            android: { priority: 'normal', notification: { channelId: 'ytbooster_channel' } }
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {}
 
     res.json({ success: true });
   } catch (e) {
@@ -1232,29 +1405,42 @@ router.post('/group/subadmin', authMiddleware, async (req, res) => {
 
     if (action === 'remove') {
       room.subAdmins = (room.subAdmins || []).filter(s => s.userId.toString() !== targetUserId);
+      // Also remove from admins array (keep only original owner/first admin)
+      const ownerId = room.createdBy?.toString() || room.admins?.[0]?.toString();
+      if (targetUserId !== ownerId) {
+        room.admins = room.admins.filter(a => a.toString() !== targetUserId);
+      }
     } else if (action === 'add') {
       const existing = (room.subAdmins || []).find(s => s.userId.toString() === targetUserId);
       if (!existing) {
         room.subAdmins = [...(room.subAdmins || []), {
           userId: targetUserId,
           canDeleteMessages: permissions?.canDeleteMessages ?? true,
-          canBanMembers: permissions?.canBanMembers ?? false,
+          canBanMembers: permissions?.canBanMembers ?? true,
           canInviteMembers: permissions?.canInviteMembers ?? true,
-          canPinMessages: permissions?.canPinMessages ?? false,
+          canPinMessages: permissions?.canPinMessages ?? true,
           canChangeGroupInfo: permissions?.canChangeGroupInfo ?? false,
-          canStartVoiceChat: permissions?.canStartVoiceChat ?? false
+          canStartVoiceChat: permissions?.canStartVoiceChat ?? true
         }];
+      }
+      // Also add to admins array so isAdmin = true
+      if (!room.admins.some(a => a.toString() === targetUserId)) {
+        room.admins.push(targetUserId);
       }
     } else if (action === 'update') {
       const idx = (room.subAdmins || []).findIndex(s => s.userId.toString() === targetUserId);
       if (idx !== -1 && permissions) Object.assign(room.subAdmins[idx], permissions);
+      // Ensure still in admins array
+      if (!room.admins.some(a => a.toString() === targetUserId)) {
+        room.admins.push(targetUserId);
+      }
     }
     await room.save();
 
     const target = await User.findById(targetUserId).select('channelName').lean();
     const io = req.app.get('io');
     if (io) {
-      const sysText = action === 'add' ? `${target?.channelName} ko sub-admin banaya gaya ⭐` : action === 'remove' ? `${target?.channelName} ka sub-admin role hataya gaya` : null;
+      const sysText = action === 'add' ? `${target?.channelName} ko admin banaya gaya ⭐` : action === 'remove' ? `${target?.channelName} ka admin role hataya gaya` : null;
       if (sysText) {
         const sysMsg = await ChatMessage.create({ roomId, senderId: req.user._id, senderName: 'System', senderPic: '', text: sysText });
         io.to(`chat_${roomId}`).emit('chat_message', { _id: sysMsg._id, roomId, senderId: req.user._id, senderName: 'System', senderPic: '', text: sysText, createdAt: sysMsg.createdAt });

@@ -54,6 +54,7 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
     private var durationJob: kotlinx.coroutines.Job? = null
     private var timeoutJob: kotlinx.coroutines.Job? = null
     private var webrtcInitialized = false
+    private var callStarted = false  // prevent double call_start
 
     // Track surface init state to avoid double-init crash
     private var localSurfaceInited = false
@@ -69,9 +70,10 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
     private fun iceServers() = listOf(
         PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
         PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
-        PeerConnection.IceServer.builder("turn:80.211.139.118:3478")
+        PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("turn:80.211.141.242:3478")
             .setUsername("ytbooster").setPassword("ytbooster2024").createIceServer(),
-        PeerConnection.IceServer.builder("turn:80.211.139.118:3478?transport=tcp")
+        PeerConnection.IceServer.builder("turn:80.211.141.242:3478?transport=tcp")
             .setUsername("ytbooster").setPassword("ytbooster2024").createIceServer()
     )
 
@@ -254,6 +256,8 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── Outgoing call ─────────────────────────────────────────
     fun startCall(roomId: String, roomName: String, callType: String) {
+        if (callStarted) return  // prevent double call
+        callStarted = true
         this.roomId.value = roomId
         this.roomName.value = roomName
         this.callType.value = callType
@@ -546,6 +550,7 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
                 isCamOff.value = false
                 isScreenSharing.value = false
                 upgradeRequest.value = null
+                callStarted = false
             }
         }.start()
     }
@@ -554,6 +559,8 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
     private fun listenCallEvents() {
         SocketManager.on("call_incoming") { args ->
             try {
+                // Ignore if already in a call
+                if (callState.value != CallState.IDLE) return@on
                 val data = args[0] as JSONObject
                 roomId.value   = data.optString("roomId")
                 callType.value = data.optString("callType", "voice")
@@ -572,15 +579,30 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
                 remoteSocketId = data.optString("socketId")
                 // Callee joined — cancel timeout
                 timeoutJob?.cancel()
-                // peerConnection already created in startCall → just send offer
                 val withVideo = callType.value == "video"
                 val constraints = MediaConstraints().apply {
                     mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
                     if (withVideo) mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
                 }
-                Thread {
-                    peerConnection?.createOffer(makeSdpObserver(isOffer = true), constraints)
-                }.start()
+                if (withVideo) {
+                    // Wait for video track to be ready before creating offer
+                    initVideoTrack {
+                        localVideoTrack?.let { track ->
+                            val pc = peerConnection ?: return@initVideoTrack
+                            val existingVideoSender = pc.senders?.firstOrNull { it.track() is VideoTrack }
+                            if (existingVideoSender == null) {
+                                pc.addTrack(track, listOf("stream0"))
+                            }
+                        }
+                        Thread {
+                            peerConnection?.createOffer(makeSdpObserver(isOffer = true), constraints)
+                        }.start()
+                    }
+                } else {
+                    Thread {
+                        peerConnection?.createOffer(makeSdpObserver(isOffer = true), constraints)
+                    }.start()
+                }
             } catch (e: Exception) { }
         }
 

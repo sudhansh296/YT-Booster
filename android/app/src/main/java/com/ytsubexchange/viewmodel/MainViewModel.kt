@@ -53,11 +53,30 @@ class MainViewModel : ViewModel() {
     private val _updateInfo = MutableStateFlow<com.ytsubexchange.data.VersionResponse?>(null)
     val updateInfo: StateFlow<com.ytsubexchange.data.VersionResponse?> = _updateInfo
 
-    fun setUpdateAvailable(info: com.ytsubexchange.data.VersionResponse) {
+    fun setUpdateAvailable(info: com.ytsubexchange.data.VersionResponse?) {
         _updateInfo.value = info
     }
 
     private var token: String = ""
+
+    private val _callHistory = MutableStateFlow<List<com.ytsubexchange.data.CallLogEntry>>(emptyList())
+    val callHistory: StateFlow<List<com.ytsubexchange.data.CallLogEntry>> = _callHistory
+    private val _isLoadingCallHistory = MutableStateFlow(false)
+    val isLoadingCallHistory: StateFlow<Boolean> = _isLoadingCallHistory
+
+    fun loadCallHistory() {
+        viewModelScope.launch {
+            _isLoadingCallHistory.value = true
+            try {
+                val resp = RetrofitClient.api.getCallHistory("Bearer $token")
+                _callHistory.value = resp.calls
+            } catch (e: Exception) {
+                android.util.Log.e("CallHistory", parseError(e))
+            } finally {
+                _isLoadingCallHistory.value = false
+            }
+        }
+    }
 
     fun init(savedToken: String) {
         token = savedToken
@@ -67,6 +86,7 @@ class MainViewModel : ViewModel() {
         loadNotices()
         loadTransactions()
         loadLeaderboard()
+        loadCallHistory()
     }
 
     fun loadInit() {
@@ -240,7 +260,8 @@ class MainViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val res = RetrofitClient.api.submitVideoOrder("Bearer $token", mapOf("videoUrl" to videoUrl, "videoType" to videoType))
-                onResult(res.success, res.message ?: "Order submit ho gaya!")
+                if (res.success) loadProfile()
+                onResult(res.success, res.message ?: "Video submit ho gaya! Doosre users watch karenge.")
             } catch (e: Exception) {
                 onResult(false, parseError(e))
             }

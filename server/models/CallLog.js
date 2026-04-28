@@ -4,7 +4,7 @@ const callLogSchema = new mongoose.Schema({
   roomId: { type: String, required: true, index: true },
   callerId: { type: String, required: true },
   callerName: { type: String, default: '' },
-  callType: { type: String, enum: ['voice', 'video'], required: true },
+  callType: { type: String, enum: ['voice', 'video', 'audio'], required: true },
   participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   status: { 
     type: String, 

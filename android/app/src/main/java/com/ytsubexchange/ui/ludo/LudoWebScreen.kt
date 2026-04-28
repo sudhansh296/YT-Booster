@@ -26,29 +26,15 @@ fun LudoWebScreen(
     onBack: () -> Unit,
     onGameEnd: (List<String>) -> Unit = {}
 ) {
-    Column(Modifier.fillMaxSize().background(Color(0xFF0a0a1a))) {
-        // Top bar
-        Row(
-            Modifier.fillMaxWidth().background(Color(0xFF1a0a2e)).padding(4.dp, 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, null, tint = Color.White)
-            }
-            Text("🎲 Ludo", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Spacer(Modifier.weight(1f))
-            if (mode != LudoMode.VS_COMPUTER) {
-                Text("50🪙 × $playerCount", color = Color(0xFFFFD700), fontSize = 13.sp,
-                    modifier = Modifier.padding(end = 12.dp))
-            }
-        }
-
+    Column(Modifier.fillMaxSize().background(Color(0xFF1a0a3e))) {
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.allowFileAccess = true
+                    settings.useWideViewPort = true
+                    settings.loadWithOverviewMode = true
                     @Suppress("DEPRECATION")
                     settings.allowFileAccessFromFileURLs = true
                     @Suppress("DEPRECATION")
@@ -56,7 +42,7 @@ fun LudoWebScreen(
                     settings.builtInZoomControls = false
                     settings.displayZoomControls = false
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    setBackgroundColor(android.graphics.Color.parseColor("#1a0a3e"))
 
                     addJavascriptInterface(object {
                         @JavascriptInterface
@@ -68,8 +54,7 @@ fun LudoWebScreen(
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, url: String?) {
-                            // Call startGame AFTER page fully loads
-                            view?.evaluateJavascript("startGame($playerCount);", null)
+                            // Menu is shown by default in ludo.html — no auto-start needed
                         }
                     }
                     loadUrl("file:///android_asset/ludo.html")

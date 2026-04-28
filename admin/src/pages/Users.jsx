@@ -11,7 +11,7 @@ export default function Users() {
   const PER_PAGE = 20;
 
   const load = () => {
-    api.get('/ytadm1n_x9k2p7/users')
+    api.get('/ytadm1n_x9k2p7/users?limit=500')
       .then(r => {
         const data = r.data;
         setUsers(Array.isArray(data) ? data : (data?.users || []));

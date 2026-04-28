@@ -60,6 +60,12 @@ app.use('/download', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  // Force download for APK files
+  if (req.path.endsWith('.apk')) {
+    const filename = req.path.split('/').pop();
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+  }
   next();
 }, express.static(path.join(__dirname, 'public/download')));
 app.use('/demo', express.static(path.join(__dirname, 'public/demo')));
@@ -71,9 +77,20 @@ app.use('/admin-assets', express.static(path.join(__dirname, 'public/admin-asset
 
 // Legal pages
 app.get('/privacy', (_req, res) => res.sendFile(path.join(__dirname, 'public/privacy.html')));
+app.get('/privacy.html', (_req, res) => res.sendFile(path.join(__dirname, 'public/privacy.html')));
 app.get('/terms', (_req, res) => res.sendFile(path.join(__dirname, 'public/terms.html')));
+app.get('/terms.html', (_req, res) => res.sendFile(path.join(__dirname, 'public/terms.html')));
+// Landing page at root
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'public/landing.html')));
 
-mongoose.connect(process.env.MONGO_URI).then(async () => {
+mongoose.connect(process.env.MONGO_URI, {
+  maxPoolSize: 20,          // Connection pool - multiple queries parallel
+  minPoolSize: 5,           // Always keep 5 connections ready
+  socketTimeoutMS: 10000,
+  serverSelectionTimeoutMS: 5000,
+  heartbeatFrequencyMS: 10000,
+  compressors: 'zlib',      // Compress data transfer
+}).then(async () => {
   console.log('MongoDB connected');
   // Auto-create SUB006 for organic users if not exists
   const AdminCode = require('./models/AdminCode');
@@ -84,11 +101,69 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
   );
 });
 
+// ── In-memory cache for frequently accessed data ──────────────
+const cache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
+function setCache(key, value) {
+  cache.set(key, { value, expires: Date.now() + CACHE_TTL });
+}
+function getCache(key) {
+  const item = cache.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expires) { cache.delete(key); return null; }
+  return item.value;
+}
+function clearCache(key) { cache.delete(key); }
+app.set('cache', { set: setCache, get: getCache, clear: clearCache });
+
 app.use('/auth', require('./routes/auth'));
 // Referral short links - /ref/TOKEN → landing page
 app.get('/ref/:token', (req, res) => {
   const path = require('path');
   res.sendFile(path.join(__dirname, 'public/landing.html'));
+});
+
+// Voice Chat invite link - /vc/ROOMID → open app directly to voice chat
+app.get('/vc/:roomId', async (req, res) => {
+  const { roomId } = req.params;
+  const appLink = `ytbooster://vc/${roomId}`;
+  const downloadLink = 'https://api.picrypto.in/download/YT-Booster.apk';
+  res.send(`
+    <html>
+      <head>
+        <title>Join Voice Chat - YT-Booster</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: Arial; text-align: center; padding: 20px; background: #0f0f0f; color: white; }
+          .card { background: #1a1a2e; padding: 30px; border-radius: 15px; max-width: 400px; margin: 50px auto; }
+          .btn { display: inline-block; padding: 14px 28px; margin: 10px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 16px; }
+          .btn-primary { background: #7b2ff7; color: white; }
+          .btn-secondary { background: #333; color: #aaa; font-size: 13px; padding: 10px 20px; }
+        </style>
+        <script>
+          window.onload = function() {
+            window.location.href = '${appLink}';
+            setTimeout(function() {
+              document.getElementById('fallback').style.display = 'block';
+            }, 2000);
+          };
+        </script>
+      </head>
+      <body>
+        <div class="card">
+          <div style="font-size: 48px; margin-bottom: 16px;">🎙</div>
+          <h2>Voice Chat Invite</h2>
+          <p style="color: #aaa;">Opening YT-Booster app...</p>
+          <div id="fallback" style="display:none; margin-top: 20px;">
+            <p style="color: #aaa; font-size: 14px;">App nahi khula?</p>
+            <a href="${appLink}" class="btn btn-primary">App Mein Kholo</a><br>
+            <a href="${downloadLink}" class="btn btn-secondary">App Download Karo</a>
+          </div>
+        </div>
+      </body>
+    </html>
+  `);
 });
 
 // Group invite links - /join-group/TOKEN → redirect to app or show join page
@@ -191,6 +266,7 @@ if (SUBADMIN_PATH !== 'subadmin') {
 
 const { addToQueue, removeFromQueue, getQueueSize, getQueue } = require('./queue');
 const User = require('./models/User');
+const { sendFCMNotification } = require('./fcm-helper');
 const Transaction = require('./models/Transaction');
 
 // My channel - always in queue, gives 2 coins
@@ -260,17 +336,17 @@ setInterval(async () => {
   } catch (e) { /* silent */ }
 }, 60 * 1000);
 
-// Auto-delete community messages older than 24 hours (runs every hour)
+// Auto-delete community messages older than 48 hours (runs every hour)
 setInterval(async () => {
   try {
     const ChatMessage = require('./models/ChatMessage');
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
     const deleted = await ChatMessage.deleteMany({
       roomId: 'community_global',
       createdAt: { $lt: cutoff }
     });
     if (deleted.deletedCount > 0) {
-      console.log(`[Community] Auto-deleted ${deleted.deletedCount} messages older than 24h`);
+      console.log(`[Community] Auto-deleted ${deleted.deletedCount} messages older than 48h`);
       io.to('community_global').emit('community_cleared', {});
     }
   } catch (e) { /* silent */ }
@@ -359,14 +435,16 @@ io.on('connection', (socket) => {
       const subscribedIds = new Set(recentSubs.map(t => t.relatedUserId?.toString()).filter(Boolean));
 
       // Build list of up to 9 other users from queue - exclude already subscribed
+      // Boosted channels ko pehle dikhao (priority)
+      const now = new Date();
       const queueList = getQueue()
         .filter(u => u.userId !== user._id.toString() && !subscribedIds.has(u.userId))
-        .slice(0, 9);
+        .slice(0, 20); // more candidates for sorting
 
-      // Fetch user details for each queue entry
-      const channelList = await Promise.all(
+      // Fetch user details + boost status
+      const channelListRaw = await Promise.all(
         queueList.map(async (u) => {
-          const u2 = await User.findById(u.userId, 'channelName channelUrl profilePic youtubeId');
+          const u2 = await User.findById(u.userId, 'channelName channelUrl profilePic youtubeId boostedUntil');
           if (!u2) return null;
           return {
             channelId: u2.youtubeId,
@@ -374,12 +452,44 @@ io.on('connection', (socket) => {
             channelUrl: u2.channelUrl,
             profilePic: u2.profilePic,
             matchId: u.userId,
-            coinsReward: 1
+            coinsReward: 1,
+            isBoosted: u2.boostedUntil && new Date(u2.boostedUntil) > now
           };
         })
       );
 
-      // ── Build exactly 3 cards: 1) Owner, 2) P2P queue match, 3) Random online user ──
+      // Sort: boosted first, then normal
+      const channelList = channelListRaw.filter(Boolean).sort((a, b) => {
+        if (a.isBoosted && !b.isBoosted) return -1;
+        if (!a.isBoosted && b.isBoosted) return 1;
+        return 0;
+      }).slice(0, 9);
+
+      // ── Build exactly 3 cards: 1) Admin Promoted (highest priority), 2) Owner, 3) P2P ──
+
+      // Card 0 (HIGHEST): Admin promoted channels — rotate through active ones
+      let adminPromotedEntry = null;
+      try {
+        const PromotedChannel = require('../models/PromotedChannel');
+        const promotedChannels = await PromotedChannel.find({ isActive: true }).lean();
+        if (promotedChannels.length > 0) {
+          // Rotate: pick one based on time so different channels get shown
+          const idx = Math.floor(Date.now() / 30000) % promotedChannels.length; // rotate every 30s
+          const pc = promotedChannels[idx];
+          // Don't show if user already subscribed recently
+          if (!subscribedIds.has(pc._id?.toString()) && pc.channelId !== user.youtubeId) {
+            adminPromotedEntry = {
+              channelId: pc.channelId,
+              channelName: pc.channelName,
+              channelUrl: pc.channelUrl,
+              profilePic: pc.profilePic || '',
+              matchId: pc.userId || `promoted_${pc._id}`,
+              coinsReward: 3, // admin promoted = 3 coins reward
+              cardType: 'admin_promoted'
+            };
+          }
+        }
+      } catch (e) { /* silent */ }
 
       // Card 1: Owner (Coder Lobby) — sirf tab agar 24h mein claim nahi kiya
       const ownerAlreadyClaimed = await Transaction.findOne({
@@ -398,9 +508,12 @@ io.on('connection', (socket) => {
         cardType: 'owner'
       };
 
-      // Card 2: P2P — queue mein jo search kar raha hai (already subscribed exclude)
+      // Card 2: P2P — queue mein jo search kar raha hai (boosted first)
       const p2pEntry = channelList.filter(Boolean).find(c => c) || null;
-      if (p2pEntry) p2pEntry.cardType = 'p2p';
+      if (p2pEntry) {
+        p2pEntry.cardType = 'p2p';
+        if (p2pEntry.isBoosted) p2pEntry.coinsReward = 2; // boosted channels give 2 coins
+      }
 
       // Card 3: Random online user (app pe online, queue mein nahi)
       let onlineEntry = null;
@@ -435,15 +548,27 @@ io.on('connection', (socket) => {
         }
       } catch (e) { /* silent */ }
 
-      // Combine — always show 3 (fill with more P2P if needed)
+      // Combine — priority order:
+      // 1. Owner (Coder Lobby)
+      // 2. Admin Promoted channel
+      // 3. User Boosted (coins se) P2P
+      // 4. Normal P2P queue
+      // 5. Online user
       const finalList = [];
       if (ownerEntry) finalList.push(ownerEntry);
-      if (p2pEntry) finalList.push(p2pEntry);
+      if (adminPromotedEntry) finalList.push(adminPromotedEntry);
+      // Boosted P2P first, then normal P2P
+      const boostedP2p = channelList.filter(Boolean).find(c => c.isBoosted);
+      const normalP2p = channelList.filter(Boolean).find(c => !c.isBoosted);
+      if (boostedP2p) { boostedP2p.cardType = 'p2p'; boostedP2p.coinsReward = 2; finalList.push(boostedP2p); }
+      else if (p2pEntry) finalList.push(p2pEntry);
       if (onlineEntry) finalList.push(onlineEntry);
-
-      // Fill remaining slots with more P2P if less than 3
+      // Fill remaining with normal P2P
+      if (finalList.length < 3 && normalP2p && !finalList.includes(normalP2p)) {
+        normalP2p.cardType = 'p2p'; finalList.push(normalP2p);
+      }
       if (finalList.length < 3) {
-        const extra = channelList.filter(Boolean).filter(c => c !== p2pEntry).slice(0, 3 - finalList.length);
+        const extra = channelList.filter(Boolean).filter(c => !finalList.includes(c)).slice(0, 3 - finalList.length);
         finalList.push(...extra);
       }
 
@@ -928,21 +1053,49 @@ io.on('connection', (socket) => {
       { status: 'connected', connectTime: new Date() }
     ).catch(() => {});
     
-    // Notify caller that someone joined
+    // Notify caller that someone joined — send to both chat room AND caller's user room
     socket.to(`chat_${roomId}`).emit('call_user_joined', {
       userId: socket.userId, socketId: socket.id
     });
+    // Also send directly to caller's personal room (in case caller is not in chat room socket)
+    if (callerId) {
+      io.to(`user_${callerId}`).emit('call_user_joined', {
+        userId: socket.userId, socketId: socket.id
+      });
+    }
   });
 
-  socket.on('call_end', ({ roomId }) => {
-    // Update call log
+  socket.on('call_end', async ({ roomId }) => {
+    // Update call log with duration
     const CallLog = require('./models/CallLog');
-    CallLog.findOneAndUpdate(
-      { roomId, status: { $in: ['ringing', 'connected'] } },
-      { status: 'ended', endTime: new Date() }
-    ).catch(() => {});
+    try {
+      const log = await CallLog.findOne({ roomId, status: { $in: ['ringing', 'connected'] } });
+      if (log) {
+        const endTime = new Date();
+        const connectTime = log.connectTime || log.startTime;
+        const duration = Math.floor((endTime - connectTime) / 1000);
+        await CallLog.findByIdAndUpdate(log._id, { 
+          status: 'ended', 
+          endTime, 
+          duration: duration > 0 ? duration : 0 
+        });
+      }
+    } catch (e) { console.error('call_end log error:', e.message); }
     
     socket.to(`chat_${roomId}`).emit('call_ended', { endedBy: socket.userId });
+    // Also notify via user rooms (for users not in chat socket room)
+    try {
+      const ChatRoom = require('./models/ChatRoom');
+      const room = await ChatRoom.findById(roomId).select('members').lean();
+      if (room) {
+        room.members.forEach(memberId => {
+          const mId = memberId.toString();
+          if (mId !== socket.userId) {
+            io.to(`user_${mId}`).emit('call_ended', { endedBy: socket.userId });
+          }
+        });
+      }
+    } catch (e) {}
   });
 
   // Voice → Video upgrade request
@@ -992,14 +1145,15 @@ io.on('connection', (socket) => {
       if (!userId) return;
 
       const ChatRoom = require('./models/ChatRoom');
-      const room = await ChatRoom.findById(roomId).select('members isGroup admins subAdmins').lean();
+      const room = await ChatRoom.findById(roomId).select('members isGroup admins subAdmins createdBy').lean();
       if (!room || !room.members.some(m => m.toString() === userId)) return;
 
       // Permission check: owner/admin start kar sake, member join kar sake agar active ho
       if (room.isGroup) {
+        const isOwner = room.createdBy?.toString() === userId;
         const isAdmin = room.admins?.some(a => a.toString() === userId);
         const subAdmin = room.subAdmins?.find(s => s.userId.toString() === userId);
-        const canStart = isAdmin || subAdmin?.canStartVoiceChat;
+        const canStart = isOwner || isAdmin || subAdmin?.canStartVoiceChat;
         const isAlreadyActive = io.voiceChats.has(roomId) && io.voiceChats.get(roomId).size > 0;
         if (!canStart && !isAlreadyActive) {
           socket.emit('voice_chat_error', { message: 'Voice chat abhi active nahi hai. Sirf Owner/Admin start kar sakte hain' });
@@ -1025,6 +1179,10 @@ io.on('connection', (socket) => {
       // Tell existing participants about new joiner
       socket.to(`voice_${roomId}`).emit('voice_chat_user_joined', { roomId, ...myInfo });
 
+      // Notify all chat room members (not in voice) that voice chat is active
+      const totalCount = participants.size;
+      io.to(`chat_${roomId}`).emit('voice_chat_active', { roomId, participantCount: totalCount, startedBy: user.channelName });
+
       console.log(`[voice_chat] ${user.channelName} joined room ${roomId}, total: ${participants.size}`);
     } catch (e) { console.log('[voice_chat_join] error:', e.message); }
   });
@@ -1037,6 +1195,9 @@ io.on('connection', (socket) => {
       if (io.voiceChats.get(roomId).size === 0) io.voiceChats.delete(roomId);
     }
     io.to(`voice_${roomId}`).emit('voice_chat_user_left', { roomId, userId: socket.userId, socketId: socket.id });
+    // Notify chat room members about updated participant count
+    const remaining = io.voiceChats.has(roomId) ? io.voiceChats.get(roomId).size : 0;
+    io.to(`chat_${roomId}`).emit('voice_chat_active', { roomId, participantCount: remaining });
     console.log(`[voice_chat] ${socket.userId} left room ${roomId}`);
   });
 
@@ -1156,6 +1317,7 @@ io.on('connection', (socket) => {
       let userInfo = socketUserCache.get(socket.id);
       if (!userInfo) {
         const User = require('./models/User');
+const { sendFCMNotification } = require('./fcm-helper');
         const user = await User.findById(socket.userId).select('channelName profilePic').lean();
         if (!user) return;
         userInfo = { channelName: user.channelName, profilePic: user.profilePic || '' };
@@ -1240,6 +1402,38 @@ setInterval(deleteOldFiles, 60 * 60 * 1000);
 setInterval(deleteOldMessages, 60 * 60 * 1000);
 deleteOldFiles(); // Run on startup too
 deleteOldMessages();
+
+// ── Daily Task Reminder — 8 PM every day ─────────────────────
+async function sendDailyTaskReminder() {
+  try {
+    const now = new Date();
+    if (now.getHours() !== 20 || now.getMinutes() > 5) return; // Only run at ~8 PM
+    const admin = require('./firebase-admin');
+    if (!admin) return;
+    const users = await User.find({ 
+      fcmToken: { $exists: true, $ne: null, $ne: '' } 
+    }).select('fcmToken _id').limit(2000).lean();
+    for (const user of users) {
+      admin.messaging().send({
+        token: user.fcmToken,
+        notification: { 
+          title: '🎯 Daily Tasks Baaki Hain!', 
+          body: 'Aaj ke tasks complete karo aur coins kamao. Kal reset ho jayenge!' 
+        },
+        data: { type: 'daily_task_reminder' },
+        android: { priority: 'normal', notification: { channelId: 'ytbooster_channel', sound: 'default' } }
+      }).catch(async e => {
+        if (e.message && (e.message.includes('not found') || e.message.includes('invalid') || e.message.includes('Unregistered'))) {
+          await User.findByIdAndUpdate(user._id, { $unset: { fcmToken: 1 } });
+        }
+      });
+    }
+    console.log(`Daily task reminder sent to ${users.length} users`);
+  } catch (e) { console.error('Daily task reminder error:', e.message); }
+}
+
+// Check every 5 minutes (for the 8 PM window)
+setInterval(sendDailyTaskReminder, 5 * 60 * 1000);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

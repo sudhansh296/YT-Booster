@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, enum: ['earn', 'earn_owner', 'spend', 'admin_add', 'admin_remove'], required: true },
+  type: { type: String, enum: ['earn', 'earn_owner', 'spend', 'admin_add', 'admin_remove', 'video_submit', 'promo_watch', 'boost_spend'], required: true },
   coins: { type: Number, required: true },
   description: { type: String },
   relatedUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

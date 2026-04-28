@@ -35,6 +35,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
@@ -83,6 +84,9 @@ sealed class Screen {
     object DailyTasks : Screen()
     object Settings : Screen()
     object Transactions : Screen()
+    object Friends : Screen()
+    object ChannelBoost : Screen()
+    object CallHistory : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -90,6 +94,7 @@ class MainActivity : ComponentActivity() {
     private val chatViewModel: ChatViewModel by viewModels()
     private val callViewModel: com.ytsubexchange.viewmodel.CallViewModel by viewModels()
     private val groupVoiceChatViewModel: com.ytsubexchange.viewmodel.GroupVoiceChatViewModel by viewModels()
+    private val musicViewModel: com.ytsubexchange.music.MusicViewModel by viewModels()
     private var tokenState: MutableState<String?>? = null
     var pendingCallAccept: (() -> Unit)? = null
 
@@ -199,6 +204,9 @@ class MainActivity : ComponentActivity() {
         // Request media permissions on startup (Android 13+)
         requestMediaPermissions()
 
+        // Request battery optimization exemption (for background notifications)
+        requestBatteryOptimizationExemption()
+
         // Check for app update in background
         checkForUpdate()
         // Register FCM token
@@ -213,6 +221,22 @@ class MainActivity : ComponentActivity() {
             var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
 
             if (token.value != null) {
+                // Auto-join voice chat when rooms are loaded
+                val rooms by chatViewModel.rooms.collectAsState()
+                LaunchedEffect(rooms) {
+                    val authPrefs3 = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                    val autoJoinVc = authPrefs3.getString("auto_join_vc", null)
+                    if (autoJoinVc != null && rooms.isNotEmpty()) {
+                        val vcRoom = rooms.firstOrNull { it._id == autoJoinVc }
+                        if (vcRoom != null) {
+                            authPrefs3.edit().remove("auto_join_vc").apply()
+                            chatViewModel.openRoom(vcRoom)
+                            groupVoiceChatViewModel.join(autoJoinVc, "", "", "", roomName = vcRoom.name)
+                            currentScreen = Screen.Chat
+                        }
+                    }
+                }
+
                 LaunchedEffect(token.value) {
                     viewModel.init(token.value!!)
                     // Handle pending group invite
@@ -221,6 +245,21 @@ class MainActivity : ComponentActivity() {
                     if (pendingGroupInvite != null) {
                         authPrefs3.edit().remove("pending_group_invite").apply()
                         chatViewModel.joinGroupByLink(pendingGroupInvite)
+                    }
+                    // Handle pending voice chat join
+                    val pendingVcJoin = authPrefs3.getString("pending_vc_join", null)
+                    if (pendingVcJoin != null) {
+                        authPrefs3.edit().remove("pending_vc_join").apply()
+                        // Find the room and open it, then join voice chat
+                        val vcRoom = chatViewModel.rooms.value.firstOrNull { it._id == pendingVcJoin }
+                        if (vcRoom != null) {
+                            chatViewModel.openRoom(vcRoom)
+                            groupVoiceChatViewModel.join(pendingVcJoin, "", "", "", roomName = vcRoom.name)
+                        } else {
+                            // Room not loaded yet — store for later
+                            authPrefs3.edit().putString("auto_join_vc", pendingVcJoin).apply()
+                        }
+                        currentScreen = Screen.Chat
                     }
                 }
 
@@ -269,6 +308,21 @@ class MainActivity : ComponentActivity() {
                         TransactionScreen(viewModel, onBack = { currentScreen = Screen.Profile })
                         return@setContent
                     }
+                    is Screen.Friends -> {
+                        BackHandler { currentScreen = Screen.Profile }
+                        com.ytsubexchange.ui.FriendsScreen { currentScreen = Screen.Profile }
+                        return@setContent
+                    }
+                    is Screen.ChannelBoost -> {
+                        BackHandler { currentScreen = Screen.Profile }
+                        com.ytsubexchange.ui.ChannelBoostScreen { currentScreen = Screen.Profile }
+                        return@setContent
+                    }
+                    is Screen.CallHistory -> {
+                        BackHandler { currentScreen = Screen.Profile }
+                        com.ytsubexchange.ui.CallHistoryScreen(viewModel) { currentScreen = Screen.Profile }
+                        return@setContent
+                    }
                     else -> {}
                 }
 
@@ -302,7 +356,33 @@ class MainActivity : ComponentActivity() {
                     }
 
 
-                    Box(modifier = Modifier.fillMaxSize().padding(bottom = bottomPad).imePadding()) {
+                    // Swipe between main tabs
+                    val mainTabs = listOf<Screen>(Screen.Home, Screen.Chat, Screen.Referral, Screen.Exchange, Screen.Profile)
+                    val currentTabIdx = mainTabs.indexOfFirst { it::class == currentScreen::class }
+
+                    Box(modifier = Modifier.fillMaxSize().padding(bottom = bottomPad).imePadding()
+                        .then(
+                            if (!isInChatWindow && currentTabIdx >= 0) {
+                                Modifier.pointerInput(currentTabIdx) {
+                                    var totalDrag = 0f
+                                    detectHorizontalDragGestures(
+                                        onDragEnd = {
+                                            if (totalDrag < -80f && currentTabIdx < mainTabs.size - 1) {
+                                                currentScreen = mainTabs[currentTabIdx + 1]
+                                            } else if (totalDrag > 80f && currentTabIdx > 0) {
+                                                currentScreen = mainTabs[currentTabIdx - 1]
+                                            }
+                                            totalDrag = 0f
+                                        },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            totalDrag += dragAmount
+                                        }
+                                    )
+                                }
+                            } else Modifier
+                        )
+                    ) {
                         when (currentScreen) {
                             is Screen.Home -> HomeScreen(
                                 viewModel = viewModel,
@@ -312,14 +392,18 @@ class MainActivity : ComponentActivity() {
                             is Screen.Leaderboard -> LeaderboardScreen(viewModel)
                             is Screen.Referral -> ReferralScreen(viewModel)
                             is Screen.History -> TransactionScreen(viewModel)
-                            is Screen.Chat -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) }, onRequestScreenCapture = { requestVoiceChatScreenCapture() })
-                            is Screen.ChatWithCommunity -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, openCommunity = (currentScreen as Screen.ChatWithCommunity).openCommunity, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) }, onRequestScreenCapture = { requestVoiceChatScreenCapture() })
+                            is Screen.Chat -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, musicViewModel = musicViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) }, onRequestScreenCapture = { requestVoiceChatScreenCapture() })
+                            is Screen.ChatWithCommunity -> ChatScreen(chatViewModel, onBack = { currentScreen = Screen.Home }, openCommunity = (currentScreen as Screen.ChatWithCommunity).openCommunity, callViewModel = callViewModel, voiceChatViewModel = groupVoiceChatViewModel, musicViewModel = musicViewModel, onPickFile = { mime, cb -> pickFile(mime, cb) }, onRequestScreenCapture = { requestVoiceChatScreenCapture() })
                             is Screen.Exchange -> ExchangeScreen(viewModel)
                             is Screen.Profile -> ProfileScreen(
                                 viewModel = viewModel,
                                 onNavigateToStreak = { currentScreen = Screen.Streak },
                                 onNavigateToSettings = { currentScreen = Screen.Settings },
-                                onNavigateToTransactions = { currentScreen = Screen.Transactions }
+                                onNavigateToTransactions = { currentScreen = Screen.Transactions },
+                                onNavigateToFriends = { currentScreen = Screen.Friends },
+                                onNavigateToBoost = { currentScreen = Screen.ChannelBoost },
+                                onNavigateToCallHistory = { currentScreen = Screen.CallHistory },
+                                onLogout = { token.value = null }
                             )
                             else -> {}
                         }
@@ -337,6 +421,125 @@ class MainActivity : ComponentActivity() {
                             dark = dark,
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
+                    }
+
+                    // ── Global Voice Call Floating Indicator ─────────────
+                    val activeCallState by callViewModel.callState.collectAsState()
+                    val callRoomName by callViewModel.roomName.collectAsState()
+                    val activeCallDuration by callViewModel.callDuration.collectAsState()
+                    val activeCallType by callViewModel.callType.collectAsState()
+                    val isCallActive = activeCallState == com.ytsubexchange.viewmodel.CallState.IN_CALL ||
+                                       activeCallState == com.ytsubexchange.viewmodel.CallState.CALLING
+                    val isOnCallScreen = currentScreen is Screen.Chat || currentScreen is Screen.ChatWithCommunity
+
+                    if (isCallActive && !isOnCallScreen) {
+                        val inf = rememberInfiniteTransition(label = "pulse")
+                        val alpha by inf.animateFloat(0.6f, 1f,
+                            infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "a")
+                        val durationStr = remember(activeCallDuration) {
+                            "%02d:%02d".format(activeCallDuration / 60, activeCallDuration % 60)
+                        }
+                        Box(
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 8.dp, start = 12.dp, end = 12.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF1B5E20).copy(alpha = 0.95f))
+                                .clickable { /* tap to go back to call — navigate to chat */ currentScreen = Screen.Chat }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier.size(8.dp).clip(CircleShape)
+                                            .background(Color(0xFF4CAF50).copy(alpha = alpha))
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        if (activeCallState == com.ytsubexchange.viewmodel.CallState.CALLING) "Calling ${callRoomName}..."
+                                        else "${if (activeCallType == "video") "📹" else "📞"} ${callRoomName}",
+                                        color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                if (activeCallState == com.ytsubexchange.viewmodel.CallState.IN_CALL) {
+                                    Text(durationStr, color = Color(0xFF81C784), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Global Group Voice Chat Floating Indicator ───────
+                    val isVoiceChatActive by groupVoiceChatViewModel.isActive.collectAsState()
+                    val voiceChatRoomName by groupVoiceChatViewModel.activeRoomName.collectAsState()
+                    val voiceChatRoomId by groupVoiceChatViewModel.activeRoomId.collectAsState()
+                    val isOnGroupChatScreen = false // show on all screens including chat
+                    // Hide global banner if we're already in the room where voice chat is active
+                    val currentOpenRoom by chatViewModel.openRoom.collectAsState()
+                    val isInActiveVcRoom = currentOpenRoom?._id == voiceChatRoomId && voiceChatRoomId.isNotEmpty()
+
+                    if (isVoiceChatActive && !isOnGroupChatScreen && !isInActiveVcRoom) {
+                        val inf2 = rememberInfiniteTransition(label = "vcpulse")
+                        val vcAlpha by inf2.animateFloat(0.6f, 1f,
+                            infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "vca")
+                        Box(
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = if (isCallActive && !isOnCallScreen) 52.dp else 8.dp, start = 12.dp, end = 12.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF1A237E).copy(alpha = 0.95f))
+                                .clickable {
+                                    // Navigate to chat and open the voice chat room
+                                    if (voiceChatRoomId.isNotEmpty()) {
+                                        val room = chatViewModel.rooms.value.firstOrNull { it._id == voiceChatRoomId }
+                                        if (room != null) chatViewModel.openRoom(room)
+                                    }
+                                    currentScreen = Screen.Chat
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🎙", fontSize = 18.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            voiceChatRoomName.ifEmpty { "Voice Chat" },
+                                            color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "Tap to join",
+                                            color = Color.White.copy(0.7f), fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(
+                                        Modifier.size(32.dp).clip(CircleShape)
+                                            .background(Color(0xFF4CAF50).copy(alpha = vcAlpha)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🎙", fontSize = 14.sp)
+                                    }
+                                    Box(
+                                        Modifier.size(32.dp).clip(CircleShape)
+                                            .background(Color(0xFFE53935)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("✕", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // In-app chat notification — compact WhatsApp style popup
@@ -545,12 +748,136 @@ class MainActivity : ComponentActivity() {
                     // Floating Chatbot Button
                     FloatingChatbotButton()
 
-                    // Floating Games Button
-                    FloatingGamesButton()
+                    // Floating Games Button — hidden for now
+                    // FloatingGamesButton()
+
+                    // ── App Update Dialog ─────────────────────
+                    val updateInfo by viewModel.updateInfo.collectAsState()
+                    updateInfo?.let { info ->
+                        androidx.compose.ui.window.Dialog(
+                            onDismissRequest = { if (!info.forceUpdate) viewModel.setUpdateAvailable(null) }
+                        ) {
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color(0xFF1A1A2E))
+                                    .padding(24.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("🚀", fontSize = 44.sp)
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "New Update Available!",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Version ${info.versionName}",
+                                        color = Color(0xFF9E9E9E),
+                                        fontSize = 13.sp
+                                    )
+                                    if (info.changelog.isNotEmpty()) {
+                                        Spacer(Modifier.height(12.dp))
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF0D0D1A))
+                                                .padding(12.dp)
+                                        ) {
+                                            Text(info.changelog, color = Color(0xFFBBBBBB), fontSize = 12.sp)
+                                        }
+                                    }
+                                    Spacer(Modifier.height(20.dp))
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                Brush.horizontalGradient(
+                                                    listOf(Color(0xFFE53935), Color(0xFFFF6B6B))
+                                                )
+                                            )
+                                            .clickable {
+                                                // Download and install APK
+                                                try {
+                                                    val dlUrl = info.downloadUrl.ifEmpty {
+                                                        "https://api.picrypto.in/download/YT-Booster.apk"
+                                                    }
+                                                    val request = android.app.DownloadManager.Request(
+                                                        android.net.Uri.parse(dlUrl)
+                                                    ).apply {
+                                                        setTitle("YT-Booster Update")
+                                                        setDescription("Downloading v${info.versionName}...")
+                                                        setNotificationVisibility(
+                                                            android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                                                        )
+                                                        setDestinationInExternalPublicDir(
+                                                            android.os.Environment.DIRECTORY_DOWNLOADS,
+                                                            "YT-Booster-v${info.versionName}.apk"
+                                                        )
+                                                        setAllowedOverMetered(true)
+                                                        setAllowedOverRoaming(true)
+                                                        setMimeType("application/vnd.android.package-archive")
+                                                    }
+                                                    val dm = getSystemService(android.app.DownloadManager::class.java)
+                                                    dm.enqueue(request)
+                                                    viewModel.setUpdateAvailable(null)
+                                                } catch (e: Exception) {
+                                                    // Fallback — open browser
+                                                    startActivity(
+                                                        android.content.Intent(
+                                                            android.content.Intent.ACTION_VIEW,
+                                                            android.net.Uri.parse(
+                                                                info.downloadUrl.ifEmpty {
+                                                                    "https://api.picrypto.in/download/YT-Booster.apk"
+                                                                }
+                                                            )
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                            .padding(vertical = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "⬇️ Download Update",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                    if (!info.forceUpdate) {
+                                        Spacer(Modifier.height(10.dp))
+                                        TextButton(
+                                            onClick = { viewModel.setUpdateAvailable(null) },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text("Baad mein", color = Color(0xFF666666), fontSize = 13.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             } else {
                 LoginScreen()
             }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        try { 
+            musicViewModel.connectService()
+            android.util.Log.d("MainActivity", "Music service connected in onStart()")
+        } catch (e: Exception) { 
+            android.util.Log.e("MainActivity", "Error connecting music service", e)
+            e.printStackTrace() 
         }
     }
 
@@ -560,6 +887,32 @@ class MainActivity : ComponentActivity() {
     }
 
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
+    private fun requestBatteryOptimizationExemption() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            val pm = getSystemService(android.os.PowerManager::class.java)
+            
+            // Check if already asked before
+            val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            val hasAskedBefore = prefs.getBoolean("battery_optimization_asked", false)
+            
+            // Only show popup if not asked before AND permission not granted
+            if (!hasAskedBefore && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = android.content.Intent(
+                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        android.net.Uri.parse("package:$packageName")
+                    )
+                    startActivity(intent)
+                    
+                    // Mark as asked so it won't show again
+                    prefs.edit().putBoolean("battery_optimization_asked", true).apply()
+                } catch (e: Exception) {
+                    android.util.Log.e("Battery", "Cannot request battery exemption: ${e.message}")
+                }
+            }
+        }
+    }
 
     private fun setupNetworkCallback() {
         val cm = getSystemService(android.net.ConnectivityManager::class.java)
@@ -586,6 +939,20 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         networkCallback?.let {
             getSystemService(android.net.ConnectivityManager::class.java).unregisterNetworkCallback(it)
+        }
+    }
+
+    // Refresh data when app comes to foreground
+    override fun onResume() {
+        super.onResume()
+        val savedToken = getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE).getString("token", null)
+        if (savedToken != null) {
+            viewModel.loadProfile()
+            viewModel.loadTransactions()
+            // Reconnect socket if disconnected
+            com.ytsubexchange.network.SocketManager.reconnect()
+            // Reload chat rooms
+            chatViewModel.loadRooms()
         }
     }
 
@@ -620,7 +987,8 @@ class MainActivity : ComponentActivity() {
                 android.Manifest.permission.READ_MEDIA_IMAGES,
                 android.Manifest.permission.READ_MEDIA_VIDEO,
                 android.Manifest.permission.READ_MEDIA_AUDIO,
-                android.Manifest.permission.RECORD_AUDIO
+                android.Manifest.permission.RECORD_AUDIO,
+                android.Manifest.permission.POST_NOTIFICATIONS  // FCM notifications ke liye
             )
         } else {
             // Android 12 and below
@@ -788,6 +1156,23 @@ class MainActivity : ComponentActivity() {
                 return
             }
 
+            // ytbooster://vc/ROOMID or https://api.picrypto.in/vc/ROOMID — voice chat invite
+            val isVcDeepLink = (scheme == "ytbooster" && host == "vc") ||
+                (scheme == "https" && host == "api.picrypto.in" && (uri.path ?: "").startsWith("/vc/"))
+            if (isVcDeepLink) {
+                val roomId = if (scheme == "ytbooster") {
+                    uri.pathSegments.firstOrNull() ?: uri.lastPathSegment ?: ""
+                } else {
+                    (uri.path ?: "").removePrefix("/vc/").trim()
+                }
+                if (roomId.isNotEmpty()) {
+                    getSharedPreferences("prefs", Context.MODE_PRIVATE).edit()
+                        .putString("pending_vc_join", roomId)
+                        .apply()
+                }
+                return
+            }
+
             // ytsubexchange://auth?token=...
             val token = uri.getQueryParameter("token")
             val ref = uri.getQueryParameter("ref")
@@ -928,10 +1313,14 @@ fun FloatingChatbotButton() {
             val prefs = context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE)
             val token = "Bearer ${prefs.getString("token", "")}"
             val history = messages.dropLast(1).takeLast(8).map {
-                mapOf("role" to if (it.isUser) "user" else "ai", "text" to it.text)
+                com.ytsubexchange.data.AiMessage(
+                    role = if (it.isUser) "user" else "ai",
+                    text = it.text
+                )
             }
             val resp = com.ytsubexchange.network.RetrofitClient.api.aiChat(
-                token, mapOf("message" to lastQuery, "history" to history)
+                token,
+                com.ytsubexchange.data.AiChatRequest(message = lastQuery, history = history)
             )
             messages = messages + BotMsg(resp.reply, false)
         } catch (e: Exception) {
@@ -1284,18 +1673,16 @@ fun FloatingGamesButton() {
         return
     }
 
-    // Ludo lobby
+    // Ludo lobby — open WebScreen directly
     if (showLudo) {
         Dialog(
             onDismissRequest = { showLudo = false },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false, dismissOnBackPress = true, dismissOnClickOutside = false
+            )
         ) {
-            com.ytsubexchange.ui.ludo.LudoLobbyScreen(
-                myCoins = 0, onBack = { showLudo = false },
-                onStartGame = { mode, players, code ->
-                    ludoMode = mode; ludoPlayers = players; ludoRoomCode = code
-                    showLudo = false; inLudoGame = true
-                }
+            com.ytsubexchange.ui.ludo.LudoWebScreen(
+                onBack = { showLudo = false }
             )
         }
         return
@@ -1382,7 +1769,8 @@ fun FloatingGamesButton() {
 
                         Spacer(Modifier.height(16.dp))
 
-                        // All games — Coming Soon
+                        // Games list
+                        // All games — Coming Soon (Ludo included)
                         val comingSoonGames = listOf(
                             Triple("🎲", "Ludo", "2-4 players • P2P • 50🪙 per player"),
                             Triple("🃏", "Teen Patti", "3 cards • P2P • 50🪙 entry"),
@@ -1390,6 +1778,7 @@ fun FloatingGamesButton() {
                             Triple("🎴", "Andar Bahar", "Card game • Choose side • 10🪙+"),
                             Triple("🎰", "Satta Matka", "Rolling dice • Pick number • 5x coins")
                         )
+
                         comingSoonGames.forEach { (emoji, name, desc) ->
                             Box(
                                 Modifier.fillMaxWidth()

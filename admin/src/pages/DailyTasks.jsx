@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const BASE = import.meta.env.VITE_API_URL || 'https://api.picrypto.in';
-const headers = () => ({ 'x-admin-secret': localStorage.getItem('admin_token') });
+const headers = () => ({ 'x-admin-token': localStorage.getItem('admin_token') });
 
 const TASK_TYPES = [
   { value: 'login', label: '📱 Daily Login' },

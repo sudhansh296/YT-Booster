@@ -482,8 +482,24 @@ router.get('/streak', authMiddleware, async (req, res) => {
 router.get('/promo-videos', authMiddleware, async (req, res) => {
   try {
     const PromoVideo = require('../models/PromoVideo');
-    const videos = await PromoVideo.find({ isActive: true }).sort({ priority: -1, createdAt: -1 }).limit(10).lean();
-    res.json({ videos });
+    const videos = await PromoVideo.find({ isActive: true }).sort({ priority: -1, createdAt: -1 }).limit(20).lean();
+    // Shuffle within same priority groups so different users see different order
+    const grouped = {};
+    videos.forEach(v => {
+      const p = v.priority || 0;
+      if (!grouped[p]) grouped[p] = [];
+      grouped[p].push(v);
+    });
+    const shuffled = Object.keys(grouped).sort((a, b) => b - a).flatMap(p => {
+      const arr = grouped[p];
+      // Fisher-Yates shuffle
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    });
+    res.json({ videos: shuffled.slice(0, 10) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -531,38 +547,57 @@ router.post('/video-order', authMiddleware, async (req, res) => {
     const { videoUrl, videoType } = req.body;
     if (!videoUrl || !videoType) return res.status(400).json({ error: 'videoUrl and videoType required' });
 
-    // Video type rewards
-    const rewards = {
-      'Short': { watchers: 20, coins: 200 },
-      'Long': { watchers: 10, coins: 300 }
+    // Video type costs (user pays to get views)
+    const costs = {
+      'Short': { cost: 50, type: 'short', watchSeconds: 60, coinsReward: 5, label: 'Short' },
+      'Long':  { cost: 100, type: 'long', watchSeconds: 180, coinsReward: 10, label: 'Long' }
     };
 
-    const reward = rewards[videoType];
-    if (!reward) return res.status(400).json({ error: 'Invalid video type. Use Short or Long' });
+    const config = costs[videoType];
+    if (!config) return res.status(400).json({ error: 'Invalid video type. Use Short or Long' });
 
     // Validate YouTube URL
     if (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
       return res.status(400).json({ error: 'Valid YouTube URL required' });
     }
 
-    // Award coins immediately
-    req.user.coins += reward.coins;
-    req.user.totalEarned += reward.coins;
+    // Check sufficient coins
+    if (req.user.coins < config.cost) {
+      return res.status(400).json({ error: `Insufficient coins. Need ${config.cost} coins, you have ${req.user.coins}` });
+    }
+
+    // Deduct coins
+    req.user.coins -= config.cost;
+    req.user.totalSpent = (req.user.totalSpent || 0) + config.cost;
     await req.user.save();
 
-    // Create transaction record
+    // Save as PromoVideo so it appears in Watch & Earn
+    const PromoVideo = require('../models/PromoVideo');
+    await PromoVideo.create({
+      title: `${req.user.channelName} - ${config.label} Video`,
+      youtubeUrl: videoUrl,
+      channelName: req.user.channelName,
+      type: config.type,
+      coinsReward: config.coinsReward,
+      watchSeconds: config.watchSeconds,
+      isActive: true,
+      addedBy: req.user._id.toString(),
+      priority: 0
+    });
+
+    // Transaction record
     await Transaction.create({
       userId: req.user._id,
-      type: 'video_submit',
-      coins: reward.coins,
-      description: `${videoType} video submitted: ${reward.watchers} watchers, ${reward.coins} coins`
+      type: 'spend',
+      coins: -config.cost,
+      description: `${videoType} video submitted for Watch & Earn (${config.cost} coins)`
     });
 
     res.json({ 
       success: true, 
-      message: `${videoType} video submitted! ${reward.coins} coins earned for ${reward.watchers} watchers`,
+      message: `${videoType} video submitted! ${config.cost} coins deducted. Your video will appear in Watch & Earn.`,
       coins: req.user.coins,
-      earned: reward.coins
+      cost: config.cost
     });
 
   } catch (e) { 

@@ -4,7 +4,7 @@ import api, { ADMIN_BASE } from '../api';
 export default function PromoVideos() {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ title: '', youtubeUrl: '', channelName: '', type: 'short', coinsReward: 5, priority: 0 });
+  const [form, setForm] = useState({ title: '', youtubeUrl: '', channelName: '', type: 'short', coinsReward: 10, priority: 0 });
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -18,7 +18,7 @@ export default function PromoVideos() {
   useEffect(() => { load(); }, []);
 
   const handleTypeChange = (type) => {
-    setForm(f => ({ ...f, type, coinsReward: type === 'long' ? 15 : 5 }));
+    setForm(f => ({ ...f, type, coinsReward: type === 'long' ? 15 : 10 }));
   };
 
   const addVideo = async () => {
@@ -85,7 +85,7 @@ export default function PromoVideos() {
           <div>
             <label style={{ color: '#aaa', fontSize: 12, display: 'block', marginBottom: 4 }}>Type</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              {[['short', '⚡ Short (60s)', 5], ['long', '🎬 Long (150s)', 15]].map(([t, label, coins]) => (
+              {[['short', '⚡ Short (60s)', 10], ['long', '🎬 Long (180s)', 15]].map(([t, label, coins]) => (
                 <button key={t} onClick={() => handleTypeChange(t)}
                   style={{ padding: '8px 16px', background: form.type === t ? '#FF0000' : '#222', border: '1px solid #333', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 13 }}>
                   {label} • {coins} coins

@@ -23,6 +23,7 @@ data class MatchData(
 
 data class BuySubsRequest(val coins: Int)
 data class BuySubsResponse(val success: Boolean, val remainingCoins: Int, val message: String? = null)
+data class VideoOrderResponse(val success: Boolean, val message: String? = null, val coins: Int = 0, val cost: Int = 0)
 data class CoinsEarned(val coins: Int, val earned: Int)
 data class CoinRequestBody(val coins: Int)
 data class CoinRequestResponse(val success: Boolean, val requestId: String)
@@ -155,6 +156,8 @@ data class GroupSubAdmin(
 data class GroupSearchResult(val _id: String, val name: String, val pic: String = "", val description: String? = null, val memberCount: Int = 0, val hasInviteLink: Boolean = false, val isMember: Boolean = false)
 data class GroupSearchResponse(val groups: List<GroupSearchResult>)
 data class GroupInviteLinkResponse(val success: Boolean, val inviteLink: String = "", val token: String = "")
+data class PendingGroupInvite(val roomId: String, val roomName: String, val roomPic: String = "")
+data class PendingGroupInvitesResponse(val invites: List<PendingGroupInvite>)
 data class SubAdminPermissions(
     val canDeleteMessages: Boolean = true,
     val canBanMembers: Boolean = false,
@@ -174,6 +177,7 @@ data class GroupJoinByLinkResponse(val success: Boolean, val alreadyMember: Bool
 // ── AI Companion ──────────────────────────────────────────────
 data class AiChatResponse(val reply: String, val success: Boolean = true)
 data class AiMessage(val role: String, val text: String)
+data class AiChatRequest(val message: String, val history: List<AiMessage> = emptyList())
 
 // ── Promo Videos ──────────────────────────────────────────────
 data class PromoVideo(
@@ -214,7 +218,8 @@ data class GroupMember(val _id: String, val channelName: String, val profilePic:
 data class GroupInfoResponse(
     val room: ChatRoom,
     val members: List<GroupMember>,
-    val isAdmin: Boolean
+    val isAdmin: Boolean,
+    val ownerId: String = ""
 )
 data class ReactRequest(val msgId: String, val emoji: String)
 data class ReactResponse(val success: Boolean, val reactions: Map<String, List<String>>)
@@ -249,6 +254,7 @@ data class SentRequest(
 data class SentRequestsResponse(val requests: List<SentRequest>)
 
 data class SetDisappearingRequest(val roomId: String, val seconds: Int)
+data class ForwardMessageRequest(val msgId: String, val targetRoomIds: List<String>)
 data class GroupInviteNotif(val roomId: String, val roomName: String, val invitedBy: String, val invitedByPic: String)
 
 data class OnlineStatusResponse(val onlineUsers: List<String>)
@@ -278,12 +284,13 @@ data class CallLogEntry(
     val roomId: String,
     val callerId: String,
     val callerName: String,
-    val callType: String, // "voice" or "video"
-    val status: String, // "ringing", "connected", "ended", "missed", "declined"
+    val callType: String, // "voice", "video", "audio"
+    val status: String,   // "ringing", "connected", "ended", "missed", "declined"
     val startTime: String,
     val connectTime: String? = null,
     val endTime: String? = null,
-    val duration: Int = 0, // seconds
+    val duration: Int = 0,       // seconds
+    val isOutgoing: Boolean = false,
     val isMissed: Boolean = false,
     val isDeclined: Boolean = false
 )
@@ -348,7 +355,10 @@ data class BoostStatusResponse(
     val isBoosted: Boolean = false, val boostedUntil: String? = null,
     val coins: Int = 0, val costs: Map<String, Int> = emptyMap()
 )
+data class BoostRequest(val duration: String)
 data class BoostResponse(val success: Boolean, val coins: Int = 0, val boostedUntil: String? = null)
+data class BoostedChannel(val _id: String = "", val channelName: String = "", val channelUrl: String = "", val profilePic: String = "", val boostedUntil: String = "")
+data class BoostedChannelsResponse(val channels: List<BoostedChannel> = emptyList())
 
 // ── Friends ───────────────────────────────────────────────────
 data class FriendUser(

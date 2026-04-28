@@ -35,6 +35,10 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
     private var screenVideoTrack: org.webrtc.VideoTrack? = null
     private val _isActive = MutableStateFlow(false)
     val isActive: StateFlow<Boolean> = _isActive
+    private val _activeRoomName = MutableStateFlow("")
+    val activeRoomName: StateFlow<String> = _activeRoomName
+    private val _activeRoomId = MutableStateFlow("")
+    val activeRoomId: StateFlow<String> = _activeRoomId
     private val _toastMsg = MutableStateFlow<String?>(null)
     val toastMsg: StateFlow<String?> = _toastMsg
     private var currentRoomId = ""
@@ -53,9 +57,11 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearToast() { _toastMsg.value = null }
 
-    fun join(roomId: String, userId: String, name: String, pic: String, admin: Boolean = false) {
+    fun join(roomId: String, userId: String, name: String, pic: String, admin: Boolean = false, roomName: String = "") {
         if (_isActive.value) return
         currentRoomId = roomId
+        _activeRoomName.value = roomName
+        _activeRoomId.value = roomId
         myUserId = userId
         isAdmin = admin
         if (name.isNotEmpty()) { myName = name; myPic = pic; startJoin() }
@@ -71,7 +77,7 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun leave() { if (!_isActive.value) return; SocketManager.leaveVoiceChat(currentRoomId); cleanup() }
+    fun leave() { if (!_isActive.value) return; _activeRoomName.value = ""; _activeRoomId.value = ""; SocketManager.leaveVoiceChat(currentRoomId); cleanup() }
 
     fun toggleMute() {
         _isMuted.value = !_isMuted.value
@@ -149,6 +155,8 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun isGroupAdmin() = isAdmin
+    fun getMyUserId() = myUserId
+    fun getCurrentRoomId() = currentRoomId
 
     fun adminMuteUser(targetUserId: String, muted: Boolean) {
         if (!isAdmin) return
@@ -168,8 +176,8 @@ class GroupVoiceChatViewModel(app: Application) : AndroidViewModel(app) {
     private fun iceServers() = listOf(
         PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
         PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
-        PeerConnection.IceServer.builder("turn:80.211.139.118:3478").setUsername("ytbooster").setPassword("ytbooster2024").createIceServer(),
-        PeerConnection.IceServer.builder("turn:80.211.139.118:3478?transport=tcp").setUsername("ytbooster").setPassword("ytbooster2024").createIceServer()
+        PeerConnection.IceServer.builder("turn:80.211.141.242:3478").setUsername("ytbooster").setPassword("ytbooster2024").createIceServer(),
+        PeerConnection.IceServer.builder("turn:80.211.141.242:3478?transport=tcp").setUsername("ytbooster").setPassword("ytbooster2024").createIceServer()
     )
 
     private fun initWebRTC(onDone: () -> Unit) {

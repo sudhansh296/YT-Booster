@@ -4,6 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.app.Activity
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -11,6 +15,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.input.pointer.pointerInput
@@ -23,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,6 +37,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +51,7 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -52,6 +60,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.ytsubexchange.data.*
+import com.ytsubexchange.music.MusicViewModel
+import com.ytsubexchange.music.ui.MusicScreen
 import com.ytsubexchange.viewmodel.CallViewModel
 import com.ytsubexchange.viewmodel.ChatViewModel
 import com.ytsubexchange.viewmodel.GroupVoiceChatViewModel
@@ -108,6 +118,7 @@ fun ChatScreen(
     onBack: () -> Unit = {},
     callViewModel: CallViewModel? = null,
     voiceChatViewModel: GroupVoiceChatViewModel? = null,
+    musicViewModel: com.ytsubexchange.music.MusicViewModel? = null,
     openCommunity: Boolean = false,
     onPickFile: (String, (android.net.Uri, String, String) -> Unit) -> Unit = { _, _ -> },
     onRequestScreenCapture: (() -> Unit)? = null,
@@ -137,6 +148,7 @@ fun ChatScreen(
                 onRoomClick = { viewModel.openRoom(it) },
                 onBack = onBack,
                 viewModel = viewModel,
+                musicViewModel = musicViewModel,
                 openCommunity = openCommunity
             )
         }
@@ -150,6 +162,7 @@ fun ChatListScreen(
     onRoomClick: (ChatRoom) -> Unit,
     onBack: () -> Unit,
     viewModel: ChatViewModel,
+    musicViewModel: com.ytsubexchange.music.MusicViewModel? = null,
     openCommunity: Boolean = false
 ) {
     val isLoading by viewModel.isLoading.collectAsState()
@@ -172,22 +185,286 @@ fun ChatListScreen(
     var menuRoom by remember { mutableStateOf<ChatRoom?>(null) }
     var showLeaveConfirm by remember { mutableStateOf(false) }
 
+    // YT Music voice search state
+    var musicSearchText by remember { mutableStateOf("") }
+    var isMicListening by remember { mutableStateOf(false) }
+    var musicAutoPlay by remember { mutableStateOf(false) }
+    val musicResults by (musicViewModel?.searchResults ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsState()
+
+    // AI voice search state
+    var aiSearchText by remember { mutableStateOf("") }
+    var isAiMicListening by remember { mutableStateOf(false) }
+
+    LaunchedEffect(musicResults, musicAutoPlay) {
+        if (musicAutoPlay && musicResults.isNotEmpty()) {
+            musicViewModel?.playSong(musicResults.first())
+            musicAutoPlay = false
+        }
+    }
+
+    val voiceLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        isMicListening = false
+        isAiMicListening = false
+        if (result.resultCode == Activity.RESULT_OK) {
+            val q = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!q.isNullOrBlank()) {
+                if (selectedTab == 4) {
+                    musicSearchText = q
+                    musicAutoPlay = true
+                    musicViewModel?.search(q)
+                } else if (selectedTab == 3) {
+                    aiSearchText = q
+                }
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(chatBg())) {
         Box(Modifier.fillMaxWidth().height(3.dp).background(Brush.horizontalGradient(listOf(AccentRed, Color(0xFFFF6B6B)))))
         Row(Modifier.fillMaxWidth().padding(12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(chatSearchBg()).clickable {
-                if (selectedTab == 1) {
-                    viewModel.showNewChatDialog(); viewModel.searchGroups("")
-                } else {
-                    viewModel.showNewChatDialog()
+            when (selectedTab) {
+                0 -> {
+                    // Direct tab: P2P member search
+                    var userSearchText by remember { mutableStateOf("") }
+                    Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(chatSearchBg())
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .clickable {
+                                viewModel.showNewChatDialog()
+                            }
+                    ) {
+                        if (userSearchText.isEmpty()) {
+                            androidx.compose.material3.Text("Search members...", color = chatTextSec(), fontSize = 13.sp)
+                        }
+                        BasicTextField(
+                            value = userSearchText,
+                            onValueChange = { 
+                                userSearchText = it
+                                if (it.isNotBlank()) {
+                                    viewModel.loadUsers(it)
+                                    viewModel.showNewChatDialog()
+                                }
+                            },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = chatTextPrimary(), fontSize = 13.sp),
+                            singleLine = true,
+                            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                if (userSearchText.isNotBlank()) {
+                                    viewModel.loadUsers(userSearchText)
+                                    viewModel.showNewChatDialog()
+                                }
+                            })
+                        )
+                    }
+                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(6.dp))
                 }
-            }) {
-                Row(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Search, null, tint = chatTextSec(), modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (selectedTab == 1) "Group search karo..." else "User search karo...", color = chatTextSec(), fontSize = 14.sp)
+                1 -> {
+                    // Group tab: Group search
+                    var groupSearchText by remember { mutableStateOf("") }
+                    Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(chatSearchBg())
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .clickable {
+                                viewModel.showNewChatDialog()
+                            }
+                    ) {
+                        if (groupSearchText.isEmpty()) {
+                            androidx.compose.material3.Text("Search groups...", color = chatTextSec(), fontSize = 13.sp)
+                        }
+                        BasicTextField(
+                            value = groupSearchText,
+                            onValueChange = { 
+                                groupSearchText = it
+                                if (it.length >= 2) {
+                                    viewModel.searchGroups(it)
+                                    viewModel.showNewChatDialog()
+                                }
+                            },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = chatTextPrimary(), fontSize = 13.sp),
+                            singleLine = true,
+                            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                if (groupSearchText.isNotBlank()) {
+                                    viewModel.searchGroups(groupSearchText)
+                                    viewModel.showNewChatDialog()
+                                }
+                            })
+                        )
+                    }
+                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(6.dp))
+                }
+                2 -> {
+                    // Community tab: P2P member search
+                    var communitySearchText by remember { mutableStateOf("") }
+                    Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(chatSearchBg())
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .clickable {
+                                viewModel.showNewChatDialog()
+                            }
+                    ) {
+                        if (communitySearchText.isEmpty()) {
+                            androidx.compose.material3.Text("Search members...", color = chatTextSec(), fontSize = 13.sp)
+                        }
+                        BasicTextField(
+                            value = communitySearchText,
+                            onValueChange = { 
+                                communitySearchText = it
+                                if (it.isNotBlank()) {
+                                    viewModel.loadUsers(it)
+                                    viewModel.showNewChatDialog()
+                                }
+                            },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = chatTextPrimary(), fontSize = 13.sp),
+                            singleLine = true,
+                            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                if (communitySearchText.isNotBlank()) {
+                                    viewModel.loadUsers(communitySearchText)
+                                    viewModel.showNewChatDialog()
+                                }
+                            })
+                        )
+                    }
+                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(6.dp))
+                }
+                3 -> {
+                    // AI tab: AI search box + mic
+                    Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(chatSearchBg())
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        if (aiSearchText.isEmpty()) {
+                            androidx.compose.material3.Text("AI se kuch puchho...", color = chatTextSec(), fontSize = 13.sp)
+                        }
+                        BasicTextField(
+                            value = aiSearchText,
+                            onValueChange = { aiSearchText = it },
+                            textStyle = androidx.compose.ui.text.TextStyle(color = chatTextPrimary(), fontSize = 13.sp),
+                            singleLine = true,
+                            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { /* AI screen handles it */ })
+                        )
+                    }
+                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(6.dp))
+                    // Mic button
+                    Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(if (isAiMicListening) Color(0xFFDB2777) else Color(0xFF7C3AED))
+                            .clickable {
+                                isAiMicListening = true
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "AI se kuch puchho...")
+                                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                                }
+                                voiceLauncher.launch(intent)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.material3.Text(if (isAiMicListening) "⏹" else "🎤", fontSize = 16.sp)
+                    }
+                    androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(4.dp))
+                }
+                4 -> {
+                    // YT Music tab: Music search box + mic + play/pause
+                    if (musicViewModel != null) {
+                        val isPlaying by musicViewModel.isPlaying.collectAsState()
+                        val currentSong by musicViewModel.currentSong.collectAsState()
+                        Box(
+                            modifier = androidx.compose.ui.Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(chatSearchBg())
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            if (musicSearchText.isEmpty()) {
+                                androidx.compose.material3.Text("Search songs, artists...", color = chatTextSec(), fontSize = 13.sp)
+                            }
+                            BasicTextField(
+                                value = musicSearchText,
+                                onValueChange = { musicSearchText = it },
+                                textStyle = androidx.compose.ui.text.TextStyle(color = chatTextPrimary(), fontSize = 13.sp),
+                                singleLine = true,
+                                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = {
+                                    if (musicSearchText.isNotBlank()) musicViewModel.search(musicSearchText)
+                                })
+                            )
+                        }
+                        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(6.dp))
+                        // Mic button
+                        Box(
+                            modifier = androidx.compose.ui.Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(if (isMicListening) Color(0xFFDB2777) else Color(0xFF7C3AED))
+                                .clickable {
+                                    isMicListening = true
+                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Song ka naam bolo...")
+                                        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                                    }
+                                    voiceLauncher.launch(intent)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.material3.Text(if (isMicListening) "⏹" else "🎤", fontSize = 16.sp)
+                        }
+                        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(6.dp))
+                        // Play/Pause button
+                        Box(
+                            modifier = androidx.compose.ui.Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFFDB2777))))
+                                .clickable {
+                                    if (currentSong != null) {
+                                        musicViewModel.playPause()
+                                    } else if (musicSearchText.isNotBlank()) {
+                                        musicAutoPlay = true
+                                        musicViewModel.search(musicSearchText)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.material3.Text(
+                                if (isPlaying) "⏸" else "▶",
+                                fontSize = 16.sp,
+                                color = Color.White
+                            )
+                        }
+                        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(4.dp))
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
                 }
             }
+            // ⋮ Menu icon - ALWAYS visible on ALL tabs
             Box {
                 IconButton(onClick = { showChatMenu = true }) {
                     Icon(Icons.Default.MoreVert, null, tint = chatTextSec())
@@ -231,7 +508,7 @@ fun ChatListScreen(
             }
         }
         Row(Modifier.fillMaxWidth().padding(12.dp, 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            listOf("Direct", "Group", "Community", "AI 🤖").forEachIndexed { i, label ->
+            listOf("Direct", "Group", "Community", "AI 🤖", "YT Music 🎵").forEachIndexed { i, label ->
                 Column(Modifier.clickable { selectedTab = i }.padding(8.dp, 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(label, color = if (selectedTab == i) AccentRed else chatTextSec(),
@@ -266,7 +543,16 @@ fun ChatListScreen(
         Divider(color = chatDivider(), thickness = 0.5.dp)
         when (selectedTab) {
             2 -> CommunityChatScreen(viewModel = viewModel)
-            3 -> AiCompanionChatTab(viewModel = viewModel)
+            3 -> AiCompanionChatTab(viewModel = viewModel, prefillText = aiSearchText, onPrefillUsed = { aiSearchText = "" })
+            4 -> {
+                if (musicViewModel != null) {
+                    YTMusicTab(musicViewModel)
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Music player unavailable", color = Color.White)
+                    }
+                }
+            }
             else -> {
                 if (isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AccentRed) }
@@ -364,7 +650,6 @@ fun ChatListScreen(
                     if (room.isGroup) {
                         Row(Modifier.fillMaxWidth().clickable {
                             showRoomMenu = false
-                            menuRoom = null
                             showLeaveConfirm = true
                         }.padding(16.dp, 14.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -568,6 +853,13 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
     val listState = rememberLazyListState()
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) { viewModel.joinCommunity() }
+    // Refresh online count every 30 seconds
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            viewModel.joinCommunity()
+        }
+    }
     LaunchedEffect(communityMessages.size) {
         if (communityMessages.isNotEmpty()) listState.scrollToItem(communityMessages.size - 1)
     }
@@ -588,12 +880,16 @@ fun CommunityChatScreen(viewModel: ChatViewModel) {
                 Text("LIVE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.weight(1f))
-            if (communityOnline > 0) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
-                    Spacer(Modifier.width(4.dp))
-                    Text("$communityOnline online", color = Color(0xFF4CAF50), fontSize = 11.sp)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(
+                    if (communityOnline > 0) Color(0xFF4CAF50) else Color(0xFF666666)
+                ))
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    if (communityOnline > 0) "$communityOnline online" else "0 online",
+                    color = if (communityOnline > 0) Color(0xFF4CAF50) else Color(0xFF666666),
+                    fontSize = 11.sp
+                )
             }
         }
         Divider(color = chatDivider(), thickness = 0.5.dp)
@@ -822,6 +1118,8 @@ fun ChatWindowScreen(
     var showEmojiPanel by remember { mutableStateOf(false) }
     var showAttachMenu by remember { mutableStateOf(false) }
     var showDeleteChatsMenu by remember { mutableStateOf(false) }
+    var showClearChatDialog by remember { mutableStateOf(false) }
+    var showVoiceChatFullScreen by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1) }
     val displayMessages = if (showSearchBar && searchQuery.isNotBlank())
@@ -886,19 +1184,8 @@ fun ChatWindowScreen(
             // Call buttons
             if (callViewModel != null && !isBlockedByMe && !isBlockedByThem) {
                 IconButton(onClick = {
-                    if (room.isGroup) {
-                        // Group call — sirf owner start kare, admins join kar sakte hain
-                        val isOwner = groupInfo?.isAdmin == true
-                        val isAdmin = groupInfo?.room?.subAdmins?.any { it.userId == myId } == true
-                        val canJoin = isOwner || isAdmin
-                        if (canJoin) {
-                            callViewModel.startCall(room._id, room.name, "audio")
-                        } else {
-                            viewModel.setToast("📞 Sirf Owner aur Admins call mein join kar sakte hain")
-                        }
-                    } else {
-                        callViewModel.startCall(room._id, room.name, "audio")
-                    }
+                    // Server pe permission check hoga — yahan seedha start karo
+                    callViewModel.startCall(room._id, room.name, "voice")
                 }) {
                     Icon(Icons.Default.Call, null, tint = chatTextSec(), modifier = Modifier.size(20.dp))
                 }
@@ -910,18 +1197,25 @@ fun ChatWindowScreen(
             }
             // Group voice chat button — owner/admin start kar sake, member join kar sake agar active ho
             if (room.isGroup && voiceChatViewModel != null) {
+                val vcIsActive by voiceChatViewModel.isActive.collectAsState()
                 IconButton(onClick = {
-                    val isOwner = groupInfo?.isAdmin == true
-                    val subAdmin = groupInfo?.room?.subAdmins?.firstOrNull { it.userId == myId }
-                    val canStart = isOwner || subAdmin?.canStartVoiceChat == true
-                    val vcActive = voiceChatViewModel.isActive.value
-                    when {
-                        canStart -> voiceChatViewModel.join(room._id, myId, "", "")
-                        vcActive -> voiceChatViewModel.join(room._id, myId, "", "") // join existing
-                        else -> viewModel.setToast("🎙️ Voice chat abhi active nahi hai. Sirf Owner/Admin start kar sakte hain")
+                    if (vcIsActive) {
+                        showVoiceChatFullScreen = true
+                    } else {
+                        // Pass isAdmin flag — groupInfo se ya default false
+                        val isOwner = groupInfo?.isAdmin == true ||
+                            groupInfo?.ownerId == myId ||
+                            groupInfo?.room?.subAdmins?.any { it.userId == myId } == true
+                        voiceChatViewModel.join(room._id, myId, "", "", isOwner)
+                        showVoiceChatFullScreen = true
                     }
                 }) {
-                    Icon(Icons.Default.Mic, null, tint = chatTextSec(), modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.Default.Mic,
+                        null,
+                        tint = if (vcIsActive) Color(0xFF4CAF50) else chatTextSec(),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
             IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = chatTextSec()) }
@@ -949,7 +1243,10 @@ fun ChatWindowScreen(
                                 "Block User" -> viewModel.blockUser {}
                                 "Unblock User" -> viewModel.unblockUser {}
                                 "Delete Chats ⏱" -> showDeleteChatsMenu = true
-                                "Clear Chat" -> viewModel.clearChat()
+                                "Clear Chat" -> {
+                                    // Show dialog with 2 options
+                                    showClearChatDialog = true
+                                }
                             }
                         })
                 }
@@ -973,15 +1270,67 @@ fun ChatWindowScreen(
             }
         }
 
-        // Pinned message
+        // Pinned message — click karne pe scroll karo us message pe
+        val pinnedScrollScope = rememberCoroutineScope()
         pinnedMsg?.let { msg ->
-            Row(Modifier.fillMaxWidth().background(chatCardAlt()).padding(16.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().background(chatCardAlt()).padding(16.dp, 6.dp)
+                    .clickable {
+                        // Scroll to pinned message
+                        val idx = messages.indexOfFirst { it._id == msg._id }
+                        if (idx >= 0) {
+                            pinnedScrollScope.launch {
+                                listState.animateScrollToItem(idx)
+                            }
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(Modifier.width(3.dp).height(32.dp).background(AccentRed))
                 Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("Pinned", color = AccentRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Column(Modifier.weight(1f)) {
+                    Text("📌 Pinned", color = AccentRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Text(msg.text.take(60), color = chatTextSec(), fontSize = 12.sp, maxLines = 1)
                 }
+                // Unpin button
+                IconButton(onClick = { viewModel.pinMessage() }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Unpin", tint = chatTextSec(), modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        // ── Voice Chat Active Banner (Telegram style) ────────
+        if (room.isGroup && voiceChatViewModel != null) {
+            val vcActive by voiceChatViewModel.isActive.collectAsState()
+            val vcParticipants by voiceChatViewModel.participants.collectAsState()
+            val vcMuted by voiceChatViewModel.isMuted.collectAsState()
+            val vcActiveMap by viewModel.voiceChatActive.collectAsState()
+            val serverCount = vcActiveMap[room._id] ?: 0
+            val showBanner = vcActive || serverCount > 0
+
+            if (showBanner) {
+                val displayCount = if (vcActive) vcParticipants.size else serverCount
+                VoiceChatActiveBanner(
+                    roomName = room.name,
+                    participantCount = displayCount,
+                    isMuted = if (vcActive) vcMuted else false,
+                    onJoin = {
+                        if (!vcActive) {
+                            voiceChatViewModel.join(room._id, myId, "", "", roomName = room.name)
+                        }
+                        showVoiceChatFullScreen = true
+                    },
+                    onMuteToggle = {
+                        if (vcActive) voiceChatViewModel.toggleMute()
+                        else {
+                            voiceChatViewModel.join(room._id, myId, "", "", roomName = room.name)
+                            showVoiceChatFullScreen = true
+                        }
+                    },
+                    onLeave = {
+                        if (vcActive) voiceChatViewModel.leave()
+                    }
+                )
             }
         }
 
@@ -1007,6 +1356,7 @@ fun ChatWindowScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
                 items(displayMessages) { msg ->
                     MessageBubble(msg = msg, myId = myId, onLongClick = { viewModel.onMsgLongPress(msg) },
+                        isPartnerOnline = isPartnerOnline,
                         onSwipeReply = { swipedMsg -> viewModel.setReply(swipedMsg) })
                 }
             }
@@ -1213,7 +1563,8 @@ fun ChatWindowScreen(
                         add(Triple("Reply", Icons.Default.Reply, false))
                         add(Triple("Forward", Icons.Default.Forward, false))
                         add(Triple(if (isStarred) "Unstar ★" else "Star ⭐", Icons.Default.Star, false))
-                        add(Triple("Pin 📌", Icons.Default.PushPin, false))
+                        val isPinned = pinnedMsg?._id == msg._id
+                        add(Triple(if (isPinned) "Unpin 📌" else "Pin 📌", Icons.Default.PushPin, false))
                         if (msg.text.isNotBlank() && !hasFile) add(Triple("Copy", Icons.Default.ContentCopy, false))
                         // Edit — sirf apne text messages pe
                         if (msg.senderId == myId && msg.text.isNotBlank() && !hasFile) add(Triple("Edit ✏️", Icons.Default.Edit, false))
@@ -1234,6 +1585,7 @@ fun ChatWindowScreen(
                                         "Star ⭐" -> viewModel.starMessage()
                                         "Unstar ★" -> viewModel.starMessage()
                                         "Pin 📌" -> viewModel.pinMessage()
+                                        "Unpin 📌" -> viewModel.pinMessage()
                                         "Copy" -> {
                                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             cm.setPrimaryClip(ClipData.newPlainText("msg", msg.text))
@@ -1280,7 +1632,9 @@ fun ChatWindowScreen(
                                             viewModel.dismissContext()
                                         }                                        "Delete" -> {
                                             deleteMsgId = msg._id
-                                            deleteMsgIsMine = msg.senderId == myId
+                                            // Delete for everyone: apna message OR group mein owner/admin
+                                            val isGroupAdmin = room.isGroup && (groupInfo?.isAdmin == true || groupInfo?.ownerId == myId)
+                                            deleteMsgIsMine = msg.senderId == myId || isGroupAdmin
                                             viewModel.dismissContext()
                                             showDeleteDialog = true
                                         }
@@ -1423,29 +1777,43 @@ fun ChatWindowScreen(
 
     // Forward dialog
     if (showForwardDialog) {
-        val allRooms by viewModel.rooms.collectAsState()
+        val forwardRooms by viewModel.rooms.collectAsState()
+        val availableRooms = forwardRooms.filter { it._id != room._id }
+        
         Dialog(onDismissRequest = { showForwardDialog = false }) {
             Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("↪ Forward to...", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
-                    LazyColumn(Modifier.weight(1f, false)) {
-                        items(allRooms.filter { it._id != room._id }) { r ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    viewModel.forwardMessage(forwardMsgId, listOf(r._id))
-                                    showForwardDialog = false
-                                }.padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(allRooms.indexOf(r))),
-                                    contentAlignment = Alignment.Center) {
-                                    Icon(if (r.isGroup) Icons.Default.Group else Icons.Default.Person, null,
-                                        tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                    
+                    if (availableRooms.isEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("📭", fontSize = 32.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text("No chats available", color = chatTextSec(), fontSize = 14.sp)
+                                Text("Start a chat first to forward", color = chatTextSec(), fontSize = 12.sp)
+                            }
+                        }
+                    } else {
+                        LazyColumn(Modifier.weight(1f, false)) {
+                            items(availableRooms) { r ->
+                                Row(
+                                    Modifier.fillMaxWidth().clickable {
+                                        viewModel.forwardMessage(forwardMsgId, listOf(r._id))
+                                        showForwardDialog = false
+                                    }.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(Modifier.size(36.dp).clip(CircleShape).background(avatarGradient(availableRooms.indexOf(r))),
+                                        contentAlignment = Alignment.Center) {
+                                        Icon(if (r.isGroup) Icons.Default.Group else Icons.Default.Person, null,
+                                            tint = Color.White.copy(0.8f), modifier = Modifier.size(20.dp))
+                                    }
+                                    Text(r.name, color = chatTextPrimary(), fontSize = 14.sp)
                                 }
-                                Text(r.name, color = chatTextPrimary(), fontSize = 14.sp)
                             }
                         }
                     }
@@ -1455,6 +1823,55 @@ fun ChatWindowScreen(
                 }
             }
         }
+    }
+
+
+    // Clear Chat dialog — delete from me / delete from everyone
+    if (showClearChatDialog) {
+        // Owner/admin check — group mein sirf owner/admin "Delete from Everyone" kar sakta hai
+        val isGroupOwnerOrAdmin = room.isGroup && (groupInfo?.isAdmin == true || 
+            groupInfo?.ownerId == myId ||
+            groupInfo?.room?.subAdmins?.any { it.userId == myId } == true)
+        val canDeleteForEveryone = !room.isGroup || isGroupOwnerOrAdmin
+        AlertDialog(
+            onDismissRequest = { showClearChatDialog = false },
+            containerColor = chatCard(),
+            title = { Text("🗑️ Clear Chat", color = chatTextPrimary(), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Kaise clear karna hai?", color = chatTextSec(), fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (canDeleteForEveryone) {
+                        Button(
+                            onClick = {
+                                showClearChatDialog = false
+                                viewModel.clearChat()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) { Text("Delete from Everyone", color = Color.White, fontSize = 13.sp) }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showClearChatDialog = false
+                            viewModel.clearChatForMe()
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = chatTextPrimary()),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Text("Delete from Me Only", fontSize = 13.sp) }
+                    TextButton(
+                        onClick = { showClearChatDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Cancel", color = chatTextSec()) }
+                }
+            },
+            dismissButton = {}
+        )
     }
 
     // Edit message dialog
@@ -1492,62 +1909,74 @@ fun ChatWindowScreen(
         }
     }
 
-    // Delete message dialog — Delete for Everyone / Delete for Me
+    // Delete message dialog — simple AlertDialog, center mein
     if (showDeleteDialog) {
-        Dialog(onDismissRequest = { showDeleteDialog = false }) {
-            Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🗑️ Delete Message", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Spacer(Modifier.height(4.dp))
-                    // Delete for Everyone — sirf apne messages pe
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor = chatCard(),
+            title = {
+                Text("Delete Message", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                    // Delete for Everyone — apna message ya group admin
                     if (deleteMsgIsMine) {
-                        Box(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF2A1A1A))
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
                                     viewModel.deleteMessageById(deleteMsgId, forEveryone = true)
                                     showDeleteDialog = false
                                 }
-                                .padding(14.dp)
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            Icon(Icons.Default.Delete, null, tint = AccentRed, modifier = Modifier.size(20.dp))
                             Column {
-                                Text("Delete for Everyone", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("Sabke liye delete ho jaayega", color = chatTextSec(), fontSize = 12.sp)
+                                Text("Delete for Everyone", color = AccentRed, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                Text("Sabke liye delete hoga", color = chatTextSec(), fontSize = 11.sp)
                             }
                         }
+                        Spacer(Modifier.height(4.dp))
                     }
                     // Delete for Me — hamesha available
-                    Box(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                            .background(chatCardAlt())
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable {
                                 viewModel.deleteMessageById(deleteMsgId, forEveryone = false)
                                 showDeleteDialog = false
                             }
-                            .padding(14.dp)
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        Icon(Icons.Default.Delete, null, tint = chatTextPrimary(), modifier = Modifier.size(20.dp))
                         Column {
-                            Text("Delete for Me", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Sirf aapke liye delete hoga", color = chatTextSec(), fontSize = 12.sp)
+                            Text("Delete for Me", color = chatTextPrimary(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("Sirf aapke liye delete hoga", color = chatTextSec(), fontSize = 11.sp)
                         }
                     }
-                    TextButton(onClick = { showDeleteDialog = false }, modifier = Modifier.align(Alignment.End)) {
-                        Text("Cancel", color = chatTextSec())
-                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel", color = chatTextSec())
                 }
             }
-        }
+        )
     }
 
-    // Group voice chat — full screen overlay
+    // Group voice chat — full screen overlay (tap on banner to open, Message btn to minimize)
     if (voiceChatViewModel != null) {
         val vcActive by voiceChatViewModel.isActive.collectAsState()
-        if (vcActive) {
+        if (vcActive && showVoiceChatFullScreen) {
             GroupVoiceChatScreen(
                 roomName = room.name,
                 viewModel = voiceChatViewModel,
-                onLeave = { /* stays in chat */ },
+                onLeave = { showVoiceChatFullScreen = false }, // minimize — wapas chat pe
                 onRequestScreenCapture = onRequestScreenCapture
             )
             return
@@ -1629,22 +2058,22 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
     var permInviteMembers by remember { mutableStateOf(true) }
     var permPinMessages by remember { mutableStateOf(false) }
     var permChangeInfo by remember { mutableStateOf(false) }
+    var permStartVoiceChat by remember { mutableStateOf(false) }
 
     val subAdmins = groupInfo.room.subAdmins ?: emptyList()
 
     fun memberRole(member: GroupMember): String {
-        val isAdmin = groupInfo.room.members?.firstOrNull() == member._id ||
-            groupInfo.isAdmin && member._id == myId
         return when {
-            member._id == (groupInfo.room.members?.firstOrNull() ?: "") -> "Owner"
-            subAdmins.any { it.userId == member._id } -> "Sub-Admin"
+            groupInfo.ownerId.isNotEmpty() && member._id == groupInfo.ownerId -> "Owner"
+            groupInfo.isAdmin && member._id == myId && groupInfo.ownerId.isEmpty() -> "Owner"
+            subAdmins.any { it.userId == member._id } -> "Admin"
             else -> "Member"
         }
     }
 
     fun roleColor(role: String) = when (role) {
         "Owner" -> Color(0xFFFFD700)
-        "Sub-Admin" -> Color(0xFF29B6F6)
+        "Admin" -> Color(0xFF29B6F6)
         else -> Color(0xFF9E9E9E)
     }
 
@@ -1675,14 +2104,15 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                 LazyColumn(Modifier.heightIn(max = 280.dp)) {
                     items(groupInfo.members) { member ->
                         val role = when {
-                            subAdmins.any { it.userId == member._id } -> "Sub-Admin"
-                            groupInfo.isAdmin && member._id == myId -> "Owner"
+                            groupInfo.ownerId.isNotEmpty() && member._id == groupInfo.ownerId -> "Owner"
+                            groupInfo.isAdmin && member._id == myId && groupInfo.ownerId.isEmpty() -> "Owner"
+                            subAdmins.any { it.userId == member._id } -> "Admin"
                             else -> "Member"
                         }
                         Row(
                             Modifier.fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable(enabled = groupInfo.isAdmin && member._id != myId) {
+                                .clickable(enabled = groupInfo.isAdmin && member._id != myId && role != "Owner") {
                                     selectedMember = member
                                 }
                                 .padding(vertical = 6.dp, horizontal = 4.dp),
@@ -1700,7 +2130,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                                 Text(member.channelName, color = chatTextPrimary(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                                 Text(role, color = roleColor(role), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                             }
-                            if (groupInfo.isAdmin && member._id != myId) {
+                            if (groupInfo.isAdmin && member._id != myId && role != "Owner") {
                                 Icon(Icons.Default.MoreVert, null, tint = chatTextSec(), modifier = Modifier.size(16.dp))
                             }
                         }
@@ -1746,20 +2176,20 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                         }
                         Column {
                             Text(member.channelName, color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text(if (isSubAdmin) "Sub-Admin" else "Member", color = if (isSubAdmin) Color(0xFF29B6F6) else chatTextSec(), fontSize = 12.sp)
+                            Text(if (isSubAdmin) "Admin" else "Member", color = if (isSubAdmin) Color(0xFF29B6F6) else chatTextSec(), fontSize = 12.sp)
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                     Divider(color = chatDivider())
                     Spacer(Modifier.height(8.dp))
 
-                    // Promote to SubAdmin / Edit permissions
+                    // Promote to Admin / Edit permissions
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
                             .background(Color(0xFF1A1A2A))
                             .clickable {
                                 subAdminTarget = member
-                                // Load existing perms if already subadmin
+                    // Load existing perms if already admin
                                 val existing = subAdmins.firstOrNull { it.userId == member._id }
                                 permDeleteMsg = existing?.canDeleteMessages ?: true
                                 permBanMembers = existing?.canBanMembers ?: false
@@ -1775,14 +2205,14 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                     ) {
                         Icon(Icons.Default.AdminPanelSettings, null, tint = Color(0xFF29B6F6), modifier = Modifier.size(22.dp))
                         Column {
-                            Text(if (isSubAdmin) "Edit Sub-Admin Rights" else "Make Sub-Admin", color = chatTextPrimary(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text(if (isSubAdmin) "Edit Admin Rights" else "Make Admin", color = chatTextPrimary(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             Text("Telegram style permissions set karo", color = chatTextSec(), fontSize = 11.sp)
                         }
                     }
 
                     Spacer(Modifier.height(6.dp))
 
-                    // Remove SubAdmin role
+                    // Remove Admin role
                     if (isSubAdmin) {
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
@@ -1796,7 +2226,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Icon(Icons.Default.RemoveModerator, null, tint = Color(0xFFFF9800), modifier = Modifier.size(22.dp))
-                            Text("Remove Sub-Admin", color = chatTextPrimary(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Remove Admin", color = chatTextPrimary(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Spacer(Modifier.height(6.dp))
                     }
@@ -1826,12 +2256,12 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
         }
     }
 
-    // SubAdmin permissions dialog (Telegram style)
+    // Admin permissions dialog (Telegram style)
     if (showSubAdminPerms && subAdminTarget != null) {
         Dialog(onDismissRequest = { showSubAdminPerms = false }) {
             Card(colors = CardDefaults.cardColors(containerColor = chatCard()), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp)) {
-                    Text("⭐ Sub-Admin Rights", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("⭐ Admin Rights", color = chatTextPrimary(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(subAdminTarget!!.channelName, color = Color(0xFF29B6F6), fontSize = 13.sp)
                     Spacer(Modifier.height(16.dp))
 
@@ -1841,7 +2271,8 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                         Triple("Ban Members", permBanMembers, { v: Boolean -> permBanMembers = v }),
                         Triple("Invite Members", permInviteMembers, { v: Boolean -> permInviteMembers = v }),
                         Triple("Pin Messages", permPinMessages, { v: Boolean -> permPinMessages = v }),
-                        Triple("Change Group Info", permChangeInfo, { v: Boolean -> permChangeInfo = v })
+                        Triple("Change Group Info", permChangeInfo, { v: Boolean -> permChangeInfo = v }),
+                        Triple("🎙 Start Voice Chat", permStartVoiceChat, { v: Boolean -> permStartVoiceChat = v })
                     ).forEach { (label, value, onChange) ->
                         Row(
                             Modifier.fillMaxWidth().padding(vertical = 6.dp),
@@ -1870,7 +2301,8 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
                                         "canBanMembers" to permBanMembers,
                                         "canInviteMembers" to permInviteMembers,
                                         "canPinMessages" to permPinMessages,
-                                        "canChangeGroupInfo" to permChangeInfo
+                                        "canChangeGroupInfo" to permChangeInfo,
+                                        "canStartVoiceChat" to permStartVoiceChat
                                     )
                                 )
                                 showSubAdminPerms = false
@@ -1885,7 +2317,7 @@ fun GroupInfoPanel(groupInfo: GroupInfoResponse, viewModel: ChatViewModel, roomI
 }
 
 @Composable
-fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwipeReply: ((ChatMessage) -> Unit)? = null) {
+fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwipeReply: ((ChatMessage) -> Unit)? = null, isPartnerOnline: Boolean = false) {
     val isMine = myId.isNotEmpty() && msg.senderId == myId
     var showEmojiPicker by remember { mutableStateOf(false) }
     var offsetX by remember { mutableStateOf(0f) }
@@ -2213,9 +2645,17 @@ fun MessageBubble(msg: ChatMessage, myId: String, onLongClick: () -> Unit, onSwi
                         Spacer(Modifier.width(3.dp))
                         Text("edited", color = Color.White.copy(0.45f), fontSize = 9.sp)
                     }
-                    if (isMine && msg.read) {
+                    // WhatsApp style ticks
+                    // ✓ = offline (sent, not delivered)
+                    // ✓✓ grey = online (delivered, not read)
+                    // ✓✓ blue = read
+                    if (isMine) {
                         Spacer(Modifier.width(4.dp))
-                        Text("✓✓", color = Color(0xFF29B6F6), fontSize = 10.sp)
+                        when {
+                            msg.read -> Text("✓✓", color = Color(0xFF29B6F6), fontSize = 10.sp)
+                            isPartnerOnline -> Text("✓✓", color = Color.White.copy(0.6f), fontSize = 10.sp)
+                            else -> Text("✓", color = Color.White.copy(0.6f), fontSize = 10.sp)
+                        }
                     }
                 }
             }
@@ -2547,38 +2987,233 @@ fun CreateGroupDialog(users: List<ChatUser>, onSearch: (String) -> Unit, onCreat
 }
 
 @Composable
-fun AiCompanionChatTab(viewModel: ChatViewModel) {
-    Box(
-        Modifier.fillMaxSize().background(chatBg()).navigationBarsPadding(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text("🤖", fontSize = 64.sp)
-            Text(
-                "AI Companion",
-                color = chatTextPrimary(),
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
-            )
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A))))
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-            ) {
-                Text("Coming Soon", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+fun AiCompanionChatTab(
+    viewModel: ChatViewModel,
+    prefillText: String = "",
+    onPrefillUsed: () -> Unit = {}
+) {
+    data class AiMsg(val text: String, val isUser: Boolean)
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var messages by remember {
+        mutableStateOf(listOf(
+            AiMsg("Namaste! Main YT Buddy hoon 🤖\nYouTube tips, coins, subscribers, ya koi bhi sawaal pucho — main help karunga!", false)
+        ))
+    }
+    var input by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    // Auto-scroll to bottom on new message
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    }
+
+    // Handle prefill text
+    LaunchedEffect(prefillText) {
+        if (prefillText.isNotEmpty()) {
+            input = prefillText
+            onPrefillUsed()
+        }
+    }
+
+    fun sendMessage() {
+        val msg = input.trim()
+        if (msg.isBlank() || isLoading) return
+        input = ""
+        messages = messages + AiMsg(msg, true)
+        isLoading = true
+        scope.launch {
+            try {
+                val prefs = context.getSharedPreferences("prefs", android.content.Context.MODE_PRIVATE)
+                val token = "Bearer ${prefs.getString("token", "")}"
+                val history = messages.dropLast(1).takeLast(8).map {
+                    com.ytsubexchange.data.AiMessage(
+                        role = if (it.isUser) "user" else "ai",
+                        text = it.text
+                    )
+                }
+                val resp = com.ytsubexchange.network.RetrofitClient.api.aiChat(
+                    token,
+                    com.ytsubexchange.data.AiChatRequest(message = msg, history = history)
+                )
+                messages = messages + AiMsg(resp.reply, false)
+            } catch (e: Exception) {
+                android.util.Log.e("AI_CHAT", "Error: ${e.javaClass.simpleName}: ${e.message}")
+                messages = messages + AiMsg("Abhi server se connect nahi ho pa raha. Thodi der baad try karo! 🙏", false)
+            } finally {
+                isLoading = false
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Hamara AI assistant jald aa raha hai.\nYT-Booster ke saath connected rahein!",
-                color = chatTextSec(),
-                fontSize = 14.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        }
+    }
+
+    Column(
+        Modifier.fillMaxSize().background(chatBg()).navigationBarsPadding().imePadding()
+    ) {
+        // Header
+        Box(
+            Modifier.fillMaxWidth()
+                .background(Brush.horizontalGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935))))
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(0.15f)),
+                    contentAlignment = Alignment.Center
+                ) { Text("🤖", fontSize = 20.sp) }
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text("YT Buddy", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
+                        Spacer(Modifier.width(4.dp))
+                        Text("AI Assistant • Online", color = Color.White.copy(0.8f), fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+
+        // Quick suggestion chips
+        if (messages.size == 1) {
+            val suggestions = listOf("YouTube tips 📈", "Coins kaise kamayein? 🪙", "Subscribers badhao 🚀", "Referral system ❓")
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(suggestions) { s ->
+                    Box(
+                        Modifier.clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF1A1A2E))
+                            .border(1.dp, Color(0xFF7B2FF7).copy(0.5f), RoundedCornerShape(20.dp))
+                            .clickable { input = s; sendMessage() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(s, color = Color(0xFFBB86FC), fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        // Messages list
+        androidx.compose.foundation.lazy.LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            items(messages) { msg ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (msg.isUser) Arrangement.End else Arrangement.Start,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    if (!msg.isUser) {
+                        Box(
+                            Modifier.size(28.dp).clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935)))),
+                            contentAlignment = Alignment.Center
+                        ) { Text("🤖", fontSize = 14.sp) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Box(
+                        Modifier
+                            .widthIn(max = 280.dp)
+                            .clip(
+                                RoundedCornerShape(
+                                    topStart = 16.dp, topEnd = 16.dp,
+                                    bottomStart = if (msg.isUser) 16.dp else 4.dp,
+                                    bottomEnd = if (msg.isUser) 4.dp else 16.dp
+                                )
+                            )
+                            .background(
+                                if (msg.isUser)
+                                    Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFF4A1A8A)))
+                                else
+                                    Brush.linearGradient(listOf(Color(0xFF1A1A2E), Color(0xFF1E1E30)))
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            msg.text,
+                            color = if (msg.isUser) Color.White else chatTextPrimary(),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
+                    }
+                    if (msg.isUser) Spacer(Modifier.width(6.dp))
+                }
+            }
+
+            // Typing indicator
+            if (isLoading) {
+                item {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Box(
+                            Modifier.size(28.dp).clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935)))),
+                            contentAlignment = Alignment.Center
+                        ) { Text("🤖", fontSize = 14.sp) }
+                        Spacer(Modifier.width(6.dp))
+                        Box(
+                            Modifier.clip(RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp))
+                                .background(Color(0xFF1A1A2E))
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                repeat(3) { i ->
+                                    val inf = rememberInfiniteTransition(label = "dot$i")
+                                    val alpha by inf.animateFloat(
+                                        0.3f, 1f,
+                                        infiniteRepeatable(tween(600, delayMillis = i * 200), RepeatMode.Reverse),
+                                        label = "a$i"
+                                    )
+                                    Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFBB86FC).copy(alpha)))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Input bar
+        Row(
+            Modifier.fillMaxWidth()
+                .background(chatCard())
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            androidx.compose.foundation.text.BasicTextField(
+                value = input,
+                onValueChange = { input = it },
+                modifier = Modifier.weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(chatCardAlt())
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(color = chatTextPrimary(), fontSize = 14.sp),
+                cursorBrush = SolidColor(Color(0xFF7B2FF7)),
+                maxLines = 4,
+                decorationBox = { inner ->
+                    if (input.isEmpty()) Text("YT Buddy se pucho...", color = chatTextSec(), fontSize = 14.sp)
+                    inner()
+                }
             )
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.size(42.dp).clip(CircleShape)
+                    .background(
+                        if (input.isNotBlank() && !isLoading)
+                            Brush.linearGradient(listOf(Color(0xFF7B2FF7), Color(0xFFE53935)))
+                        else
+                            Brush.linearGradient(listOf(Color(0xFF333344), Color(0xFF333344)))
+                    )
+                    .clickable(enabled = input.isNotBlank() && !isLoading) { sendMessage() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("➤", color = Color.White, fontSize = 18.sp)
+            }
         }
     }
 }
@@ -2830,4 +3465,232 @@ fun formatChatTime(iso: String): String {
             else -> SimpleDateFormat("dd MMM", Locale.getDefault()).format(date)
         }
     } catch (e: Exception) { "" }
+}
+
+
+@Composable
+fun YTMusicTab(musicViewModel: com.ytsubexchange.music.MusicViewModel) {
+    // Simply call the MusicScreen composable
+    MusicScreen(viewModel = musicViewModel)
+}
+
+@Composable
+private fun FeatureItem(text: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(6.dp).clip(CircleShape).background(AccentRed)
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text,
+            color = chatTextPrimary(),
+            fontSize = 14.sp
+        )
+    }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MusiQFlow Helper Composables
+// ══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun MusicSongItem(
+    song: com.ytsubexchange.music.SongResult,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    AccentPurple: Color,
+    SurfaceColor: Color,
+    TextPrimary: Color,
+    TextSecondary: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isActive) AccentPurple.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.03f))
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = song.thumbnailUrl,
+            contentDescription = null,
+            modifier = Modifier.size(46.dp).clip(RoundedCornerShape(8.dp)).background(SurfaceColor)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                song.title,
+                color = if (isActive) AccentPurple else TextPrimary,
+                fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            if (song.artist.isNotEmpty()) {
+                Text(song.artist, color = TextSecondary, fontSize = 12.sp, maxLines = 1, 
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+        }
+        if (isActive) Text("▶", color = AccentPurple, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun MusicIdleContent(
+    history: List<String>,
+    onArtistClick: (String) -> Unit,
+    onHistoryClick: (String) -> Unit,
+    currentSong: com.ytsubexchange.music.SongResult?,
+    hasMiniPlayer: Boolean,
+    AccentPurple: Color,
+    TextPrimary: Color,
+    TextSecondary: Color,
+    TextMuted: Color,
+    SurfaceColor: Color
+) {
+    val indianArtists = listOf("Arijit Singh", "Shreya Ghoshal", "AP Dhillon", "Diljit Dosanjh",
+        "Jubin Nautiyal", "Neha Kakkar", "Atif Aslam", "Badshah")
+    val intlArtists = listOf("The Weeknd", "Ed Sheeran", "Taylor Swift", "Drake",
+        "Billie Eilish", "Bruno Mars", "Eminem", "Coldplay")
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState())
+    ) {
+        // History chips
+        if (history.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                history.take(6).forEach { q ->
+                    Box(
+                        modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            .background(SurfaceColor).clickable { onHistoryClick(q) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) { Text(q, color = TextSecondary, fontSize = 12.sp) }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        Text("🇮🇳 Indian Artists", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        MusicArtistGrid(indianArtists, onArtistClick, AccentPurple, AccentPurple, TextSecondary)
+
+        Spacer(Modifier.height(10.dp))
+
+        Text("🌍 International", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        MusicArtistGrid(intlArtists, onArtistClick, AccentPurple, AccentPurple, TextSecondary)
+
+        Spacer(Modifier.height(10.dp))
+
+        // Branding
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("♫", fontSize = 96.sp, color = AccentPurple.copy(alpha = 0.35f))
+            Spacer(Modifier.height(8.dp))
+            Row {
+                Text("Musiq", color = TextPrimary.copy(alpha = 0.3f), fontSize = 32.sp, fontWeight = FontWeight.Black)
+                Text("Flow", color = AccentPurple.copy(alpha = 0.6f), fontSize = 32.sp, fontWeight = FontWeight.Black)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text("No Ads  •  Non Stop Music", color = TextMuted.copy(alpha = 0.6f), fontSize = 13.sp)
+        }
+
+        Spacer(Modifier.height(if (hasMiniPlayer) 80.dp else 12.dp))
+    }
+}
+
+@Composable
+private fun MusicArtistGrid(
+    artists: List<String>,
+    onClick: (String) -> Unit,
+    AccentPurple: Color,
+    AccentPink: Color,
+    TextSecondary: Color
+) {
+    val gradients = listOf(
+        listOf(Color(0xFF7C3AED), Color(0xFFDB2777)),
+        listOf(Color(0xFF0369A1), Color(0xFF7C3AED)),
+        listOf(Color(0xFFBE185D), Color(0xFF7C3AED)),
+        listOf(Color(0xFF6D28D9), Color(0xFF0369A1))
+    )
+
+    val rows = artists.chunked(4)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        rows.forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { artist ->
+                    val gi = artists.indexOf(artist) % gradients.size
+                    Column(
+                        modifier = Modifier.weight(1f).clickable { onClick(artist) },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier.size(56.dp).clip(CircleShape)
+                                .background(Brush.linearGradient(gradients[gi])),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(artist.first().toString(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(3.dp))
+                        Text(artist.split(" ").first(), color = TextSecondary, fontSize = 9.sp, maxLines = 1, 
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MusicMiniPlayerBar(
+    song: com.ytsubexchange.music.SongResult,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    onPlayPause: () -> Unit,
+    onExpand: () -> Unit,
+    modifier: Modifier = Modifier,
+    AccentPurple: Color,
+    AccentPink: Color,
+    SurfaceColor: Color,
+    TextPrimary: Color,
+    TextSecondary: Color
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(12.dp)
+            .clip(RoundedCornerShape(16.dp)).background(SurfaceColor)
+            .clickable(onClick = onExpand).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(model = song.thumbnailUrl, contentDescription = null,
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(song.title, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, 
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(song.artist, color = TextSecondary, fontSize = 11.sp, maxLines = 1, 
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(28.dp), color = AccentPurple, strokeWidth = 2.dp)
+        } else {
+            Box(
+                modifier = Modifier.size(36.dp).clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(AccentPurple, AccentPink)))
+                    .clickable(onClick = onPlayPause),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(if (isPlaying) "⏸" else "▶", fontSize = 14.sp)
+            }
+        }
+    }
 }

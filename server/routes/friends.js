@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const User = require('../models/User');
+const { sendFCMNotification } = require('../fcm-helper');
 
 // Search users to add as friend
 router.get('/search', authMiddleware, async (req, res) => {
@@ -46,6 +47,28 @@ router.post('/add/:userId', authMiddleware, async (req, res) => {
         pic: req.user.profilePic
       });
     }
+
+    // Send FCM notification
+    try {
+      const admin = require('../firebase-admin');
+      const targetUser = await User.findById(targetId).select('fcmToken').lean();
+      if (admin && targetUser?.fcmToken) {
+        await admin.messaging().send({
+          token: targetUser.fcmToken,
+          notification: { 
+            title: '👥 New Friend!', 
+            body: `${req.user.channelName} ne aapko friend add kiya!` 
+          },
+          data: { type: 'friend_added', userId: req.user._id.toString() },
+          android: { priority: 'high', notification: { channelId: 'ytbooster_channel', sound: 'default' } }
+        }).catch(async e => {
+          if (e.message && (e.message.includes('not found') || e.message.includes('invalid') || e.message.includes('Unregistered'))) {
+            await User.findByIdAndUpdate(targetId, { $unset: { fcmToken: 1 } });
+          }
+        });
+      }
+    } catch (e) { /* silent */ }
+
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

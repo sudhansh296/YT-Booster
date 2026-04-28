@@ -197,21 +197,25 @@ fun GroupProfileScreen(
 
             items(groupInfo.members) { member ->
                 val isSubAdmin = subAdmins.any { it.userId == member._id }
-                val isOwner = groupInfo.isAdmin && member._id == myId
+                // Owner = createdBy from server (ownerId)
+                val isOwner = member._id == groupInfo.ownerId || 
+                    (groupInfo.ownerId.isEmpty() && member._id == myId && groupInfo.isAdmin)
                 val role = when {
-                    isOwner -> "Owner"
-                    isSubAdmin -> "Admin ⭐"
+                    isOwner -> "👑 Owner"
+                    isSubAdmin -> "⭐ Admin"
+                    member._id == myId -> "You"
                     else -> "Member"
                 }
                 val roleColor = when {
                     isOwner -> Color(0xFFFFD700)
                     isSubAdmin -> Color(0xFF29B6F6)
+                    member._id == myId -> Color(0xFF4CAF50)
                     else -> TxtS
                 }
 
                 Row(
                     Modifier.fillMaxWidth()
-                        .clickable(enabled = groupInfo.isAdmin && member._id != myId) { selectedMember = member }
+                        .clickable(enabled = groupInfo.isAdmin && member._id != myId && role != "👑 Owner") { selectedMember = member }
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -231,7 +235,7 @@ fun GroupProfileScreen(
                         Text(member.channelName, color = TxtP, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         Text(role, color = roleColor, fontSize = 12.sp)
                     }
-                    if (groupInfo.isAdmin && member._id != myId) {
+                    if (groupInfo.isAdmin && member._id != myId && role != "👑 Owner") {
                         Icon(Icons.Default.MoreVert, null, tint = TxtS, modifier = Modifier.size(18.dp))
                     }
                 }
@@ -445,7 +449,7 @@ fun GroupProfileScreen(
                         subAdminTarget = member
                         val existing = subAdmins.firstOrNull { it.userId == member._id }
                         permDeleteMsg = existing?.canDeleteMessages ?: true
-                        permBanMembers = existing?.canBanMembers ?: false
+                        permBanMembers = existing?.canBanMembers ?: true
                         permInviteMembers = existing?.canInviteMembers ?: true
                         permPinMessages = existing?.canPinMessages ?: false
                         permChangeInfo = existing?.canChangeGroupInfo ?: false
@@ -463,6 +467,11 @@ fun GroupProfileScreen(
 
                     MemberActionRow(Icons.Default.PersonRemove, Color(0xFFFF6B6B), "Remove from Group") {
                         viewModel.removeMemberFromGroup(roomId, member._id)
+                        selectedMember = null
+                    }
+
+                    MemberActionRow(Icons.Default.Block, Color(0xFFFF6B6B), "Block Member") {
+                        viewModel.blockMemberFromGroup(roomId, member._id)
                         selectedMember = null
                     }
 

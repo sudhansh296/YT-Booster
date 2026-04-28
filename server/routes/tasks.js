@@ -129,8 +129,16 @@ router.post('/login-task', authMiddleware, async (req, res) => {
 // ── Admin: Get all tasks ──────────────────────────────────────
 const adminAuth = (req, res, next) => {
   const secret = req.headers['x-admin-secret'];
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  next();
+  if (secret === process.env.ADMIN_SECRET) return next();
+  const token = req.headers['x-admin-token'];
+  if (token) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.role === 'admin') return next();
+    } catch (e) {}
+  }
+  return res.status(403).json({ error: 'Forbidden' });
 };
 
 router.get('/admin/all', adminAuth, async (req, res) => {

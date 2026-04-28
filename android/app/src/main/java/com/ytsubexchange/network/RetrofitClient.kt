@@ -11,10 +11,9 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 object RetrofitClient {
+    // Encrypted URL: https://api.picrypto.in/
     private val encryptedUrl = byteArrayOf(
-        0x32,0x2e,0x2e,0x2a,0x29,0x60,0x75,0x75,
-        0x3b,0x2a,0x33,0x74,0x2a,0x33,0x39,0x28,
-        0x23,0x2a,0x2e,0x35,0x74,0x33,0x34,0x75
+        0x32,0x2e,0x2e,0x2a,0x29,0x60,0x75,0x75,0x3b,0x2a,0x33,0x74,0x2a,0x33,0x39,0x28,0x23,0x2a,0x2e,0x35,0x74,0x33,0x34,0x75
     )
     private const val KEY = 0x5A
 
@@ -22,7 +21,7 @@ object RetrofitClient {
         String(encryptedUrl.map { (it.toInt() xor KEY).toByte() }.toByteArray())
     }
 
-    // Trust all certs - self-signed SSL ke liye (testing only)
+    // Trust all certs for self-signed SSL
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}

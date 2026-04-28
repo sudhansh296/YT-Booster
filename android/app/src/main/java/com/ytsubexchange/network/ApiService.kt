@@ -211,11 +211,17 @@ interface ApiService {
     suspend fun submitVideoOrder(
         @Header("Authorization") token: String,
         @Body body: Map<String, String>
-    ): com.ytsubexchange.data.BuySubsResponse
+    ): com.ytsubexchange.data.VideoOrderResponse
 
     // ── Chat Room Actions ─────────────────────────────────────
     @POST("chat/clear")
     suspend fun clearChat(
+        @Header("Authorization") token: String,
+        @Body body: Map<String, String>
+    ): com.ytsubexchange.data.DeleteMsgResponse
+
+    @POST("chat/clear-for-me")
+    suspend fun clearChatForMe(
         @Header("Authorization") token: String,
         @Body body: Map<String, String>
     ): com.ytsubexchange.data.DeleteMsgResponse
@@ -304,11 +310,16 @@ interface ApiService {
         @Query("q") query: String
     ): com.ytsubexchange.data.GroupSearchResponse
 
+    @GET("chat/group/pending-invites")
+    suspend fun getPendingGroupInvites(
+        @Header("Authorization") token: String
+    ): com.ytsubexchange.data.PendingGroupInvitesResponse
+
     // ── Forward / Disappearing / Read ─────────────────────────
     @POST("chat/forward")
     suspend fun forwardMessage(
         @Header("Authorization") token: String,
-        @Body body: Map<String, Any>
+        @Body body: com.ytsubexchange.data.ForwardMessageRequest
     ): com.ytsubexchange.data.DeleteMsgResponse
 
     @POST("chat/disappearing")
@@ -327,7 +338,7 @@ interface ApiService {
     @POST("ai/chat")
     suspend fun aiChat(
         @Header("Authorization") token: String,
-        @Body body: Map<String, Any>
+        @Body body: com.ytsubexchange.data.AiChatRequest
     ): com.ytsubexchange.data.AiChatResponse
 
     // ── Promo Videos ──────────────────────────────────────────
@@ -407,8 +418,11 @@ interface ApiService {
     @GET("boost/status")
     suspend fun getBoostStatus(@Header("Authorization") token: String): com.ytsubexchange.data.BoostStatusResponse
 
+    @GET("boost/boosted-channels")
+    suspend fun getBoostedChannels(@Header("Authorization") token: String): com.ytsubexchange.data.BoostedChannelsResponse
+
     @POST("boost/channel")
-    suspend fun boostChannel(@Header("Authorization") token: String, @Body body: Map<String, String>): com.ytsubexchange.data.BoostResponse
+    suspend fun boostChannel(@Header("Authorization") token: String, @Body body: com.ytsubexchange.data.BoostRequest): com.ytsubexchange.data.BoostResponse
 
     // ── Friends ───────────────────────────────────────────────
     @GET("friends")

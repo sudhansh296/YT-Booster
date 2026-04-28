@@ -44,8 +44,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val _rooms = MutableStateFlow<List<ChatRoom>>(emptyList())
     val rooms: StateFlow<List<ChatRoom>> = _rooms
 
-    // Rooms that user has left/deleted — persist across loadRooms calls
-    private val _hiddenRoomIds = mutableSetOf<String>()
+    // Rooms that user has left/deleted — persist across app restarts
+    private val hiddenRoomsPrefs = app.getSharedPreferences("hidden_rooms", Context.MODE_PRIVATE)
+    private val _hiddenRoomIds = mutableSetOf<String>().apply {
+        addAll(hiddenRoomsPrefs.getStringSet("ids", emptySet()) ?: emptySet())
+    }
+
+    private fun saveHiddenRooms() {
+        hiddenRoomsPrefs.edit().putStringSet("ids", _hiddenRoomIds.toSet()).apply()
+    }
 
     private val _openRoom = MutableStateFlow<ChatRoom?>(null)
     val openRoom: StateFlow<ChatRoom?> = _openRoom
@@ -164,6 +171,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     val groupInvite: StateFlow<com.ytsubexchange.data.GroupInviteNotif?> = _groupInvite
     fun clearGroupInvite() { _groupInvite.value = null }
 
+    // Voice chat active state — roomId -> participantCount
+    private val _voiceChatActive = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val voiceChatActive: StateFlow<Map<String, Int>> = _voiceChatActive
+
     // Group info
     private val _groupInfo = MutableStateFlow<com.ytsubexchange.data.GroupInfoResponse?>(null)
     val groupInfo: StateFlow<com.ytsubexchange.data.GroupInfoResponse?> = _groupInfo
@@ -198,7 +209,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         _aiLoading.value = true
         viewModelScope.launch {
             try {
-                val resp = RetrofitClient.api.aiChat(token, mapOf("message" to text))
+                val history = _aiMessages.value.dropLast(1).takeLast(8)
+                val resp = RetrofitClient.api.aiChat(
+                    token,
+                    com.ytsubexchange.data.AiChatRequest(message = text, history = history)
+                )
                 _aiMessages.value = _aiMessages.value + AiMessage("ai", resp.reply)
             } catch (e: Exception) {
                 _aiMessages.value = _aiMessages.value + AiMessage("ai", "Sorry, kuch problem aayi. Dobara try karo.")
@@ -222,6 +237,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         loadPendingRequests()
         loadSentRequests()
         loadBlockedUsers()
+        loadPendingGroupInvites()
         listenSocketEvents()
         joinUserRoom()
     }
@@ -306,11 +322,36 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val resp = RetrofitClient.api.getChatMessages(token, roomId)
-                _messages.value = resp.messages
-                _messageCache[roomId] = resp.messages
-                saveMessagesToDisk(roomId, resp.messages)
-                _pinnedMsg.value = resp.messages.firstOrNull { it.pinned }
-            } catch (e: Exception) { }
+                val serverMessages = resp.messages
+
+                if (serverMessages.isEmpty()) {
+                    if (_messages.value.isEmpty()) {
+                        val diskMsgs = loadMessagesFromDisk(roomId)
+                        if (diskMsgs.isNotEmpty()) {
+                            _messages.value = diskMsgs
+                            _messageCache[roomId] = diskMsgs
+                        }
+                    }
+                    return@launch
+                }
+
+                val existingTemps = _messages.value.filter { it._id.startsWith("temp_") }
+                val unconfirmedTemps = existingTemps.filter { temp ->
+                    serverMessages.none { real -> real.text == temp.text && !real._id.startsWith("temp_") }
+                }
+
+                val finalMessages = serverMessages + unconfirmedTemps
+                _messages.value = finalMessages
+                _messageCache[roomId] = finalMessages
+                saveMessagesToDisk(roomId, finalMessages)
+                _pinnedMsg.value = serverMessages.firstOrNull { it.pinned }
+            } catch (e: Exception) {
+                val diskMsgs = loadMessagesFromDisk(roomId)
+                if (diskMsgs.isNotEmpty() && _messages.value.isEmpty()) {
+                    _messages.value = diskMsgs
+                    _messageCache[roomId] = diskMsgs
+                }
+            }
         }
     }
 
@@ -706,6 +747,23 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun loadPendingGroupInvites() {
+        viewModelScope.launch {
+            try {
+                val resp = RetrofitClient.api.getPendingGroupInvites(token)
+                // Show first pending invite as notification
+                resp.invites.firstOrNull()?.let { invite ->
+                    _groupInvite.value = com.ytsubexchange.data.GroupInviteNotif(
+                        roomId = invite.roomId,
+                        roomName = invite.roomName,
+                        invitedBy = "",
+                        invitedByPic = invite.roomPic
+                    )
+                }
+            } catch (e: Exception) { }
+        }
+    }
+
     fun loadSentRequests() {
         viewModelScope.launch {
             try {
@@ -817,7 +875,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun forwardMessage(msgId: String, targetRoomIds: List<String>) {
         viewModelScope.launch {
             try {
-                RetrofitClient.api.forwardMessage(token, mapOf("msgId" to msgId, "targetRoomIds" to targetRoomIds))
+                RetrofitClient.api.forwardMessage(token, com.ytsubexchange.data.ForwardMessageRequest(msgId, targetRoomIds))
                 _toastMsg.value = "Message forward ho gaya ✅"
             } catch (e: Exception) { _toastMsg.value = "Forward nahi hua" }
         }
@@ -893,12 +951,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 val body = com.ytsubexchange.data.ManageSubAdminRequest(roomId, targetUserId, action, perms)
                 RetrofitClient.api.manageSubAdmin(token, body)
                 _toastMsg.value = when (action) {
-                    "add" -> "Sub-admin bana diya ⭐"
-                    "remove" -> "Sub-admin role hataya"
+                    "add" -> "Admin bana diya ⭐"
+                    "remove" -> "Admin role hataya"
                     else -> "Updated"
                 }
                 loadGroupInfo(roomId)
-            } catch (e: Exception) { _toastMsg.value = "Sub-admin update nahi hua: ${e.message?.take(50)}" }
+            } catch (e: Exception) { _toastMsg.value = "Admin update nahi hua: ${e.message?.take(50)}" }
         }
     }
 
@@ -907,8 +965,21 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 RetrofitClient.api.groupRemoveMember(token, com.ytsubexchange.data.GroupRemoveRequest(roomId, userId))
                 loadGroupInfo(roomId)
-                _toastMsg.value = "Member remove kar diya"
+                _toastMsg.value = "Member remove ho gaya"
             } catch (e: Exception) { _toastMsg.value = "Remove nahi ho saka" }
+        }
+    }
+
+    fun blockMemberFromGroup(roomId: String, userId: String) {
+        viewModelScope.launch {
+            try {
+                // Remove from group first
+                RetrofitClient.api.groupRemoveMember(token, com.ytsubexchange.data.GroupRemoveRequest(roomId, userId))
+                // Then block the user
+                RetrofitClient.api.blockUser(token, mapOf("targetUserId" to userId))
+                loadGroupInfo(roomId)
+                _toastMsg.value = "Member block aur remove ho gaya"
+            } catch (e: Exception) { _toastMsg.value = "Block nahi ho saka" }
         }
     }
 
@@ -973,6 +1044,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun leaveGroupById(roomId: String) {
         // Add to hidden set FIRST — so even if loadRooms fires, it stays hidden
         _hiddenRoomIds.add(roomId)
+        saveHiddenRooms()
         // Remove from list immediately
         _rooms.value = _rooms.value.filter { it._id != roomId }
         _messageCache.remove(roomId)
@@ -989,6 +1061,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     // Delete DM room locally (just hide from list — no server delete needed)
     fun deleteRoomLocally(roomId: String) {
         _hiddenRoomIds.add(roomId)
+        saveHiddenRooms()
         _rooms.value = _rooms.value.filter { it._id != roomId }
         _messageCache.remove(roomId)
         msgPrefs.edit().remove("room_$roomId").apply()
@@ -997,15 +1070,72 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearToast() { _toastMsg.value = null }
 
+    private val _clearedRooms = mutableSetOf<String>()  // rooms that were cleared
+
+    // Persist deleted-for-me message IDs across sessions
+    private val deletedForMePrefs = app.getSharedPreferences("deleted_for_me", Context.MODE_PRIVATE).also { dfmPrefs ->
+        // One-time migration: clear corrupted data from old installs
+        if (!prefs.getBoolean("dfm_migrated_v2", false)) {
+            dfmPrefs.edit().clear().apply()
+            prefs.edit().putBoolean("dfm_migrated_v2", true).apply()
+        }
+    }
+    // Persist cleared room timestamps across sessions
+    private val clearedRoomsPrefs = app.getSharedPreferences("cleared_rooms", Context.MODE_PRIVATE)
+
+    private fun addDeletedForMe(roomId: String, msgId: String) {
+        val key = "room_$roomId"
+        // IMPORTANT: Must create a NEW set — getStringSet returns live reference
+        val existing = HashSet<String>(deletedForMePrefs.getStringSet(key, emptySet()) ?: emptySet())
+        existing.add(msgId)
+        // Limit to last 500 IDs to prevent unbounded growth / corruption
+        val limited: Set<String> = if (existing.size > 500) existing.toList().takeLast(500).toHashSet() else existing
+        deletedForMePrefs.edit().putStringSet(key, limited).apply()
+    }
+
+    private fun getDeletedForMe(roomId: String): Set<String> {
+        // Return a copy to avoid live reference issues
+        return HashSet<String>(deletedForMePrefs.getStringSet("room_$roomId", emptySet()) ?: emptySet())
+    }
+
+    private fun markRoomCleared(roomId: String) {
+        _clearedRooms.add(roomId)
+        clearedRoomsPrefs.edit().putLong("cleared_$roomId", System.currentTimeMillis()).apply()
+    }
+
+    private fun getRoomClearedTime(roomId: String): Long {
+        return clearedRoomsPrefs.getLong("cleared_$roomId", 0L)
+    }
+
     fun clearChat() {
         val roomId = _openRoom.value?._id ?: return
+        // Optimistic — turant local clear karo
+        _messages.value = emptyList()
+        _pinnedMsg.value = null
+        _messageCache.remove(roomId)
+        msgPrefs.edit().remove("room_$roomId").apply()
+        _toastMsg.value = "Chat clear ho gaya"
+        // Server call — sab ke liye delete
         viewModelScope.launch {
             try {
                 RetrofitClient.api.clearChat(token, mapOf("roomId" to roomId))
-                _messages.value = emptyList()
-                _pinnedMsg.value = null
-                _toastMsg.value = "Chat clear ho gaya"
-            } catch (e: Exception) { _toastMsg.value = "Clear nahi ho saka" }
+            } catch (e: Exception) { /* already cleared locally */ }
+        }
+    }
+
+    fun clearChatForMe() {
+        val roomId = _openRoom.value?._id ?: return
+        // Optimistic — turant local clear karo
+        _messages.value = emptyList()
+        _pinnedMsg.value = null
+        _messageCache.remove(roomId)
+        msgPrefs.edit().remove("room_$roomId").apply()
+        _toastMsg.value = "Chat aapke liye clear ho gaya"
+        // Server pe sirf is user ke liye clear karo
+        viewModelScope.launch {
+            try {
+                RetrofitClient.api.clearChatForMe(token, mapOf("roomId" to roomId))
+            } catch (e: Exception) { /* already cleared locally */ }
         }
     }
 
@@ -1084,13 +1214,25 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun joinCommunity() {
-        if (inCommunity) return
+        if (inCommunity) {
+            // Already joined — just re-emit to refresh online count
+            SocketManager.emit("join_community", JSONObject())
+            return
+        }
         inCommunity = true
         SocketManager.emit("join_community", JSONObject())
+        // History will come via community_history socket event
+        // Also load via API as fallback
         viewModelScope.launch {
             try {
                 val resp = RetrofitClient.api.getCommunityMessages(token)
-                _communityMessages.value = resp.messages.filter { isCommunityMsgFresh(it.createdAt) }
+                val existing = _communityMessages.value
+                val existingIds = existing.map { it._id }.toSet()
+                val newMsgs = resp.messages.filter { it._id !in existingIds }
+                if (newMsgs.isNotEmpty()) {
+                    _communityMessages.value = (resp.messages + existing.filter { it._id !in resp.messages.map { m -> m._id }.toSet() })
+                        .sortedBy { it.createdAt }
+                }
             } catch (e: Exception) { }
         }
     }
@@ -1265,11 +1407,24 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         // chat_message_notify — server sends this to user's personal room
-        // Triggers when user is offline/in different room — for popup + cache
         SocketManager.on("chat_message_notify") { args ->
             try {
                 val data = args[0] as JSONObject
                 handleIncomingMessage(data, isNotify = true)
+            } catch (e: Exception) { }
+        }
+
+        // Voice chat active/inactive notification
+        SocketManager.on("voice_chat_active") { args ->
+            try {
+                val data = args[0] as JSONObject
+                val roomId = data.optString("roomId")
+                val count = data.optInt("participantCount", 0)
+                if (roomId.isNotEmpty()) {
+                    val current = _voiceChatActive.value.toMutableMap()
+                    if (count > 0) current[roomId] = count else current.remove(roomId)
+                    _voiceChatActive.value = current
+                }
             } catch (e: Exception) { }
         }
 
@@ -1306,6 +1461,39 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 if (pinned.isNotEmpty()) _communityPinned.value = pinned
                 val count = data.optInt("onlineCount", 0)
                 if (count > 0) _communityOnline.value = count
+            } catch (e: Exception) { }
+        }
+
+        // Community history — server sends last 24hr messages on join
+        SocketManager.on("community_history") { args ->
+            try {
+                val data = args[0] as JSONObject
+                val arr = data.optJSONArray("messages") ?: return@on
+                val msgs = (0 until arr.length()).map { i ->
+                    val m = arr.getJSONObject(i)
+                    val replyTo = m.optJSONObject("replyTo")?.let { r ->
+                        ReplyRef(r.optString("msgId"), r.optString("text"), r.optString("senderName"))
+                    }
+                    ChatMessage(
+                        _id = m.optString("_id"),
+                        senderId = m.optString("senderId"),
+                        senderName = m.optString("senderName"),
+                        senderPic = m.optString("senderPic"),
+                        text = m.optString("text"),
+                        createdAt = m.optString("createdAt"),
+                        replyTo = replyTo
+                    )
+                }
+                // Merge with existing (avoid duplicates) — server msgs are authoritative
+                // Only keep existing messages that are newer than what server sent (not yet in server batch)
+                val existing = _communityMessages.value
+                val serverIds = msgs.map { it._id }.toSet()
+                // Keep existing only if they're temp messages or newer than server's latest
+                val serverLatestTime = msgs.lastOrNull()?.createdAt ?: ""
+                val keepFromExisting = existing.filter { m ->
+                    !serverIds.contains(m._id) && m.createdAt > serverLatestTime
+                }
+                _communityMessages.value = (msgs + keepFromExisting).sortedBy { it.createdAt }
             } catch (e: Exception) { }
         }
 
@@ -1567,7 +1755,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 val roomId = data.optString("roomId")
                 if (msgId.isNotEmpty()) {
                     _messages.value = _messages.value.filter { it._id != msgId }
-                    _messageCache[roomId] = _messageCache[roomId]?.filter { it._id != msgId } ?: emptyList()
+                    val updated = (_messageCache[roomId] ?: emptyList()).filter { it._id != msgId }
+                    _messageCache[roomId] = updated
+                    saveMessagesToDisk(roomId, updated)
                     if (_pinnedMsg.value?._id == msgId) _pinnedMsg.value = null
                 }
             } catch (e: Exception) { }

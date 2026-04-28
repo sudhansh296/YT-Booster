@@ -13,7 +13,8 @@ const chatRoomSchema = new mongoose.Schema({
     canBanMembers: { type: Boolean, default: false },
     canInviteMembers: { type: Boolean, default: true },
     canPinMessages: { type: Boolean, default: false },
-    canChangeGroupInfo: { type: Boolean, default: false }
+    canChangeGroupInfo: { type: Boolean, default: false },
+    canStartVoiceChat: { type: Boolean, default: false }
   }],
   slowMode: { type: Number, default: 0 },               // seconds between messages (0 = off)
   inviteToken: { type: String, default: null },          // unique group invite link token

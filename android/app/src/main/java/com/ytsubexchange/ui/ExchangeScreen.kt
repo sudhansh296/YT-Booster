@@ -9,8 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.*import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,8 +32,8 @@ data class VideoType(
     val submitCost: Int
 )
 
-val SHORT_VIDEO = VideoType("Short", "⚡", 60, 10, 20, 200)
-val LONG_VIDEO  = VideoType("Long",  "🎬", 150, 30, 10, 300)
+val SHORT_VIDEO = VideoType("Short", "⚡", 60, 5, 20, 50)
+val LONG_VIDEO  = VideoType("Long",  "🎬", 180, 10, 10, 100)
 
 @Composable
 fun ExchangeScreen(viewModel: MainViewModel) {
@@ -103,22 +102,23 @@ fun WatchTab(viewModel: MainViewModel, dark: Boolean) {
             }
         }
 
-        // ── Promo Videos Section ──────────────────────────────
+        // ── Promo Videos Section (Admin uploaded — higher coins, shuffled) ──
         if (promoVideos.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🎬 Promo Videos", color = AppColors.text(dark), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Box(Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFFF0000)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        Text("EARN", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("🎬 Featured Videos", color = AppColors.text(dark), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Box(Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFFFD700).copy(0.2f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Text("MORE COINS", color = Color(0xFFFFD700), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 promoVideos.forEach { pv ->
                     PromoVideoCard(promoVideo = pv, viewModel = viewModel, dark = dark)
                 }
             }
+            Divider(color = AppColors.cardAlt(dark), thickness = 0.5.dp)
         }
 
-        Text("Video Type:", color = AppColors.text(dark), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text("Owner Channel Videos:", color = AppColors.text(dark), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf(SHORT_VIDEO, LONG_VIDEO).forEach { vt ->
                 val sel = videoType == vt
@@ -379,7 +379,7 @@ fun SubmitTab(viewModel: MainViewModel, dark: Boolean) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("💰 ${it.coins} Coins", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text("Video submit karo, views pao", color = AppColors.textSecondary(dark), fontSize = 12.sp)
+                Text("Video submit karo, doosre watch karenge", color = AppColors.textSecondary(dark), fontSize = 12.sp)
             }
         }
 
@@ -418,12 +418,16 @@ fun SubmitTab(viewModel: MainViewModel, dark: Boolean) {
                     Text("${videoType.maxSeconds}s", color = AppColors.text(dark), fontSize = 12.sp)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Watchers earn:", color = AppColors.textSecondary(dark), fontSize = 12.sp)
+                    Text("+${videoType.coinsPerWatch} coins/watch", color = Color(0xFF4CAF50), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Watchers:", color = AppColors.textSecondary(dark), fontSize = 12.sp)
                     Text("~${videoType.watcherCount} users", color = AppColors.text(dark), fontSize = 12.sp)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Cost:", color = AppColors.textSecondary(dark), fontSize = 12.sp)
-                    Text("${videoType.submitCost} coins", color = Color(0xFFFFD700), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("-${videoType.submitCost} coins", color = Color(0xFFFF6B6B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

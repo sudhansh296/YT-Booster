@@ -291,7 +291,7 @@ fun ActiveCallScreen(
             }
 
             // Row 2: Extra controls (IN_CALL only)
-            if (callState == CallState.IN_CALL) {
+            if (callState == CallState.IN_CALL || callState == CallState.CALLING) {
                 Spacer(Modifier.height(16.dp))
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 40.dp),

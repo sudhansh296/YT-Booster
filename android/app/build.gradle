@@ -1,17 +1,18 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
     id 'com.google.gms.google-services'
 }
 
 android {
     namespace 'com.ytsubexchange'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.ytsubexchange"
         minSdk 24
-        targetSdk 34
+        targetSdk 35
         versionCode 10
         versionName "2.0"
     }
@@ -26,8 +27,14 @@ android {
     }
 
     buildFeatures { compose true }
-    composeOptions { kotlinCompilerExtensionVersion '1.5.3' }
     kotlinOptions { jvmTarget = '1.8' }
+
+    packaging {
+        jniLibs {
+            // 16KB page alignment — required for Android 15+ devices
+            useLegacyPackaging = false
+        }
+    }
     buildTypes {
         release {
             signingConfig signingConfigs.release
@@ -37,6 +44,11 @@ android {
         }
         debug {
             minifyEnabled false
+            debuggable true
+            // Add this to see better crash logs
+            ndk {
+                debugSymbolLevel 'FULL'
+            }
         }
     }
 
@@ -53,6 +65,7 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material:material-icons-extended'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
@@ -63,5 +76,26 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     implementation 'com.google.firebase:firebase-messaging-ktx'
     // WebRTC for voice/video calls
-    implementation 'io.github.webrtc-sdk:android:104.5112.01'
+    implementation 'io.github.webrtc-sdk:android:125.6422.06.1'
+    
+    // Media3 ExoPlayer for music playback
+    implementation 'androidx.media3:media3-exoplayer:1.2.0'
+    implementation 'androidx.media3:media3-session:1.2.0'
+    implementation 'androidx.media3:media3-datasource-okhttp:1.2.0'
+    
+    // Innertube module for YouTube API
+    implementation project(':innertube')
+    
+    // Ktor for networking
+    implementation 'io.ktor:ktor-client-core:3.4.1'
+    implementation 'io.ktor:ktor-client-okhttp:3.4.1'
+    implementation 'io.ktor:ktor-client-content-negotiation:3.4.1'
+    implementation 'io.ktor:ktor-serialization-kotlinx-json:3.4.1'
+    implementation 'io.ktor:ktor-client-encoding:3.4.1'
+    
+    // Additional dependencies for MusiQFlow
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+    implementation 'org.brotli:dec:0.1.2'
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.26.0'
+    implementation 'org.json:json:20231013'
 }

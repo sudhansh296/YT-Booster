@@ -42,6 +42,29 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 val roomId = remoteMessage.data["roomId"] ?: ""
                 showNotification(title, body, "group_invite", roomId)
             }
+            "friend_added" -> {
+                val userId = remoteMessage.data["userId"] ?: ""
+                showNotification(title, body, "friend_added", userId)
+            }
+            "chat_request_accepted" -> {
+                val roomId = remoteMessage.data["roomId"] ?: ""
+                showNotification(title, body, "chat", roomId)
+            }
+            "user_blocked" -> {
+                showNotification(title, body, "default", "")
+            }
+            "user_unblocked" -> {
+                showNotification(title, body, "default", "")
+            }
+            "live_event" -> {
+                showNotification(title, body, "live_event", "")
+            }
+            "daily_task_reminder" -> {
+                showNotification(title, body, "daily_tasks", "")
+            }
+            "community_message" -> {
+                showNotification(title, body, "community", "")
+            }
             else -> showNotification(title, body)
         }
     }
@@ -97,6 +120,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, "YT-Booster", NotificationManager.IMPORTANCE_HIGH).apply {
                 enableVibration(true)
+                setSound(
+                    android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -110,7 +140,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         )
 
         val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
